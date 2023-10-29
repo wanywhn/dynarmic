@@ -58,6 +58,11 @@ if (NOT TARGET xbyak::xbyak)
     endif()
 endif()
 
+if (NOT TARGET xbyak_loongarch64::xbyak_loongarch64)
+    if ("loongarch64" IN_LIST ARCHITECTURE)
+        add_subdirectory(xbyak_loongarch64)
+    endif()
+endif()
 # zydis
 
 if (NOT TARGET Zydis::Zydis)

@@ -34,6 +34,9 @@
 #elif defined(__EMSCRIPTEN__)
 #    define MCL_ARCHITECTURE wasm
 #    define MCL_ARCHITECTURE_WASM 1
+#elif defined(__loongarch__) || defined(__loongarch_arch)
+#    define MCL_ARCHITECTURE loongarch64
+#    define MCL_ARCHITECTURE_LOONGARCH64 1
 #else
 #    define MCL_ARCHITECTURE generic
 #    define MCL_ARCHITECTURE_GENERIC 1

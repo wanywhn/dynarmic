@@ -139,6 +139,10 @@ if ("x86_64" IN_LIST ARCHITECTURE)
     find_package(Zydis 4 QUIET)
 endif()
 
+if ("loongarch64" IN_LIST ARCHITECTURE)
+    find_package(xbyak_loongarch64 6 QUIET)
+endif()
+
 if (DYNARMIC_USE_LLVM)
     find_package(LLVM REQUIRED CONFIG)
     separate_arguments(LLVM_DEFINITIONS)

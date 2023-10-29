@@ -5,15 +5,12 @@
 
 #include "dynarmic/backend/exception_handler.h"
 
-#ifdef __APPLE__
-#    include <signal.h>
-#    include <sys/ucontext.h>
-#else
+
 #    include <signal.h>
 #    ifndef __OpenBSD__
 #        include <ucontext.h>
 #    endif
-#endif
+
 
 #include <cstring>
 #include <functional>
@@ -32,6 +29,8 @@
 #    include <oaknut/code_block.hpp>
 
 #    include "dynarmic/backend/arm64/abi.h"
+#elif defined(MCL_ARCHITECTURE_LOONGARCH64)
+#    include "dynarmic/backend/loongarch64/block_of_code.h"
 #else
 #    error "Invalid architecture"
 #endif
@@ -108,13 +107,7 @@ SigHandler::SigHandler() {
         supports_fast_mem = false;
         return;
     }
-#ifdef __APPLE__
-    if (sigaction(SIGBUS, &sa, &old_sa_bus) != 0) {
-        fmt::print(stderr, "dynarmic: POSIX SigHandler: could not set SIGBUS handler\n");
-        supports_fast_mem = false;
-        return;
-    }
-#endif
+
 }
 
 SigHandler::~SigHandler() {
@@ -243,6 +236,26 @@ void SigHandler::SigAction(int sig, siginfo_t* info, void* raw_context) {
 
     fmt::print(stderr, "Unhandled {} at pc {:#018x}\n", sig == SIGSEGV ? "SIGSEGV" : "SIGBUS", CTX_PC);
 
+#elif defined(MCL_ARCHITECTURE_LOONGARCH64)
+#        define CTX_PC (mctx.__pc)
+#        define CTX_SP (mctx.__gregs[LARCH_REG_SP])
+#        define CTX_LR (mctx.__gregs[LARCH_REG_RA])
+#        define CTX_X(i) (mctx.__gregs[i])
+
+    {
+        std::lock_guard<std::mutex> guard(sig_handler->code_block_infos_mutex);
+
+        const auto iter = sig_handler->FindCodeBlockInfo(CTX_PC);
+        if (iter != sig_handler->code_block_infos.end()) {
+            FakeCall fc = iter->cb(CTX_PC);
+            CTX_PC = fc.call_pc;
+            return;
+        }
+    }
+
+    fmt::print(stderr, "Unhandled {} at pc {:#018x}\n", sig == SIGSEGV ? "SIGSEGV" : "SIGBUS", CTX_PC);
+
+
 #else
 
 #    error "Invalid architecture"
@@ -302,6 +315,12 @@ void ExceptionHandler::Register(X64::BlockOfCode& code) {
 void ExceptionHandler::Register(oaknut::CodeBlock& mem, std::size_t size) {
     const u64 code_begin = mcl::bit_cast<u64>(mem.ptr());
     const u64 code_end = code_begin + size;
+    impl = std::make_unique<Impl>(code_begin, code_end);
+}
+#elif defined(MCL_ARCHITECTURE_LOONGARCH64)
+void ExceptionHandler::Register(LoongArch64::BlockOfCode& code) {
+    const u64 code_begin = mcl::bit_cast<u64>(code.getCode());
+    const u64 code_end = code_begin + code.GetTotalCodeSize();
     impl = std::make_unique<Impl>(code_begin, code_end);
 }
 #else
