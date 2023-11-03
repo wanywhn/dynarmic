@@ -413,7 +413,7 @@ void CodeGenerator::LasxFormat3RVec(uint32_t op, const T &rk, const T &rj, const
   dd(code);
 }
 
-template <typename T, typename S, typename std::enable_if<std::is_signed<S>::value, std::nullptr_t>::type = nullptr> 
+template <typename T, typename S, typename std::enable_if<std::is_signed<S>::value, std::nullptr_t>::type> 
 void CodeGenerator::LasxFormatI5(uint32_t op, uint32_t df, S imm5, const T &rj, const T &rd ) {
   verifyIncRange(imm5, -1*(1<<4), ones(4), ERR_ILLEGAL_IMM_RANGE, true);
 
@@ -421,7 +421,7 @@ void CodeGenerator::LasxFormatI5(uint32_t op, uint32_t df, S imm5, const T &rj, 
   dd(code);
 }
 
-template <typename T, typename S, typename std::enable_if<std::is_unsigned<S>::value, std::nullptr_t>::type = nullptr> 
+template <typename T, typename S, typename std::enable_if<std::is_unsigned<S>::value, std::nullptr_t>::type> 
 void CodeGenerator::LasxFormatI5(uint32_t op, uint32_t df, S imm5, const T &rj, const T &rd ) {
   verifyIncRange(imm5, 0, ones(5), ERR_ILLEGAL_IMM_RANGE, false);
 
