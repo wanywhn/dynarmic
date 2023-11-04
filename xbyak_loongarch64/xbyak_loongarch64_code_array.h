@@ -17,6 +17,7 @@
 
 #include "xbyak_loongarch64_err.h"
 #include "xbyak_loongarch64_inner.h"
+#include <cstdint>
 
 static const size_t CSIZE = sizeof(uint32_t);
 
@@ -204,6 +205,18 @@ public:
       }
     }
     top_[size_++] = code;
+  }
+  // write 8 byte data
+  void dx(uint64_t code) {
+    if (size_ >= maxSize_) {
+      if (type_ == AUTO_GROW) {
+        growMemory();
+      } else {
+        throw Error(ERR_CODE_IS_TOO_BIG);
+      }
+    }
+    top_[size_++] = static_cast<uint32_t>(code);
+    top_[size_++] = static_cast<uint32_t>(code >> 32);
   }
   const uint8_t *getCode() const { return reinterpret_cast<uint8_t *>(top_); }
   template <class F> const F getCode() const { return reinterpret_cast<F>(top_); }
