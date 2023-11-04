@@ -160,21 +160,21 @@ private:
   uint32_t bit_;
 
 public:
-  explicit Operand(Kind kind, uint32_t bit) : kind_(kind), bit_(bit) {}
-  uint32_t getBit() const { return bit_; }
-  bool isVReg() const { return is(VREG); }
-  bool isXVReg() const { return is(XVREG); }
+  constexpr explicit Operand(Kind kind, uint32_t bit) : kind_(kind), bit_(bit) {}
+  constexpr uint32_t getBit() const { return bit_; }
+  constexpr bool isVReg() const { return is(VREG); }
+  constexpr bool isXVReg() const { return is(XVREG); }
 
 private:
-  bool is(Kind kind) const { return (kind_ == kind); }
+  constexpr bool is(Kind kind) const { return (kind_ == kind); }
 };
 
 class Reg : public Operand {
   uint32_t index_;
 
 public:
-  explicit Reg(uint32_t index, Kind kind, uint32_t bit) : Operand(kind, bit), index_(index) {}
-  uint32_t getIdx() const { return index_; }
+  constexpr explicit Reg(uint32_t index, Kind kind, uint32_t bit) : Operand(kind, bit), index_(index) {}
+  constexpr uint32_t getIdx() const { return index_; }
   bool operator==(const Reg& rhs) const { return getIdx() == rhs.getIdx() && getBit() == rhs.getBit(); }
   bool operator!=(const Reg& rhs) const { return !operator==(rhs); }
 };
@@ -182,17 +182,17 @@ public:
 // General Purpose Register
 class RReg : public Reg {
 public:
-  explicit RReg(uint32_t index, uint32_t bit) : Reg(index, RREG, bit) {}
+  constexpr explicit RReg(uint32_t index, uint32_t bit) : Reg(index, RREG, bit) {}
 };
 
 class XReg : public RReg {
 public:
-  explicit XReg(uint32_t index) : RReg(index, 64) {}
+  constexpr explicit XReg(uint32_t index) : RReg(index, 64) {}
 };
 
 class WReg : public RReg {
 public:
-  explicit WReg(uint32_t index) : RReg(index, 32) {}
+  constexpr explicit WReg(uint32_t index) : RReg(index, 32) {}
 };
 
 // base for SIMD vector regisetr
@@ -200,8 +200,8 @@ class VRegVec : public Reg {
   uint32_t lane_;
 
 public:
-  explicit VRegVec(uint32_t index, uint32_t bits, uint32_t lane) : Reg(index, VREG_VEC, bits), lane_(lane){};
-  uint32_t getLane() const { return lane_; }
+  constexpr explicit VRegVec(uint32_t index, uint32_t bits, uint32_t lane) : Reg(index, VREG_VEC, bits), lane_(lane){};
+  constexpr uint32_t getLane() const { return lane_; }
 };
 
 // base for SIMD Vector Register List
@@ -209,19 +209,19 @@ class VRegList : public VRegVec {
   uint32_t len_;
 
 public:
-  explicit VRegList(const VRegVec &s) : VRegVec(s.getIdx(), s.getBit(), s.getLane()), len_(s.getIdx() - s.getIdx() + 1) {}
-  explicit VRegList(const VRegVec &s, const VRegVec &e) : VRegVec(s.getIdx(), s.getBit(), s.getLane()), len_(((e.getIdx() + 32 - s.getIdx()) % 32) + 1) {}
-  uint32_t getLen() const { return len_; }
+  constexpr explicit VRegList(const VRegVec &s) : VRegVec(s.getIdx(), s.getBit(), s.getLane()), len_(s.getIdx() - s.getIdx() + 1) {}
+  constexpr explicit VRegList(const VRegVec &s, const VRegVec &e) : VRegVec(s.getIdx(), s.getBit(), s.getLane()), len_(((e.getIdx() + 32 - s.getIdx()) % 32) + 1) {}
+  constexpr uint32_t getLen() const { return len_; }
 };
 
 // SIMD vector regisetr
 class VReg : public Reg {
 public:
-  explicit VReg(uint32_t index) : Reg(index, VREG, 128) {}
+  constexpr explicit VReg(uint32_t index) : Reg(index, VREG, 128) {}
 };
 
 class XVReg : public Reg {
 public:
-  explicit XVReg(uint32_t index) : Reg(index, XVREG, 256) {}
+  constexpr explicit XVReg(uint32_t index) : Reg(index, XVREG, 256) {}
 };
 
