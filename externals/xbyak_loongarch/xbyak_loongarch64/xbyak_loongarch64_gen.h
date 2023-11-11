@@ -20,16 +20,7 @@
 #include "xbyak_loongarch64_label.h"
 #include "xbyak_loongarch64_reg.h"
 
-enum CondFlagReg { 
-  fcc0 = 0,
-  fcc1 = 1,
-  fcc2 = 2,
-  fcc3 = 3,
-  fcc4 = 4,
-  fcc5 = 5,
-  fcc6 = 6,
-  fcc7 = 7
-};
+enum CondFlagReg { fcc0 = 0, fcc1 = 1, fcc2 = 2, fcc3 = 3, fcc4 = 4, fcc5 = 5, fcc6 = 6, fcc7 = 7 };
 
 class CodeGenerator : public CodeArray {
 
@@ -111,44 +102,25 @@ class CodeGenerator : public CodeArray {
 
   // ################## encoding function ##################
   /*LoongArch SIMD begin*/
-  template <typename T> 
-  void LasxFormat4R(uint32_t op, uint32_t df, const T &ra, const T &rk, const T &rj, const T &rd );
-  template <typename T> 
-  void LasxFormatCond(uint32_t op, uint32_t df, uint32_t cond, const T &rk, const T &rj, const T &rd );
-  template <typename T, typename R> 
-  void LasxFormatI12(uint32_t op, int32_t imm, const R &rj, const T &rd );
-  template <typename T, typename R>
-  void LasxFormatAddr(uint32_t op, uint32_t df, int32_t off, const R &rj, const T &rd );
-  template <typename T, typename R>
-  void LasxFormatI8ELM(uint32_t op, uint32_t df, uint32_t idx, int32_t imm8, const R &rj, const T &rd );
-  template <typename T, typename R>
-  void LasxFormat3R(uint32_t op, uint32_t df, const R &rk, const T &rj, const T &rd );
-  template <typename T, typename S, typename std::enable_if<std::is_signed<S>::value, std::nullptr_t>::type = nullptr>
-  void LasxFormatI5(uint32_t op, uint32_t df, S imm5, const T &rj, const T &rd );
-  template <typename T, typename S, typename std::enable_if<std::is_unsigned<S>::value, std::nullptr_t>::type = nullptr>
-  void LasxFormatI5(uint32_t op, uint32_t df, S imm5, const T &rj, const T &rd );
-  template <typename T, typename R>
-  void LasxFormat2R(uint32_t op, uint32_t df, const R &rj, const T &rd );
-  template <typename T>
-  void LasxFormatBIT(uint32_t op, uint32_t df, uint32_t m, const T &rj, const T &rd);
-  template <typename T, typename R> 
-  void LasxFormat3RX(uint32_t op, const R &rk, const R &rj, const T &rd );
-  template <typename T> 
-  void LasxFormat3RVec(uint32_t op, const T &rk, const T &rj, const T &rd );
-  template <typename T> 
-  void LasxFormatI5Mode(uint32_t op, uint32_t imm5, uint32_t mode, const T &rd );
-  template <typename T> 
-  void LasxFormatCFR(uint32_t op, uint32_t df, const T &rj, uint32_t cd);
-  template <typename T, typename R> 
-  void LasxFormatELM(uint32_t op, uint32_t df, uint32_t idx, const T &rj, const R &rd );
-  template <typename T, typename R> 
-  void LasxFormatELM_1(uint32_t op, uint32_t df, uint32_t idx, const T &rj, const R &rd );
-  template <typename T> 
-  void LasxFormat2RSubOp(uint32_t op, uint32_t subOp, const T &rj, const T &rd );
-  template <typename T> 
-  void LasxFormatI8(uint32_t op, uint32_t imm8, const T &rj, const T &rd );
-  template <typename T> 
-  void LasxFormatI13(uint32_t op, int32_t imm13, const T &rd );
+  template <typename T> void LasxFormat4R(uint32_t op, uint32_t df, const T &ra, const T &rk, const T &rj, const T &rd);
+  template <typename T> void LasxFormatCond(uint32_t op, uint32_t df, uint32_t cond, const T &rk, const T &rj, const T &rd);
+  template <typename T, typename R> void LasxFormatI12(uint32_t op, int32_t imm, const R &rj, const T &rd);
+  template <typename T, typename R> void LasxFormatAddr(uint32_t op, uint32_t df, int32_t off, const R &rj, const T &rd);
+  template <typename T, typename R> void LasxFormatI8ELM(uint32_t op, uint32_t df, uint32_t idx, int32_t imm8, const R &rj, const T &rd);
+  template <typename T, typename R> void LasxFormat3R(uint32_t op, uint32_t df, const R &rk, const T &rj, const T &rd);
+  template <typename T, typename S, typename std::enable_if<std::is_signed<S>::value, std::nullptr_t>::type = nullptr> void LasxFormatI5(uint32_t op, uint32_t df, S imm5, const T &rj, const T &rd);
+  template <typename T, typename S, typename std::enable_if<std::is_unsigned<S>::value, std::nullptr_t>::type = nullptr> void LasxFormatI5(uint32_t op, uint32_t df, S imm5, const T &rj, const T &rd);
+  template <typename T, typename R> void LasxFormat2R(uint32_t op, uint32_t df, const R &rj, const T &rd);
+  template <typename T> void LasxFormatBIT(uint32_t op, uint32_t df, uint32_t m, const T &rj, const T &rd);
+  template <typename T, typename R> void LasxFormat3RX(uint32_t op, const R &rk, const R &rj, const T &rd);
+  template <typename T> void LasxFormat3RVec(uint32_t op, const T &rk, const T &rj, const T &rd);
+  template <typename T> void LasxFormatI5Mode(uint32_t op, uint32_t imm5, uint32_t mode, const T &rd);
+  template <typename T> void LasxFormatCFR(uint32_t op, uint32_t df, const T &rj, uint32_t cd);
+  template <typename T, typename R> void LasxFormatELM(uint32_t op, uint32_t df, uint32_t idx, const T &rj, const R &rd);
+  template <typename T, typename R> void LasxFormatELM_1(uint32_t op, uint32_t df, uint32_t idx, const T &rj, const R &rd);
+  template <typename T> void LasxFormat2RSubOp(uint32_t op, uint32_t subOp, const T &rj, const T &rd);
+  template <typename T> void LasxFormatI8(uint32_t op, uint32_t imm8, const T &rj, const T &rd);
+  template <typename T> void LasxFormatI13(uint32_t op, int32_t imm13, const T &rd);
   /*LoongArch SIMD end*/
 
   /*LoongArch base begin*/
@@ -163,7 +135,7 @@ class CodeGenerator : public CodeArray {
   void Loongarch4Reg(uint32_t opCode, uint32_t fa, uint32_t fk, uint32_t fj, uint32_t fd);
   void Loongarch1Reg1Imm(uint32_t opCode, int32_t si, uint32_t rd);
   uint32_t LoongarchLabelEnc(uint32_t op, const int32_t rj, const int32_t rd, int64_t labelOffset, int32_t type);
-  void LoongarchLabel(uint32_t op, const int32_t rj, const int32_t rd, const Label& label, int32_t type);
+  void LoongarchLabel(uint32_t op, const int32_t rj, const int32_t rd, const Label &label, int32_t type);
   void LasxFormatI8VSTELM(uint32_t op, uint32_t df, uint32_t idx, int32_t imm8, const XReg &rj, const VReg &vd);
   /*LoongArch base end*/
 
@@ -178,7 +150,7 @@ public:
   const XReg t1, t2, t3, t4, t5, t6, t7, t8, x_, fp, s0, s1, s2, s3, s4, s5;
   const XReg s6, s7, s8_;
 
-  //CPU Control Regs/CP0 Regs
+  // CPU Control Regs/CP0 Regs
   const XReg c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12;
   const XReg c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25;
   const XReg c26, c27, c28, c29, c30, c31;
@@ -208,10 +180,12 @@ public:
         f0(0), f1(1), f2(2), f3(3), f4(4), f5(5), f6(6), f7(7), f8(8), f9(9), f10(10), f11(11), f12(12), f13(13), f14(14), f15(15), f16(16), f17(17), f18(18), f19(19), f20(20), f21(21), f22(22), f23(23), f24(24), f25(25), f26(26), f27(27), f28(28), f29(29), f30(30), f31(31)
 
         ,
-        vr0(0), vr1(1), vr2(2), vr3(3), vr4(4), vr5(5), vr6(6), vr7(7), vr8(8), vr9(9), vr10(10), vr11(11), vr12(12), vr13(13), vr14(14), vr15(15), vr16(16), vr17(17), vr18(18), vr19(19), vr20(20), vr21(21), vr22(22), vr23(23), vr24(24), vr25(25), vr26(26), vr27(27), vr28(28), vr29(29), vr30(30), vr31(31) 
+        vr0(0), vr1(1), vr2(2), vr3(3), vr4(4), vr5(5), vr6(6), vr7(7), vr8(8), vr9(9), vr10(10), vr11(11), vr12(12), vr13(13), vr14(14), vr15(15), vr16(16), vr17(17), vr18(18), vr19(19), vr20(20), vr21(21), vr22(22), vr23(23), vr24(24), vr25(25), vr26(26), vr27(27), vr28(28), vr29(29), vr30(30),
+        vr31(31)
 
         ,
-        xr0(0), xr1(1), xr2(2), xr3(3), xr4(4), xr5(5), xr6(6), xr7(7), xr8(8), xr9(9), xr10(10), xr11(11), xr12(12), xr13(13), xr14(14), xr15(15), xr16(16), xr17(17), xr18(18), xr19(19), xr20(20), xr21(21), xr22(22), xr23(23), xr24(24), xr25(25), xr26(26), xr27(27), xr28(28), xr29(29), xr30(30), xr31(31) 
+        xr0(0), xr1(1), xr2(2), xr3(3), xr4(4), xr5(5), xr6(6), xr7(7), xr8(8), xr9(9), xr10(10), xr11(11), xr12(12), xr13(13), xr14(14), xr15(15), xr16(16), xr17(17), xr18(18), xr19(19), xr20(20), xr21(21), xr22(22), xr23(23), xr24(24), xr25(25), xr26(26), xr27(27), xr28(28), xr29(29), xr30(30),
+        xr31(31)
 
 #endif
   {
@@ -249,9 +223,7 @@ public:
     labelMgr_.set(this);
   }
   bool hasUndefinedLabel() const { return labelMgr_.hasUndefClabel(); }
-  void clearCache(void *begin, void *end) {
-    __builtin___clear_cache((char *)begin, (char *)end);
-  }
+  void clearCache(void *begin, void *end) { __builtin___clear_cache((char *)begin, (char *)end); }
   /*
           MUST call ready() to complete generating code if you use AutoGrow
      mode.

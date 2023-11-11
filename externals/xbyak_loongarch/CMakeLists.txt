@@ -14,7 +14,7 @@
 # limitations under the License.
 #*******************************************************************************
 
-    cmake_minimum_required (VERSION 3.8)
+    cmake_minimum_required (VERSION 3.14)
 
     # file(READ xbyak_loongarch64/xbyak_loongarch64_version.h VERSION_FILE)
     # string(REGEX MATCH "[0-9]+\.[0-9]+\.[0-9]+" VERSION ${VERSION_FILE})
@@ -39,11 +39,11 @@
         "Build shared library"
         OFF
     )
-    #option(
-    #	TEST
-    #	"Build xbyak_loongarch64 tests"
-    #	OFF
-    #)
+    option(
+    	TEST
+    	"Build xbyak_loongarch64 tests"
+    	OFF
+    )
     
     if(NOT DEFINED CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
@@ -66,7 +66,7 @@
         POSITION_INDEPENDENT_CODE ON)
     
     if(SHARED)
-    add_library(xbyak_loongarch64_sh SHARED src/xbyak_loongarch64_impl.cpp src/util_impl.cpp)
+    add_library(xbyak_loongarch64_sh SHARED src/xbyak_loongarch64_impl.cpp)
     add_library(xbyak_loongarch64::xbyak_loongarch64_sh ALIAS xbyak_loongarch64_sh)
     target_include_directories(xbyak_loongarch64_sh PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>

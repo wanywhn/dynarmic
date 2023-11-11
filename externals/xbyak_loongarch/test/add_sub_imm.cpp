@@ -15,6 +15,7 @@
  *******************************************************************************/
 #include "../xbyak_loongarch64/xbyak_loongarch64.h"
 #include <cstring>
+#include <limits>
 #define TEST_NUM 1
 
 using namespace Xbyak_loongarch64;
@@ -24,7 +25,7 @@ class GeneratorImm : public CodeGenerator {
 public:
   GeneratorImm() {}
 
-// clang-format off
+  // clang-format off
 #define GEN_FUNC_CORE(inst, type, reg)                                         \
   void gen##inst##FuncCore(const type imm) {                                   \
     mov_imm(v0, TEST_NUM);                                                     \

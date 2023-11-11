@@ -36,7 +36,7 @@
 
 #if defined(__GNUC__)
 #include <cassert>
-#include <stdlib.h>
+#include <cstdint>
 #include <sys/mman.h>
 #include <unistd.h>
 #endif

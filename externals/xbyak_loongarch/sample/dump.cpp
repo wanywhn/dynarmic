@@ -13,28 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *******************************************************************************/
+#include <cstring>
 #include <fstream>
+#include <gtest/gtest.h>
 #include <iostream>
 #include <xbyak_loongarch64/xbyak_loongarch64.h>
 using namespace Xbyak_loongarch64;
 class Generator : public CodeGenerator {
 public:
   Generator() {
-    add(w0, w0, w1);
-    ret();
+    add_d(v0, a0, a1);
+    jirl(zero, ra, 0);
   }
 };
 
-int main() {
+TEST(testDump, dumpCode) {
   Generator gen;
   gen.ready();
 
-  auto f = gen.getCode<int (*)(int, int)>();
-
-  std::ofstream fout;
-  fout.open("jited_code.bin", std::ios::out | std::ios::binary);
   std::cout << "size:" << gen.getSize() << std::endl;
-  fout.write((const char *)gen.getCode(), gen.getSize());
-
-  std::cout << f(3, 4) << std::endl;
+  gen.dump();
+  const uint8_t expect[] = {0x84, 0x94, 0x10 ,0x00, 0x20, 0x00, 0x00, 0x4C};
+  const uint8_t *code = gen.getCode();
+  EXPECT_TRUE(0 == std::memcmp(expect, code, gen.getSize()));
+}
+int main(int argc, char *argv[]) {
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
