@@ -13,19 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *******************************************************************************/
+#include <gtest/gtest.h>
 #include <xbyak_loongarch64/xbyak_loongarch64.h>
 using namespace Xbyak_loongarch64;
 class Generator : public CodeGenerator {
 public:
   Generator(size_t maxSize = DEFAULT_MAX_CODE_SIZE) : CodeGenerator(maxSize) {
-    //    top_[size_++] = 0xb000020; // machine code of "add w0, w1, w0"
-    dd(0xb000020);
-    ret();
+    dd(0x1010A4);
+    jirl(zero, ra, 0);
   }
 };
-int main() {
+
+TEST(testDirectWrite, directWrite) {
   Generator gen(65536);
   gen.ready();
   auto f = gen.getCode<int (*)(int, int)>();
-  std::cout << f(3, 4) << std::endl;
+  EXPECT_EQ(7 + 4, f(7, 4));
+}
+
+int main(int argc, char *argv[]) {
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

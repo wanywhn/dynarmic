@@ -1,0 +1,9 @@
+{
+  "name" : "xbyak-loongarch64",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "f5c5b8ddbb88dec7eed4a5ac54c36d1c64d2d29d",
+  "dependencies" : [ {
+    "name" : "gtest",
+    "version>=" : "1.14.0"
+  } ]
+}

@@ -6,3 +6,5 @@ sample/*.o
 sample/*.exe
 test/*.lst
 test/nm.make*.cpp
+cmake-build*
+.idea

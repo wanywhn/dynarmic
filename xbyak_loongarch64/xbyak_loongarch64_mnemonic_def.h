@@ -148,9 +148,9 @@ void vbitsel_v(const VReg &vd, const VReg &vj, const VReg &vk, const VReg &va);
 void vfmadd_s(const VReg &vd, const VReg &vj, const VReg &vk, const VReg &va);
 void vfmadd_d(const VReg &vd, const VReg &vj, const VReg &vk, const VReg &va);
 
-#define VFCMP_MN_FUNC_DECLEAR(name) \
-   void vfcmp_##name##_s(const VReg &vd, const VReg &vj, const VReg &vk); \
-   void vfcmp_##name##_d(const VReg &vd, const VReg &vj, const VReg &vk);
+#define VFCMP_MN_FUNC_DECLEAR(name)                                                                                                                                                                                                                                                                        \
+  void vfcmp_##name##_s(const VReg &vd, const VReg &vj, const VReg &vk);                                                                                                                                                                                                                                   \
+  void vfcmp_##name##_d(const VReg &vd, const VReg &vj, const VReg &vk);
 
 VFCMP_MN_FUNC_DECLEAR(caf)
 VFCMP_MN_FUNC_DECLEAR(cun)
@@ -189,9 +189,9 @@ void xvfnmadd_d(const XVReg &xd, const XVReg &xj, const XVReg &xk, const XVReg &
 void xvfnmsub_s(const XVReg &xd, const XVReg &xj, const XVReg &xk, const XVReg &xa);
 void xvfnmsub_d(const XVReg &xd, const XVReg &xj, const XVReg &xk, const XVReg &xa);
 
-#define XVFCMP_MN_FUNC_DECLEAR(name) \
-   void xvfcmp_##name##_s(const XVReg &xd, const XVReg &xj, const XVReg &xk); \
-   void xvfcmp_##name##_d(const XVReg &xd, const XVReg &xj, const XVReg &xk);
+#define XVFCMP_MN_FUNC_DECLEAR(name)                                                                                                                                                                                                                                                                       \
+  void xvfcmp_##name##_s(const XVReg &xd, const XVReg &xj, const XVReg &xk);                                                                                                                                                                                                                               \
+  void xvfcmp_##name##_d(const XVReg &xd, const XVReg &xj, const XVReg &xk);
 
 XVFCMP_MN_FUNC_DECLEAR(caf)
 XVFCMP_MN_FUNC_DECLEAR(cun)
@@ -269,7 +269,6 @@ void xvadd_b(const XVReg &xd, const XVReg &xj, const XVReg &xk);
 void xvadd_h(const XVReg &xd, const XVReg &xj, const XVReg &xk);
 void xvadd_w(const XVReg &xd, const XVReg &xj, const XVReg &xk);
 void xvadd_d(const XVReg &xd, const XVReg &xj, const XVReg &xk);
-
 
 void xvsub_b(const XVReg &xd, const XVReg &xj, const XVReg &xk);
 void xvsub_h(const XVReg &xd, const XVReg &xj, const XVReg &xk);
@@ -1129,414 +1128,414 @@ void xvpermi_q(const XVReg &xd, const XVReg &xj, uint32_t imm8);
 /*LASX end*/
 
 /*Base begin*/
-                                                                                    // 31~~~~~~~~~~~~~~~15  14～10  9～5  4～0
-void add_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000100000     rk      rj   rd
-void add_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000100001     rk      rj   rd
-void andi(const XReg& rd, const XReg& rj, int32_t ui12);                            // 0000001101         ui12       rj   rd
-void clo_w(const XReg& rd, const XReg& rj);                                         // 0000000000000000000100        rj   rd
-void clz_w(const XReg& rd, const XReg& rj);                                         // 0000000000000000000101        rj   rd
-void cto_w(const XReg& rd, const XReg& rj);                                         // 0000000000000000000110        rj   rd
-void ctz_w(const XReg& rd, const XReg& rj);                                         // 0000000000000000000111        rj   rd
-void clo_d(const XReg& rd, const XReg& rj);                                         // 0000000000000000001000        rj   rd
-void clz_d(const XReg& rd, const XReg& rj);                                         // 0000000000000000001001        rj   rd
-void cto_d(const XReg& rd, const XReg& rj);                                         // 0000000000000000001010        rj   rd
-void ctz_d(const XReg& rd, const XReg& rj);                                         // 0000000000000000001011        rj   rd
-void revb_2h(const XReg& rd, const XReg& rj);                                       // 0000000000000000001100        rj   rd
-void revb_4h(const XReg& rd, const XReg& rj);                                       // 0000000000000000001101        rj   rd
-void revb_2w(const XReg& rd, const XReg& rj);                                       // 0000000000000000001110        rj   rd
-void revb_d(const XReg& rd, const XReg& rj);                                        // 0000000000000000001111        rj   rd
-void revh_2w(const XReg& rd, const XReg& rj);                                       // 0000000000000000010000        rj   rd
-void revh_d(const XReg& rd, const XReg& rj);                                        // 0000000000000000010001        rj   rd
-void bitrev_4b(const XReg& rd, const XReg& rj);                                     // 0000000000000000010010        rj   rd
-void bitrev_8b(const XReg& rd, const XReg& rj);                                     // 0000000000000000010011        rj   rd
-void bitrev_w(const XReg& rd, const XReg& rj);                                      // 0000000000000000010100        rj   rd
-void bitrev_d(const XReg& rd, const XReg& rj);                                      // 0000000000000000010101        rj   rd
-void ext_w_h(const XReg& rd, const XReg& rj);                                       // 0000000000000000010110        rj   rd
-void ext_w_b(const XReg& rd, const XReg& rj);                                       // 0000000000000000010111        rj   rd
-void rdtimel_w(const XReg& rd, const XReg& rj);                                     // 0000000000000000011000        rj   rd
-void rdtimeh_w(const XReg& rd, const XReg& rj);                                     // 0000000000000000011001        rj   rd
-void rdtime_d(const XReg& rd, const XReg& rj);                                      // 0000000000000000011010        rj   rd
-void cpucfg(const XReg& rd, const XReg& rj);                                        // 0000000000000000011011        rj   rd
-void asrtle_d(const XReg& rj, const XReg& rk);                                      // 00000000000000010     rk      rj   00000
-void asrtgt_d(const XReg& rj, const XReg& rk);                                      // 00000000000000011     rk      rj   00000
-void alsl_w(const XReg& rd, const XReg& rj, const XReg& rk, uint32_t sa2);          // 000000000000010    sa2rk      rj   rd
-void alsl_wu(const XReg& rd, const XReg& rj, const XReg& rk, uint32_t sa2);         // 000000000000011    sa2rk      rj   rd
-void bytepick_w(const XReg& rd, const XReg& rj, const XReg& rk, uint32_t sa2);      // 000000000000100    sa2rk      rj   rd
-void bytepick_d(const XReg& rd, const XReg& rj, const XReg& rk, uint32_t sa3);      // 00000000000011     sa3rk      rj   rd
-void sub_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000100010     rk      rj   rd
-void sub_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000100011     rk      rj   rd
-void slt(const XReg& rd, const XReg& rj, const XReg& rk);                           // 00000000000100100     rk      rj   rd
-void sltu(const XReg& rd, const XReg& rj, const XReg& rk);                          // 00000000000100101     rk      rj   rd
-void maskeqz(const XReg& rd, const XReg& rj, const XReg& rk);                       // 00000000000100110     rk      rj   rd
-void masknez(const XReg& rd, const XReg& rj, const XReg& rk);                       // 00000000000100111     rk      rj   rd
-void nor(const XReg& rd, const XReg& rj, const XReg& rk);                           // 00000000000101000     rk      rj   rd
-void and_(const XReg& rd, const XReg& rj, const XReg& rk);                          // 00000000000101001     rk      rj   rd
-void or_(const XReg& rd, const XReg& rj, const XReg& rk);                           // 00000000000101010     rk      rj   rd
-void xor_(const XReg& rd, const XReg& rj, const XReg& rk);                          // 00000000000101011     rk      rj   rd
-void orn(const XReg& rd, const XReg& rj, const XReg& rk);                           // 00000000000101100     rk      rj   rd
-void andn(const XReg& rd, const XReg& rj, const XReg& rk);                          // 00000000000101101     rk      rj   rd
-void sll_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000101110     rk      rj   rd
-void srl_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000101111     rk      rj   rd
-void sra_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000110000     rk      rj   rd
-void sll_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000110001     rk      rj   rd
-void srl_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000110010     rk      rj   rd
-void sra_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000110011     rk      rj   rd
-void rotr_w(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00000000000110110     rk      rj   rd
-void rotr_d(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00000000000110111     rk      rj   rd
-void mul_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000111000     rk      rj   rd
-void mulh_w(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00000000000111001     rk      rj   rd
-void mulh_wu(const XReg& rd, const XReg& rj, const XReg& rk);                       // 00000000000111010     rk      rj   rd
-void mul_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000000111011     rk      rj   rd
-void mulh_d(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00000000000111100     rk      rj   rd
-void mulh_du(const XReg& rd, const XReg& rj, const XReg& rk);                       // 00000000000111101     rk      rj   rd
-void mulw_d_w(const XReg& rd, const XReg& rj, const XReg& rk);                      // 00000000000111110     rk      rj   rd
-void mulw_d_wu(const XReg& rd, const XReg& rj, const XReg& rk);                     // 00000000000111111     rk      rj   rd
-void div_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000001000000     rk      rj   rd
-void mod_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000001000001     rk      rj   rd
-void div_wu(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00000000001000010     rk      rj   rd
-void mod_wu(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00000000001000011     rk      rj   rd
-void div_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000001000100     rk      rj   rd
-void mod_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00000000001000101     rk      rj   rd
-void div_du(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00000000001000110     rk      rj   rd
-void mod_du(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00000000001000111     rk      rj   rd
-void crc_w_b_w(const XReg& rd, const XReg& rj, const XReg& rk);                     // 00000000001001000     rk      rj   rd
-void crc_w_h_w(const XReg& rd, const XReg& rj, const XReg& rk);                     // 00000000001001001     rk      rj   rd
-void crc_w_w_w(const XReg& rd, const XReg& rj, const XReg& rk);                     // 00000000001001010     rk      rj   rd
-void crc_w_d_w(const XReg& rd, const XReg& rj, const XReg& rk);                     // 00000000001001011     rk      rj   rd
-void crcc_w_b_w(const XReg& rd, const XReg& rj, const XReg& rk);                    // 00000000001001100     rk      rj   rd
-void crcc_w_h_w(const XReg& rd, const XReg& rj, const XReg& rk);                    // 00000000001001101     rk      rj   rd
-void crcc_w_w_w(const XReg& rd, const XReg& rj, const XReg& rk);                    // 00000000001001110     rk      rj   rd
-void crcc_w_d_w(const XReg& rd, const XReg& rj, const XReg& rk);                    // 00000000001001111     rk      rj   rd
-void break_(int32_t code15);                                                        // 00000000001010100       code15
-void dbcl(int32_t code15);                                                          // 00000000001010101       code15
-void syscall(int32_t code15);                                                       // 00000000001010110       code15
-void alsl_d(const XReg& rd, const XReg& rj, const XReg& rk, uint32_t sa2);          // 000000000010110    sa2rk      rj   rd
-void slli_w(const XReg& rd, const XReg& rj, uint32_t ui5);                          // 00000000010000001     ui5     rj   rd
-void slli_d(const XReg& rd, const XReg& rj, uint32_t ui6);                          // 0000000001000001     ui6     rj   rd
-void srli_w(const XReg& rd, const XReg& rj, uint32_t ui5);                          // 00000000010001001     ui5     rj   rd
-void srli_d(const XReg& rd, const XReg& rj, uint32_t ui6);                          // 0000000001000101     ui6     rj   rd
-void srai_w(const XReg& rd, const XReg& rj, uint32_t ui5);                          // 00000000010010001     ui5     rj   rd
-void srai_d(const XReg& rd, const XReg& rj, uint32_t ui6);                          // 0000000001001001     ui6     rj   rd
-void rotri_w(const XReg& rd, const XReg& rj, uint32_t ui5);                         // 00000000010011001     ui5     rj   rd
-void rotri_d(const XReg& rd, const XReg& rj, uint32_t ui6);                         // 0000000001001101     ui6     rj   rd
-void bstrins_w(const XReg& rd, const XReg& rj, uint32_t msbw, uint32_t lsbw);       // 00000000011 msbw 0 lsbw      rj   rd
-void bstrpick_w(const XReg& rd, const XReg& rj, uint32_t msbw, uint32_t lsbw);      // 00000000011 msbw 1 lsbw      rj   rd
-void bstrins_d(const XReg& rd, const XReg& rj, uint32_t msbd, uint32_t lsbd);       // 0000000010  msbd lsbd        rj   rd
-void bstrpick_d(const XReg& rd, const XReg& rj, uint32_t msbd, uint32_t lsbd);      // 0000000011  msbd lsbd        rj   rd
-void fadd_s(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000000001      fk    fj   fd
-void fadd_d(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000000010      fk    fj   fd
-void fsub_s(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000000101      fk    fj   fd
-void fsub_d(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000000110      fk    fj   fd
-void fmul_s(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000001001      fk    fj   fd
-void fmul_d(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000001010      fk    fj   fd
-void fdiv_s(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000001101      fk    fj   fd
-void fdiv_d(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000001110      fk    fj   fd
-void fmax_s(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000010001      fk    fj   fd
-void fmax_d(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000010010      fk    fj   fd
-void fmin_s(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000010101      fk    fj   fd
-void fmin_d(const XReg& fd, const XReg& fj, const XReg& fk);                        // 00000001000010110      fk    fj   fd
-void fmaxa_s(const XReg& fd, const XReg& fj, const XReg& fk);                       // 00000001000011001      fk    fj   fd
-void fmaxa_d(const XReg& fd, const XReg& fj, const XReg& fk);                       // 00000001000011010      fk    fj   fd
-void fmina_s(const XReg& fd, const XReg& fj, const XReg& fk);                       // 00000001000011101      fk    fj   fd
-void fmina_d(const XReg& fd, const XReg& fj, const XReg& fk);                       // 00000001000011110      fk    fj   fd
-void fscaleb_s(const XReg& fd, const XReg& fj, const XReg& fk);                     // 00000001000100001      fk    fj   fd
-void fscaleb_d(const XReg& fd, const XReg& fj, const XReg& fk);                     // 00000001000100010      fk    fj   fd
-void fcopysign_s(const XReg& fd, const XReg& fj, const XReg& fk);                   // 00000001000100101      fk    fj   fd
-void fcopysign_d(const XReg& fd, const XReg& fj, const XReg& fk);                   // 00000001000100110      fk    fj   fd
-void fabs_s(const XReg& fd, const XReg& fj);                                        // 0000000100010100000001       fj   fd
-void fabs_d(const XReg& fd, const XReg& fj);                                        // 0000000100010100000010       fj   fd
-void fneg_s(const XReg& fd, const XReg& fj);                                        // 0000000100010100000101       fj   fd
-void fneg_d(const XReg& fd, const XReg& fj);                                        // 0000000100010100000110       fj   fd
-void flogb_s(const XReg& fd, const XReg& fj);                                       // 0000000100010100001001       fj   fd
-void flogb_d(const XReg& fd, const XReg& fj);                                       // 0000000100010100001010       fj   fd
-void fclass_s(const XReg& fd, const XReg& fj);                                      // 0000000100010100001101       fj   fd
-void fclass_d(const XReg& fd, const XReg& fj);                                      // 0000000100010100001110       fj   fd
-void fsqrt_s(const XReg& fd, const XReg& fj);                                       // 0000000100010100010001       fj   fd
-void fsqrt_d(const XReg& fd, const XReg& fj);                                       // 0000000100010100010010       fj   fd
-void frecip_s(const XReg& fd, const XReg& fj);                                      // 0000000100010100010101       fj   fd
-void frecip_d(const XReg& fd, const XReg& fj);                                      // 0000000100010100010110       fj   fd
-void frsqrt_s(const XReg& fd, const XReg& fj);                                      // 0000000100010100011001       fj   fd
-void frsqrt_d(const XReg& fd, const XReg& fj);                                      // 0000000100010100011010       fj   fd
-void fmov_s(const XReg& fd, const XReg& fj);                                        // 0000000100010100100101       fj   fd
-void fmov_d(const XReg& fd, const XReg& fj);                                        // 0000000100010100100110       fj   fd
-void movgr2fr_w(const XReg& fd, const XReg& rj);                                    // 0000000100010100101001       rj   fd
-void movgr2fr_d(const XReg& fd, const XReg& rj);                                    // 0000000100010100101010       rj   fd
-void movgr2frh_w(const XReg& fd, const XReg& rj);                                   // 0000000100010100101011       rj   fd
-void movfr2gr_s(const XReg& rd, const XReg& fj);                                    // 0000000100010100101101       fj   rd
-void movfr2gr_d(const XReg& rd, const XReg& fj);                                    // 0000000100010100101110       fj   rd
-void movfrh2gr_s(const XReg& rd, const XReg& fj);                                   // 0000000100010100101111       fj   rd
-void movgr2fcsr(const XReg& fcsr, const XReg& rj);                                  // 0000000100010100110000       rj   fcsr
-void movfcsr2gr(const XReg& rd, const XReg& fcsr);                                  // 0000000100010100110010       fcsr rd
-void movfr2cf(const uint32_t cd, const XReg& fj);                                   // 0000000100010100110100       fj  00cd
-void movcf2fr(const XReg& fd, const uint32_t cj);                                   // 0000000100010100110101       00cj fd
-void movgr2cf(const uint32_t cd, const XReg& rj);                                   // 0000000100010100110110       rj  00cd
-void movcf2gr(const XReg& rd, const uint32_t cj);                                   // 0000000100010100110111       00cj rd
+// 31~~~~~~~~~~~~~~~15  14～10  9～5  4～0
+void add_w(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000100000     rk      rj   rd
+void add_d(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000100001     rk      rj   rd
+void andi(const XReg &rd, const XReg &rj, int32_t ui12);                       // 0000001101         ui12       rj   rd
+void clo_w(const XReg &rd, const XReg &rj);                                    // 0000000000000000000100        rj   rd
+void clz_w(const XReg &rd, const XReg &rj);                                    // 0000000000000000000101        rj   rd
+void cto_w(const XReg &rd, const XReg &rj);                                    // 0000000000000000000110        rj   rd
+void ctz_w(const XReg &rd, const XReg &rj);                                    // 0000000000000000000111        rj   rd
+void clo_d(const XReg &rd, const XReg &rj);                                    // 0000000000000000001000        rj   rd
+void clz_d(const XReg &rd, const XReg &rj);                                    // 0000000000000000001001        rj   rd
+void cto_d(const XReg &rd, const XReg &rj);                                    // 0000000000000000001010        rj   rd
+void ctz_d(const XReg &rd, const XReg &rj);                                    // 0000000000000000001011        rj   rd
+void revb_2h(const XReg &rd, const XReg &rj);                                  // 0000000000000000001100        rj   rd
+void revb_4h(const XReg &rd, const XReg &rj);                                  // 0000000000000000001101        rj   rd
+void revb_2w(const XReg &rd, const XReg &rj);                                  // 0000000000000000001110        rj   rd
+void revb_d(const XReg &rd, const XReg &rj);                                   // 0000000000000000001111        rj   rd
+void revh_2w(const XReg &rd, const XReg &rj);                                  // 0000000000000000010000        rj   rd
+void revh_d(const XReg &rd, const XReg &rj);                                   // 0000000000000000010001        rj   rd
+void bitrev_4b(const XReg &rd, const XReg &rj);                                // 0000000000000000010010        rj   rd
+void bitrev_8b(const XReg &rd, const XReg &rj);                                // 0000000000000000010011        rj   rd
+void bitrev_w(const XReg &rd, const XReg &rj);                                 // 0000000000000000010100        rj   rd
+void bitrev_d(const XReg &rd, const XReg &rj);                                 // 0000000000000000010101        rj   rd
+void ext_w_h(const XReg &rd, const XReg &rj);                                  // 0000000000000000010110        rj   rd
+void ext_w_b(const XReg &rd, const XReg &rj);                                  // 0000000000000000010111        rj   rd
+void rdtimel_w(const XReg &rd, const XReg &rj);                                // 0000000000000000011000        rj   rd
+void rdtimeh_w(const XReg &rd, const XReg &rj);                                // 0000000000000000011001        rj   rd
+void rdtime_d(const XReg &rd, const XReg &rj);                                 // 0000000000000000011010        rj   rd
+void cpucfg(const XReg &rd, const XReg &rj);                                   // 0000000000000000011011        rj   rd
+void asrtle_d(const XReg &rj, const XReg &rk);                                 // 00000000000000010     rk      rj   00000
+void asrtgt_d(const XReg &rj, const XReg &rk);                                 // 00000000000000011     rk      rj   00000
+void alsl_w(const XReg &rd, const XReg &rj, const XReg &rk, uint32_t sa2);     // 000000000000010    sa2rk      rj   rd
+void alsl_wu(const XReg &rd, const XReg &rj, const XReg &rk, uint32_t sa2);    // 000000000000011    sa2rk      rj   rd
+void bytepick_w(const XReg &rd, const XReg &rj, const XReg &rk, uint32_t sa2); // 000000000000100    sa2rk      rj   rd
+void bytepick_d(const XReg &rd, const XReg &rj, const XReg &rk, uint32_t sa3); // 00000000000011     sa3rk      rj   rd
+void sub_w(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000100010     rk      rj   rd
+void sub_d(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000100011     rk      rj   rd
+void slt(const XReg &rd, const XReg &rj, const XReg &rk);                      // 00000000000100100     rk      rj   rd
+void sltu(const XReg &rd, const XReg &rj, const XReg &rk);                     // 00000000000100101     rk      rj   rd
+void maskeqz(const XReg &rd, const XReg &rj, const XReg &rk);                  // 00000000000100110     rk      rj   rd
+void masknez(const XReg &rd, const XReg &rj, const XReg &rk);                  // 00000000000100111     rk      rj   rd
+void nor(const XReg &rd, const XReg &rj, const XReg &rk);                      // 00000000000101000     rk      rj   rd
+void and_(const XReg &rd, const XReg &rj, const XReg &rk);                     // 00000000000101001     rk      rj   rd
+void or_(const XReg &rd, const XReg &rj, const XReg &rk);                      // 00000000000101010     rk      rj   rd
+void xor_(const XReg &rd, const XReg &rj, const XReg &rk);                     // 00000000000101011     rk      rj   rd
+void orn(const XReg &rd, const XReg &rj, const XReg &rk);                      // 00000000000101100     rk      rj   rd
+void andn(const XReg &rd, const XReg &rj, const XReg &rk);                     // 00000000000101101     rk      rj   rd
+void sll_w(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000101110     rk      rj   rd
+void srl_w(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000101111     rk      rj   rd
+void sra_w(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000110000     rk      rj   rd
+void sll_d(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000110001     rk      rj   rd
+void srl_d(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000110010     rk      rj   rd
+void sra_d(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000110011     rk      rj   rd
+void rotr_w(const XReg &rd, const XReg &rj, const XReg &rk);                   // 00000000000110110     rk      rj   rd
+void rotr_d(const XReg &rd, const XReg &rj, const XReg &rk);                   // 00000000000110111     rk      rj   rd
+void mul_w(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000111000     rk      rj   rd
+void mulh_w(const XReg &rd, const XReg &rj, const XReg &rk);                   // 00000000000111001     rk      rj   rd
+void mulh_wu(const XReg &rd, const XReg &rj, const XReg &rk);                  // 00000000000111010     rk      rj   rd
+void mul_d(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000000111011     rk      rj   rd
+void mulh_d(const XReg &rd, const XReg &rj, const XReg &rk);                   // 00000000000111100     rk      rj   rd
+void mulh_du(const XReg &rd, const XReg &rj, const XReg &rk);                  // 00000000000111101     rk      rj   rd
+void mulw_d_w(const XReg &rd, const XReg &rj, const XReg &rk);                 // 00000000000111110     rk      rj   rd
+void mulw_d_wu(const XReg &rd, const XReg &rj, const XReg &rk);                // 00000000000111111     rk      rj   rd
+void div_w(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000001000000     rk      rj   rd
+void mod_w(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000001000001     rk      rj   rd
+void div_wu(const XReg &rd, const XReg &rj, const XReg &rk);                   // 00000000001000010     rk      rj   rd
+void mod_wu(const XReg &rd, const XReg &rj, const XReg &rk);                   // 00000000001000011     rk      rj   rd
+void div_d(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000001000100     rk      rj   rd
+void mod_d(const XReg &rd, const XReg &rj, const XReg &rk);                    // 00000000001000101     rk      rj   rd
+void div_du(const XReg &rd, const XReg &rj, const XReg &rk);                   // 00000000001000110     rk      rj   rd
+void mod_du(const XReg &rd, const XReg &rj, const XReg &rk);                   // 00000000001000111     rk      rj   rd
+void crc_w_b_w(const XReg &rd, const XReg &rj, const XReg &rk);                // 00000000001001000     rk      rj   rd
+void crc_w_h_w(const XReg &rd, const XReg &rj, const XReg &rk);                // 00000000001001001     rk      rj   rd
+void crc_w_w_w(const XReg &rd, const XReg &rj, const XReg &rk);                // 00000000001001010     rk      rj   rd
+void crc_w_d_w(const XReg &rd, const XReg &rj, const XReg &rk);                // 00000000001001011     rk      rj   rd
+void crcc_w_b_w(const XReg &rd, const XReg &rj, const XReg &rk);               // 00000000001001100     rk      rj   rd
+void crcc_w_h_w(const XReg &rd, const XReg &rj, const XReg &rk);               // 00000000001001101     rk      rj   rd
+void crcc_w_w_w(const XReg &rd, const XReg &rj, const XReg &rk);               // 00000000001001110     rk      rj   rd
+void crcc_w_d_w(const XReg &rd, const XReg &rj, const XReg &rk);               // 00000000001001111     rk      rj   rd
+void break_(int32_t code15);                                                   // 00000000001010100       code15
+void dbcl(int32_t code15);                                                     // 00000000001010101       code15
+void syscall(int32_t code15);                                                  // 00000000001010110       code15
+void alsl_d(const XReg &rd, const XReg &rj, const XReg &rk, uint32_t sa2);     // 000000000010110    sa2rk      rj   rd
+void slli_w(const XReg &rd, const XReg &rj, uint32_t ui5);                     // 00000000010000001     ui5     rj   rd
+void slli_d(const XReg &rd, const XReg &rj, uint32_t ui6);                     // 0000000001000001     ui6     rj   rd
+void srli_w(const XReg &rd, const XReg &rj, uint32_t ui5);                     // 00000000010001001     ui5     rj   rd
+void srli_d(const XReg &rd, const XReg &rj, uint32_t ui6);                     // 0000000001000101     ui6     rj   rd
+void srai_w(const XReg &rd, const XReg &rj, uint32_t ui5);                     // 00000000010010001     ui5     rj   rd
+void srai_d(const XReg &rd, const XReg &rj, uint32_t ui6);                     // 0000000001001001     ui6     rj   rd
+void rotri_w(const XReg &rd, const XReg &rj, uint32_t ui5);                    // 00000000010011001     ui5     rj   rd
+void rotri_d(const XReg &rd, const XReg &rj, uint32_t ui6);                    // 0000000001001101     ui6     rj   rd
+void bstrins_w(const XReg &rd, const XReg &rj, uint32_t msbw, uint32_t lsbw);  // 00000000011 msbw 0 lsbw      rj   rd
+void bstrpick_w(const XReg &rd, const XReg &rj, uint32_t msbw, uint32_t lsbw); // 00000000011 msbw 1 lsbw      rj   rd
+void bstrins_d(const XReg &rd, const XReg &rj, uint32_t msbd, uint32_t lsbd);  // 0000000010  msbd lsbd        rj   rd
+void bstrpick_d(const XReg &rd, const XReg &rj, uint32_t msbd, uint32_t lsbd); // 0000000011  msbd lsbd        rj   rd
+void fadd_s(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000000001      fk    fj   fd
+void fadd_d(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000000010      fk    fj   fd
+void fsub_s(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000000101      fk    fj   fd
+void fsub_d(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000000110      fk    fj   fd
+void fmul_s(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000001001      fk    fj   fd
+void fmul_d(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000001010      fk    fj   fd
+void fdiv_s(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000001101      fk    fj   fd
+void fdiv_d(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000001110      fk    fj   fd
+void fmax_s(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000010001      fk    fj   fd
+void fmax_d(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000010010      fk    fj   fd
+void fmin_s(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000010101      fk    fj   fd
+void fmin_d(const XReg &fd, const XReg &fj, const XReg &fk);                   // 00000001000010110      fk    fj   fd
+void fmaxa_s(const XReg &fd, const XReg &fj, const XReg &fk);                  // 00000001000011001      fk    fj   fd
+void fmaxa_d(const XReg &fd, const XReg &fj, const XReg &fk);                  // 00000001000011010      fk    fj   fd
+void fmina_s(const XReg &fd, const XReg &fj, const XReg &fk);                  // 00000001000011101      fk    fj   fd
+void fmina_d(const XReg &fd, const XReg &fj, const XReg &fk);                  // 00000001000011110      fk    fj   fd
+void fscaleb_s(const XReg &fd, const XReg &fj, const XReg &fk);                // 00000001000100001      fk    fj   fd
+void fscaleb_d(const XReg &fd, const XReg &fj, const XReg &fk);                // 00000001000100010      fk    fj   fd
+void fcopysign_s(const XReg &fd, const XReg &fj, const XReg &fk);              // 00000001000100101      fk    fj   fd
+void fcopysign_d(const XReg &fd, const XReg &fj, const XReg &fk);              // 00000001000100110      fk    fj   fd
+void fabs_s(const XReg &fd, const XReg &fj);                                   // 0000000100010100000001       fj   fd
+void fabs_d(const XReg &fd, const XReg &fj);                                   // 0000000100010100000010       fj   fd
+void fneg_s(const XReg &fd, const XReg &fj);                                   // 0000000100010100000101       fj   fd
+void fneg_d(const XReg &fd, const XReg &fj);                                   // 0000000100010100000110       fj   fd
+void flogb_s(const XReg &fd, const XReg &fj);                                  // 0000000100010100001001       fj   fd
+void flogb_d(const XReg &fd, const XReg &fj);                                  // 0000000100010100001010       fj   fd
+void fclass_s(const XReg &fd, const XReg &fj);                                 // 0000000100010100001101       fj   fd
+void fclass_d(const XReg &fd, const XReg &fj);                                 // 0000000100010100001110       fj   fd
+void fsqrt_s(const XReg &fd, const XReg &fj);                                  // 0000000100010100010001       fj   fd
+void fsqrt_d(const XReg &fd, const XReg &fj);                                  // 0000000100010100010010       fj   fd
+void frecip_s(const XReg &fd, const XReg &fj);                                 // 0000000100010100010101       fj   fd
+void frecip_d(const XReg &fd, const XReg &fj);                                 // 0000000100010100010110       fj   fd
+void frsqrt_s(const XReg &fd, const XReg &fj);                                 // 0000000100010100011001       fj   fd
+void frsqrt_d(const XReg &fd, const XReg &fj);                                 // 0000000100010100011010       fj   fd
+void fmov_s(const XReg &fd, const XReg &fj);                                   // 0000000100010100100101       fj   fd
+void fmov_d(const XReg &fd, const XReg &fj);                                   // 0000000100010100100110       fj   fd
+void movgr2fr_w(const XReg &fd, const XReg &rj);                               // 0000000100010100101001       rj   fd
+void movgr2fr_d(const XReg &fd, const XReg &rj);                               // 0000000100010100101010       rj   fd
+void movgr2frh_w(const XReg &fd, const XReg &rj);                              // 0000000100010100101011       rj   fd
+void movfr2gr_s(const XReg &rd, const XReg &fj);                               // 0000000100010100101101       fj   rd
+void movfr2gr_d(const XReg &rd, const XReg &fj);                               // 0000000100010100101110       fj   rd
+void movfrh2gr_s(const XReg &rd, const XReg &fj);                              // 0000000100010100101111       fj   rd
+void movgr2fcsr(const XReg &fcsr, const XReg &rj);                             // 0000000100010100110000       rj   fcsr
+void movfcsr2gr(const XReg &rd, const XReg &fcsr);                             // 0000000100010100110010       fcsr rd
+void movfr2cf(const uint32_t cd, const XReg &fj);                              // 0000000100010100110100       fj  00cd
+void movcf2fr(const XReg &fd, const uint32_t cj);                              // 0000000100010100110101       00cj fd
+void movgr2cf(const uint32_t cd, const XReg &rj);                              // 0000000100010100110110       rj  00cd
+void movcf2gr(const XReg &rd, const uint32_t cj);                              // 0000000100010100110111       00cj rd
 
-void fcvt_s_d(const XReg& fd, const XReg& fj);                                      // 0000000100011001000110       fj   fd
-void fcvt_d_s(const XReg& fd, const XReg& fj);                                      // 0000000100011001001001       fj   fd
-void ftintrm_w_s(const XReg& fd, const XReg& fj);                                   // 0000000100011010000001       fj   fd
-void ftintrm_w_d(const XReg& fd, const XReg& fj);                                   // 0000000100011010000010       fj   fd
-void ftintrm_l_s(const XReg& fd, const XReg& fj);                                   // 0000000100011010001001       fj   fd
-void ftintrm_l_d(const XReg& fd, const XReg& fj);                                   // 0000000100011010001010       fj   fd
-void ftintrp_w_s(const XReg& fd, const XReg& fj);                                   // 0000000100011010010001       fj   fd
-void ftintrp_w_d(const XReg& fd, const XReg& fj);                                   // 0000000100011010010010       fj   fd
-void ftintrp_l_s(const XReg& fd, const XReg& fj);                                   // 0000000100011010011001       fj   fd
-void ftintrp_l_d(const XReg& fd, const XReg& fj);                                   // 0000000100011010011010       fj   fd
-void ftintrz_w_s(const XReg& fd, const XReg& fj);                                   // 0000000100011010100001       fj   fd
-void ftintrz_w_d(const XReg& fd, const XReg& fj);                                   // 0000000100011010100010       fj   fd
-void ftintrz_l_s(const XReg& fd, const XReg& fj);                                   // 0000000100011010101001       fj   fd
-void ftintrz_l_d(const XReg& fd, const XReg& fj);                                   // 0000000100011010101010       fj   fd
-void ftintrne_w_s(const XReg& fd, const XReg& fj);                                  // 0000000100011010110001       fj   fd
-void ftintrne_w_d(const XReg& fd, const XReg& fj);                                  // 0000000100011010110010       fj   fd
-void ftintrne_l_s(const XReg& fd, const XReg& fj);                                  // 0000000100011010111001       fj   fd
-void ftintrne_l_d(const XReg& fd, const XReg& fj);                                  // 0000000100011010111010       fj   fd
-void ftint_w_s(const XReg& fd, const XReg& fj);                                     // 0000000100011011000001       fj   fd
-void ftint_w_d(const XReg& fd, const XReg& fj);                                     // 0000000100011011000010       fj   fd
-void ftint_l_s(const XReg& fd, const XReg& fj);                                     // 0000000100011011001001       fj   fd
-void ftint_l_d(const XReg& fd, const XReg& fj);                                     // 0000000100011011001010       fj   fd
-void ffint_s_w(const XReg& fd, const XReg& fj);                                     // 0000000100011101000100       fj   fd
-void ffint_s_l(const XReg& fd, const XReg& fj);                                     // 0000000100011101000110       fj   fd
-void ffint_d_w(const XReg& fd, const XReg& fj);                                     // 0000000100011101001000       fj   fd
-void ffint_d_l(const XReg& fd, const XReg& fj);                                     // 0000000100011101001010       fj   fd
-void frint_s(const XReg& fd, const XReg& fj);                                       // 0000000100011110010001       fj   fd
-void frint_d(const XReg& fd, const XReg& fj);                                       // 0000000100011110010010       fj   fd
+void fcvt_s_d(const XReg &fd, const XReg &fj);     // 0000000100011001000110       fj   fd
+void fcvt_d_s(const XReg &fd, const XReg &fj);     // 0000000100011001001001       fj   fd
+void ftintrm_w_s(const XReg &fd, const XReg &fj);  // 0000000100011010000001       fj   fd
+void ftintrm_w_d(const XReg &fd, const XReg &fj);  // 0000000100011010000010       fj   fd
+void ftintrm_l_s(const XReg &fd, const XReg &fj);  // 0000000100011010001001       fj   fd
+void ftintrm_l_d(const XReg &fd, const XReg &fj);  // 0000000100011010001010       fj   fd
+void ftintrp_w_s(const XReg &fd, const XReg &fj);  // 0000000100011010010001       fj   fd
+void ftintrp_w_d(const XReg &fd, const XReg &fj);  // 0000000100011010010010       fj   fd
+void ftintrp_l_s(const XReg &fd, const XReg &fj);  // 0000000100011010011001       fj   fd
+void ftintrp_l_d(const XReg &fd, const XReg &fj);  // 0000000100011010011010       fj   fd
+void ftintrz_w_s(const XReg &fd, const XReg &fj);  // 0000000100011010100001       fj   fd
+void ftintrz_w_d(const XReg &fd, const XReg &fj);  // 0000000100011010100010       fj   fd
+void ftintrz_l_s(const XReg &fd, const XReg &fj);  // 0000000100011010101001       fj   fd
+void ftintrz_l_d(const XReg &fd, const XReg &fj);  // 0000000100011010101010       fj   fd
+void ftintrne_w_s(const XReg &fd, const XReg &fj); // 0000000100011010110001       fj   fd
+void ftintrne_w_d(const XReg &fd, const XReg &fj); // 0000000100011010110010       fj   fd
+void ftintrne_l_s(const XReg &fd, const XReg &fj); // 0000000100011010111001       fj   fd
+void ftintrne_l_d(const XReg &fd, const XReg &fj); // 0000000100011010111010       fj   fd
+void ftint_w_s(const XReg &fd, const XReg &fj);    // 0000000100011011000001       fj   fd
+void ftint_w_d(const XReg &fd, const XReg &fj);    // 0000000100011011000010       fj   fd
+void ftint_l_s(const XReg &fd, const XReg &fj);    // 0000000100011011001001       fj   fd
+void ftint_l_d(const XReg &fd, const XReg &fj);    // 0000000100011011001010       fj   fd
+void ffint_s_w(const XReg &fd, const XReg &fj);    // 0000000100011101000100       fj   fd
+void ffint_s_l(const XReg &fd, const XReg &fj);    // 0000000100011101000110       fj   fd
+void ffint_d_w(const XReg &fd, const XReg &fj);    // 0000000100011101001000       fj   fd
+void ffint_d_l(const XReg &fd, const XReg &fj);    // 0000000100011101001010       fj   fd
+void frint_s(const XReg &fd, const XReg &fj);      // 0000000100011110010001       fj   fd
+void frint_d(const XReg &fd, const XReg &fj);      // 0000000100011110010010       fj   fd
 
-void slti(const XReg& rd, const XReg& rj, int32_t si12);                            // 0000001000  si12             rj   rd
-void sltui(const XReg& rd, const XReg& rj, int32_t si12);                           // 0000001001  si12             rj   rd
-void addi_w(const XReg& rd, const XReg& rj, int32_t si12);                          // 0000001010  si12             rj   rd
-void addi_d(const XReg& rd, const XReg& rj, int32_t si12);                          // 0000001011  si12             rj   rd
-void lu52i_d(const XReg& rd, const XReg& rj, int32_t si12);                         // 0000001100  si12             rj   rd
-void ori(const XReg& rd, const XReg& rj, int32_t ui12);                             // 0000001110  ui12             rj   rd
-void xori(const XReg& rd, const XReg& rj, int32_t ui12);                            // 0000001111  ui12             rj   rd
-void csrrd(const XReg& rd, int32_t csr14);                                          // 00000100  csr14            00000  rd
-void csrwr(const XReg& rd, int32_t csr14);                                          // 00000100  csr14            00001  rd
-void csrxchg(const XReg& rd, const XReg& rj, int32_t csr14);                        // 00000100  csr14          rj!=0,1  rd
-void cacop(const int32_t code5, const XReg& rj, int32_t si12);                      // 0000011000  si12             rj  code5
-void lddir(const XReg& rd, const XReg& rj, int32_t level8);                         // 00000110010000    level8     rj   rd
-void ldpte(const XReg& rj, int32_t seq8);                                           // 00000110010001    seq8       rj  00000
+void slti(const XReg &rd, const XReg &rj, int32_t si12);       // 0000001000  si12             rj   rd
+void sltui(const XReg &rd, const XReg &rj, int32_t si12);      // 0000001001  si12             rj   rd
+void addi_w(const XReg &rd, const XReg &rj, int32_t si12);     // 0000001010  si12             rj   rd
+void addi_d(const XReg &rd, const XReg &rj, int32_t si12);     // 0000001011  si12             rj   rd
+void lu52i_d(const XReg &rd, const XReg &rj, int32_t si12);    // 0000001100  si12             rj   rd
+void ori(const XReg &rd, const XReg &rj, int32_t ui12);        // 0000001110  ui12             rj   rd
+void xori(const XReg &rd, const XReg &rj, int32_t ui12);       // 0000001111  ui12             rj   rd
+void csrrd(const XReg &rd, int32_t csr14);                     // 00000100  csr14            00000  rd
+void csrwr(const XReg &rd, int32_t csr14);                     // 00000100  csr14            00001  rd
+void csrxchg(const XReg &rd, const XReg &rj, int32_t csr14);   // 00000100  csr14          rj!=0,1  rd
+void cacop(const int32_t code5, const XReg &rj, int32_t si12); // 0000011000  si12             rj  code5
+void lddir(const XReg &rd, const XReg &rj, int32_t level8);    // 00000110010000    level8     rj   rd
+void ldpte(const XReg &rj, int32_t seq8);                      // 00000110010001    seq8       rj  00000
 
-void iocsrrd_b(const XReg& rd, const XReg& rj);                                     // 0000011001001000000000        rj   rd
-void iocsrrd_h(const XReg& rd, const XReg& rj);                                     // 0000011001001000000001        rj   rd
-void iocsrrd_w(const XReg& rd, const XReg& rj);                                     // 0000011001001000000010        rj   rd
-void iocsrrd_d(const XReg& rd, const XReg& rj);                                     // 0000011001001000000011        rj   rd
-void iocsrwr_b(const XReg& rd, const XReg& rj);                                     // 0000011001001000000100        rj   rd
-void iocsrwr_h(const XReg& rd, const XReg& rj);                                     // 0000011001001000000101        rj   rd
-void iocsrwr_w(const XReg& rd, const XReg& rj);                                     // 0000011001001000000110        rj   rd
-void iocsrwr_d(const XReg& rd, const XReg& rj);                                     // 0000011001001000000111        rj   rd
+void iocsrrd_b(const XReg &rd, const XReg &rj); // 0000011001001000000000        rj   rd
+void iocsrrd_h(const XReg &rd, const XReg &rj); // 0000011001001000000001        rj   rd
+void iocsrrd_w(const XReg &rd, const XReg &rj); // 0000011001001000000010        rj   rd
+void iocsrrd_d(const XReg &rd, const XReg &rj); // 0000011001001000000011        rj   rd
+void iocsrwr_b(const XReg &rd, const XReg &rj); // 0000011001001000000100        rj   rd
+void iocsrwr_h(const XReg &rd, const XReg &rj); // 0000011001001000000101        rj   rd
+void iocsrwr_w(const XReg &rd, const XReg &rj); // 0000011001001000000110        rj   rd
+void iocsrwr_d(const XReg &rd, const XReg &rj); // 0000011001001000000111        rj   rd
 
-void tlbclr();                                                                      // 00000110010010000010000000000000
-void tlbflush();                                                                    // 00000110010010000010010000000000
-void tlbsrch();                                                                     // 00000110010010000010100000000000
-void tlbrd();                                                                       // 00000110010010000010110000000000
-void tlbwr();                                                                       // 00000110010010000011000000000000
-void tlbfill();                                                                     // 00000110010010000011010000000000
-void ertn();                                                                        // 00000110010010000011100000000000
+void tlbclr();   // 00000110010010000010000000000000
+void tlbflush(); // 00000110010010000010010000000000
+void tlbsrch();  // 00000110010010000010100000000000
+void tlbrd();    // 00000110010010000010110000000000
+void tlbwr();    // 00000110010010000011000000000000
+void tlbfill();  // 00000110010010000011010000000000
+void ertn();     // 00000110010010000011100000000000
 
-void idle(int32_t level15);                                                         // 00000110010010001      level15
-void invtlb(const int32_t op, const XReg& rj, const XReg& rk);                      // 00000110010010011       rk    rj   op
+void idle(int32_t level15);                                    // 00000110010010001      level15
+void invtlb(const int32_t op, const XReg &rj, const XReg &rk); // 00000110010010011       rk    rj   op
 
-void fmadd_s(const XReg& fd, const XReg& fj, const XReg& fk, const XReg& fa);       // 000010000001       fa   fk    fj   fd
-void fmadd_d(const XReg& fd, const XReg& fj, const XReg& fk, const XReg& fa);       // 000010000010       fa   fk    fj   fd
-void fmsub_s(const XReg& fd, const XReg& fj, const XReg& fk, const XReg& fa);       // 000010000101       fa   fk    fj   fd
-void fmsub_d(const XReg& fd, const XReg& fj, const XReg& fk, const XReg& fa);       // 000010000110       fa   fk    fj   fd
-void fnmadd_s(const XReg& fd, const XReg& fj, const XReg& fk, const XReg& fa);      // 000010001001       fa   fk    fj   fd
-void fnmadd_d(const XReg& fd, const XReg& fj, const XReg& fk, const XReg& fa);      // 000010001010       fa   fk    fj   fd
-void fnmsub_s(const XReg& fd, const XReg& fj, const XReg& fk, const XReg& fa);      // 000010001101       fa   fk    fj   fd
-void fnmsub_d(const XReg& fd, const XReg& fj, const XReg& fk, const XReg& fa);      // 000010001110       fa   fk    fj   fd
+void fmadd_s(const XReg &fd, const XReg &fj, const XReg &fk, const XReg &fa);  // 000010000001       fa   fk    fj   fd
+void fmadd_d(const XReg &fd, const XReg &fj, const XReg &fk, const XReg &fa);  // 000010000010       fa   fk    fj   fd
+void fmsub_s(const XReg &fd, const XReg &fj, const XReg &fk, const XReg &fa);  // 000010000101       fa   fk    fj   fd
+void fmsub_d(const XReg &fd, const XReg &fj, const XReg &fk, const XReg &fa);  // 000010000110       fa   fk    fj   fd
+void fnmadd_s(const XReg &fd, const XReg &fj, const XReg &fk, const XReg &fa); // 000010001001       fa   fk    fj   fd
+void fnmadd_d(const XReg &fd, const XReg &fj, const XReg &fk, const XReg &fa); // 000010001010       fa   fk    fj   fd
+void fnmsub_s(const XReg &fd, const XReg &fj, const XReg &fk, const XReg &fa); // 000010001101       fa   fk    fj   fd
+void fnmsub_d(const XReg &fd, const XReg &fj, const XReg &fk, const XReg &fa); // 000010001110       fa   fk    fj   fd
 
-void fcmp_caf_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      00000 fk    fj  00cd
-void fcmp_caf_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      00000 fk    fj  00cd
-void fcmp_cun_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      01000 fk    fj  00cd
-void fcmp_cun_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      01000 fk    fj  00cd
-void fcmp_ceq_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      00100 fk    fj  00cd
-void fcmp_ceq_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      00100 fk    fj  00cd
-void fcmp_cueq_s(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000001      01100 fk    fj  00cd
-void fcmp_cueq_d(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000010      01100 fk    fj  00cd
-void fcmp_clt_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      00010 fk    fj  00cd
-void fcmp_clt_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      00010 fk    fj  00cd
-void fcmp_cult_s(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000001      01010 fk    fj  00cd
-void fcmp_cult_d(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000010      01010 fk    fj  00cd
-void fcmp_cle_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      00110 fk    fj  00cd
-void fcmp_cle_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      00110 fk    fj  00cd
-void fcmp_cule_s(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000001      01110 fk    fj  00cd
-void fcmp_cule_d(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000010      01110 fk    fj  00cd
-void fcmp_cne_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      10000 fk    fj  00cd
-void fcmp_cne_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      10000 fk    fj  00cd
-void fcmp_cor_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      10100 fk    fj  00cd
-void fcmp_cor_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      10100 fk    fj  00cd
-void fcmp_cune_s(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000001      11000 fk    fj  00cd
-void fcmp_cune_d(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000010      11000 fk    fj  00cd
-void fcmp_saf_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      00001 fk    fj  00cd
-void fcmp_saf_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      00001 fk    fj  00cd
-void fcmp_sun_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      01001 fk    fj  00cd
-void fcmp_sun_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      01001 fk    fj  00cd
-void fcmp_seq_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      00101 fk    fj  00cd
-void fcmp_seq_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      00101 fk    fj  00cd
-void fcmp_sueq_s(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000001      01101 fk    fj  00cd
-void fcmp_sueq_d(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000010      01101 fk    fj  00cd
-void fcmp_slt_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      00011 fk    fj  00cd
-void fcmp_slt_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      00011 fk    fj  00cd
-void fcmp_sult_s(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000001      01011 fk    fj  00cd
-void fcmp_sult_d(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000010      01011 fk    fj  00cd
-void fcmp_sle_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      00111 fk    fj  00cd
-void fcmp_sle_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      00111 fk    fj  00cd
-void fcmp_sule_s(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000001      01111 fk    fj  00cd
-void fcmp_sule_d(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000010      01111 fk    fj  00cd
-void fcmp_sne_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      10001 fk    fj  00cd
-void fcmp_sne_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      10001 fk    fj  00cd
-void fcmp_sor_s(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000001      10101 fk    fj  00cd
-void fcmp_sor_d(const uint32_t cd, const XReg& fj, const XReg& fk);                 // 000011000010      10101 fk    fj  00cd
-void fcmp_sune_s(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000001      11001 fk    fj  00cd
-void fcmp_sune_d(const uint32_t cd, const XReg& fj, const XReg& fk);                // 000011000010      11001 fk    fj  00cd
-void fsel(const XReg& fd, const XReg& fj, const XReg& fk, const uint32_t ca);       // 00001101000000      ca  fk    fj   fd
-void addu16i_d(const XReg& rd, const XReg& rj, int32_t si16);                       // 000100      si16              rj   rd
+void fcmp_caf_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      00000 fk    fj  00cd
+void fcmp_caf_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      00000 fk    fj  00cd
+void fcmp_cun_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      01000 fk    fj  00cd
+void fcmp_cun_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      01000 fk    fj  00cd
+void fcmp_ceq_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      00100 fk    fj  00cd
+void fcmp_ceq_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      00100 fk    fj  00cd
+void fcmp_cueq_s(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000001      01100 fk    fj  00cd
+void fcmp_cueq_d(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000010      01100 fk    fj  00cd
+void fcmp_clt_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      00010 fk    fj  00cd
+void fcmp_clt_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      00010 fk    fj  00cd
+void fcmp_cult_s(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000001      01010 fk    fj  00cd
+void fcmp_cult_d(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000010      01010 fk    fj  00cd
+void fcmp_cle_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      00110 fk    fj  00cd
+void fcmp_cle_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      00110 fk    fj  00cd
+void fcmp_cule_s(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000001      01110 fk    fj  00cd
+void fcmp_cule_d(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000010      01110 fk    fj  00cd
+void fcmp_cne_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      10000 fk    fj  00cd
+void fcmp_cne_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      10000 fk    fj  00cd
+void fcmp_cor_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      10100 fk    fj  00cd
+void fcmp_cor_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      10100 fk    fj  00cd
+void fcmp_cune_s(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000001      11000 fk    fj  00cd
+void fcmp_cune_d(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000010      11000 fk    fj  00cd
+void fcmp_saf_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      00001 fk    fj  00cd
+void fcmp_saf_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      00001 fk    fj  00cd
+void fcmp_sun_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      01001 fk    fj  00cd
+void fcmp_sun_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      01001 fk    fj  00cd
+void fcmp_seq_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      00101 fk    fj  00cd
+void fcmp_seq_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      00101 fk    fj  00cd
+void fcmp_sueq_s(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000001      01101 fk    fj  00cd
+void fcmp_sueq_d(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000010      01101 fk    fj  00cd
+void fcmp_slt_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      00011 fk    fj  00cd
+void fcmp_slt_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      00011 fk    fj  00cd
+void fcmp_sult_s(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000001      01011 fk    fj  00cd
+void fcmp_sult_d(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000010      01011 fk    fj  00cd
+void fcmp_sle_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      00111 fk    fj  00cd
+void fcmp_sle_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      00111 fk    fj  00cd
+void fcmp_sule_s(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000001      01111 fk    fj  00cd
+void fcmp_sule_d(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000010      01111 fk    fj  00cd
+void fcmp_sne_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      10001 fk    fj  00cd
+void fcmp_sne_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      10001 fk    fj  00cd
+void fcmp_sor_s(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000001      10101 fk    fj  00cd
+void fcmp_sor_d(const uint32_t cd, const XReg &fj, const XReg &fk);           // 000011000010      10101 fk    fj  00cd
+void fcmp_sune_s(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000001      11001 fk    fj  00cd
+void fcmp_sune_d(const uint32_t cd, const XReg &fj, const XReg &fk);          // 000011000010      11001 fk    fj  00cd
+void fsel(const XReg &fd, const XReg &fj, const XReg &fk, const uint32_t ca); // 00001101000000      ca  fk    fj   fd
+void addu16i_d(const XReg &rd, const XReg &rj, int32_t si16);                 // 000100      si16              rj   rd
 
-void lu12i_w(const XReg& rd, int32_t si20);                                         // 0001010     si20                   rd
-void lu32i_d(const XReg& rd, int32_t si20);                                         // 0001011     si20                   rd
-void pcaddi(const XReg& rd, int32_t si20);                                          // 0001100     si20                   rd
-void pcalau12i(const XReg& rd, int32_t si20);                                       // 0001101     si20                   rd
-void pcaddu12i(const XReg& rd, int32_t si20);                                       // 0001110     si20                   rd
-void pcaddu18i(const XReg& rd, int32_t si20);                                       // 0001111     si20                   rd
+void lu12i_w(const XReg &rd, int32_t si20);   // 0001010     si20                   rd
+void lu32i_d(const XReg &rd, int32_t si20);   // 0001011     si20                   rd
+void pcaddi(const XReg &rd, int32_t si20);    // 0001100     si20                   rd
+void pcalau12i(const XReg &rd, int32_t si20); // 0001101     si20                   rd
+void pcaddu12i(const XReg &rd, int32_t si20); // 0001110     si20                   rd
+void pcaddu18i(const XReg &rd, int32_t si20); // 0001111     si20                   rd
 
-void pcaddi(const XReg& rd, const Label& label);                                    // 0001100     si20                   rd
+void pcaddi(const XReg &rd, const Label &label); // 0001100     si20                   rd
 
-void ll_w(const XReg& rd, const XReg& rj, int32_t si14);                            // 00100000    si14              rj   rd
-void sc_w(const XReg& rd, const XReg& rj, int32_t si14);                            // 00100001    si14              rj   rd
-void ll_d(const XReg& rd, const XReg& rj, int32_t si14);                            // 00100010    si14              rj   rd
-void sc_d(const XReg& rd, const XReg& rj, int32_t si14);                            // 00100011    si14              rj   rd
-void ldptr_w(const XReg& rd, const XReg& rj, int32_t si14);                         // 00100100    si14              rj   rd
-void stptr_w(const XReg& rd, const XReg& rj, int32_t si14);                         // 00100101    si14              rj   rd
-void ldptr_d(const XReg& rd, const XReg& rj, int32_t si14);                         // 00100110    si14              rj   rd
-void stptr_d(const XReg& rd, const XReg& rj, int32_t si14);                         // 00100111    si14              rj   rd
-void ld_b(const XReg& rd, const XReg& rj, int32_t si12);                            // 0010100000    si12            rj   rd
-void ld_h(const XReg& rd, const XReg& rj, int32_t si12);                            // 0010100001    si12            rj   rd
-void ld_w(const XReg& rd, const XReg& rj, int32_t si12);                            // 0010100010    si12            rj   rd
-void ld_d(const XReg& rd, const XReg& rj, int32_t si12);                            // 0010100011    si12            rj   rd
-void st_b(const XReg& rd, const XReg& rj, int32_t si12);                            // 0010100100    si12            rj   rd
-void st_h(const XReg& rd, const XReg& rj, int32_t si12);                            // 0010100101    si12            rj   rd
-void st_w(const XReg& rd, const XReg& rj, int32_t si12);                            // 0010100110    si12            rj   rd
-void st_d(const XReg& rd, const XReg& rj, int32_t si12);                            // 0010100111    si12            rj   rd
-void ld_bu(const XReg& rd, const XReg& rj, int32_t si12);                           // 0010101000    si12            rj   rd
-void ld_hu(const XReg& rd, const XReg& rj, int32_t si12);                           // 0010101001    si12            rj   rd
-void ld_wu(const XReg& rd, const XReg& rj, int32_t si12);                           // 0010101010    si12            rj   rd
-void preld(const int32_t hint, const XReg& rj, int32_t si12);                       // 0010101011    si12            rj   hint
-void fld_s(const XReg& fd, const XReg& rj, int32_t si12);                           // 0010101100    si12            rj   fd
-void fst_s(const XReg& fd, const XReg& rj, int32_t si12);                           // 0010101101    si12            rj   fd
-void fld_d(const XReg& fd, const XReg& rj, int32_t si12);                           // 0010101110    si12            rj   fd
-void fst_d(const XReg& fd, const XReg& rj, int32_t si12);                           // 0010101111    si12            rj   fd
+void ll_w(const XReg &rd, const XReg &rj, int32_t si14);      // 00100000    si14              rj   rd
+void sc_w(const XReg &rd, const XReg &rj, int32_t si14);      // 00100001    si14              rj   rd
+void ll_d(const XReg &rd, const XReg &rj, int32_t si14);      // 00100010    si14              rj   rd
+void sc_d(const XReg &rd, const XReg &rj, int32_t si14);      // 00100011    si14              rj   rd
+void ldptr_w(const XReg &rd, const XReg &rj, int32_t si14);   // 00100100    si14              rj   rd
+void stptr_w(const XReg &rd, const XReg &rj, int32_t si14);   // 00100101    si14              rj   rd
+void ldptr_d(const XReg &rd, const XReg &rj, int32_t si14);   // 00100110    si14              rj   rd
+void stptr_d(const XReg &rd, const XReg &rj, int32_t si14);   // 00100111    si14              rj   rd
+void ld_b(const XReg &rd, const XReg &rj, int32_t si12);      // 0010100000    si12            rj   rd
+void ld_h(const XReg &rd, const XReg &rj, int32_t si12);      // 0010100001    si12            rj   rd
+void ld_w(const XReg &rd, const XReg &rj, int32_t si12);      // 0010100010    si12            rj   rd
+void ld_d(const XReg &rd, const XReg &rj, int32_t si12);      // 0010100011    si12            rj   rd
+void st_b(const XReg &rd, const XReg &rj, int32_t si12);      // 0010100100    si12            rj   rd
+void st_h(const XReg &rd, const XReg &rj, int32_t si12);      // 0010100101    si12            rj   rd
+void st_w(const XReg &rd, const XReg &rj, int32_t si12);      // 0010100110    si12            rj   rd
+void st_d(const XReg &rd, const XReg &rj, int32_t si12);      // 0010100111    si12            rj   rd
+void ld_bu(const XReg &rd, const XReg &rj, int32_t si12);     // 0010101000    si12            rj   rd
+void ld_hu(const XReg &rd, const XReg &rj, int32_t si12);     // 0010101001    si12            rj   rd
+void ld_wu(const XReg &rd, const XReg &rj, int32_t si12);     // 0010101010    si12            rj   rd
+void preld(const int32_t hint, const XReg &rj, int32_t si12); // 0010101011    si12            rj   hint
+void fld_s(const XReg &fd, const XReg &rj, int32_t si12);     // 0010101100    si12            rj   fd
+void fst_s(const XReg &fd, const XReg &rj, int32_t si12);     // 0010101101    si12            rj   fd
+void fld_d(const XReg &fd, const XReg &rj, int32_t si12);     // 0010101110    si12            rj   fd
+void fst_d(const XReg &fd, const XReg &rj, int32_t si12);     // 0010101111    si12            rj   fd
 
-void ldx_b(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00111000000000000     rk      rj   rd
-void ldx_h(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00111000000001000     rk      rj   rd
-void ldx_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00111000000010000     rk      rj   rd
-void ldx_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00111000000011000     rk      rj   rd
-void stx_b(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00111000000100000     rk      rj   rd
-void stx_h(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00111000000101000     rk      rj   rd
-void stx_w(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00111000000110000     rk      rj   rd
-void stx_d(const XReg& rd, const XReg& rj, const XReg& rk);                         // 00111000000111000     rk      rj   rd
-void ldx_bu(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000001000000     rk      rj   rd
-void ldx_hu(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000001001000     rk      rj   rd
-void ldx_wu(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000001010000     rk      rj   rd
+void ldx_b(const XReg &rd, const XReg &rj, const XReg &rk);  // 00111000000000000     rk      rj   rd
+void ldx_h(const XReg &rd, const XReg &rj, const XReg &rk);  // 00111000000001000     rk      rj   rd
+void ldx_w(const XReg &rd, const XReg &rj, const XReg &rk);  // 00111000000010000     rk      rj   rd
+void ldx_d(const XReg &rd, const XReg &rj, const XReg &rk);  // 00111000000011000     rk      rj   rd
+void stx_b(const XReg &rd, const XReg &rj, const XReg &rk);  // 00111000000100000     rk      rj   rd
+void stx_h(const XReg &rd, const XReg &rj, const XReg &rk);  // 00111000000101000     rk      rj   rd
+void stx_w(const XReg &rd, const XReg &rj, const XReg &rk);  // 00111000000110000     rk      rj   rd
+void stx_d(const XReg &rd, const XReg &rj, const XReg &rk);  // 00111000000111000     rk      rj   rd
+void ldx_bu(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000001000000     rk      rj   rd
+void ldx_hu(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000001001000     rk      rj   rd
+void ldx_wu(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000001010000     rk      rj   rd
 
-void preldx(const int32_t hint, const XReg& rj, const XReg& rk);                    // 00111000001011000     rk      rj   hint
-void fldx_s(const XReg& fd, const XReg& rj, const XReg& rk);                        // 00111000001100000     rk      rj   fd
-void fldx_d(const XReg& fd, const XReg& rj, const XReg& rk);                        // 00111000001101000     rk      rj   fd
-void fstx_s(const XReg& fd, const XReg& rj, const XReg& rk);                        // 00111000001110000     rk      rj   fd
-void fstx_d(const XReg& fd, const XReg& rj, const XReg& rk);                        // 00111000001111000     rk      rj   fd
+void preldx(const int32_t hint, const XReg &rj, const XReg &rk); // 00111000001011000     rk      rj   hint
+void fldx_s(const XReg &fd, const XReg &rj, const XReg &rk);     // 00111000001100000     rk      rj   fd
+void fldx_d(const XReg &fd, const XReg &rj, const XReg &rk);     // 00111000001101000     rk      rj   fd
+void fstx_s(const XReg &fd, const XReg &rj, const XReg &rk);     // 00111000001110000     rk      rj   fd
+void fstx_d(const XReg &fd, const XReg &rj, const XReg &rk);     // 00111000001111000     rk      rj   fd
 
-void amswap_w(const XReg& rd, const XReg& rk, const XReg& rj);                      // 00111000011000000     rk      rj   rd
-void amswap_d(const XReg& rd, const XReg& rk, const XReg& rj);                      // 00111000011000001     rk      rj   rd
-void amadd_w(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011000010     rk      rj   rd
-void amadd_d(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011000011     rk      rj   rd
-void amand_w(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011000100     rk      rj   rd
-void amand_d(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011000101     rk      rj   rd
-void amor_w(const XReg& rd, const XReg& rk, const XReg& rj);                        // 00111000011000110     rk      rj   rd
-void amor_d(const XReg& rd, const XReg& rk, const XReg& rj);                        // 00111000011000111     rk      rj   rd
-void amxor_w(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011001000     rk      rj   rd
-void amxor_d(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011001001     rk      rj   rd
-void ammax_w(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011001010     rk      rj   rd
-void ammax_d(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011001011     rk      rj   rd
-void ammin_w(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011001100     rk      rj   rd
-void ammin_d(const XReg& rd, const XReg& rk, const XReg& rj);                       // 00111000011001101     rk      rj   rd
-void ammax_wu(const XReg& rd, const XReg& rk, const XReg& rj);                      // 00111000011001110     rk      rj   rd
-void ammax_du(const XReg& rd, const XReg& rk, const XReg& rj);                      // 00111000011001111     rk      rj   rd
-void ammin_wu(const XReg& rd, const XReg& rk, const XReg& rj);                      // 00111000011010000     rk      rj   rd
-void ammin_du(const XReg& rd, const XReg& rk, const XReg& rj);                      // 00111000011010001     rk      rj   rd
-void amswap_db_w(const XReg& rd, const XReg& rk, const XReg& rj);                   // 00111000011010010     rk      rj   rd
-void amswap_db_d(const XReg& rd, const XReg& rk, const XReg& rj);                   // 00111000011010011     rk      rj   rd
-void amadd_db_w(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011010100     rk      rj   rd
-void amadd_db_d(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011010101     rk      rj   rd
-void amand_db_w(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011010110     rk      rj   rd
-void amand_db_d(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011010111     rk      rj   rd
-void amor_db_w(const XReg& rd, const XReg& rk, const XReg& rj);                     // 00111000011011000     rk      rj   rd
-void amor_db_d(const XReg& rd, const XReg& rk, const XReg& rj);                     // 00111000011011001     rk      rj   rd
-void amxor_db_w(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011011010     rk      rj   rd
-void amxor_db_d(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011011011     rk      rj   rd
-void ammax_db_w(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011011100     rk      rj   rd
-void ammax_db_d(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011011101     rk      rj   rd
-void ammin_db_w(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011011110     rk      rj   rd
-void ammin_db_d(const XReg& rd, const XReg& rk, const XReg& rj);                    // 00111000011011111     rk      rj   rd
-void ammax_db_wu(const XReg& rd, const XReg& rk, const XReg& rj);                   // 00111000011100000     rk      rj   rd
-void ammax_db_du(const XReg& rd, const XReg& rk, const XReg& rj);                   // 00111000011100001     rk      rj   rd
-void ammin_db_wu(const XReg& rd, const XReg& rk, const XReg& rj);                   // 00111000011100010     rk      rj   rd
-void ammin_db_du(const XReg& rd, const XReg& rk, const XReg& rj);                   // 00111000011100011     rk      rj   rd
+void amswap_w(const XReg &rd, const XReg &rk, const XReg &rj);    // 00111000011000000     rk      rj   rd
+void amswap_d(const XReg &rd, const XReg &rk, const XReg &rj);    // 00111000011000001     rk      rj   rd
+void amadd_w(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011000010     rk      rj   rd
+void amadd_d(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011000011     rk      rj   rd
+void amand_w(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011000100     rk      rj   rd
+void amand_d(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011000101     rk      rj   rd
+void amor_w(const XReg &rd, const XReg &rk, const XReg &rj);      // 00111000011000110     rk      rj   rd
+void amor_d(const XReg &rd, const XReg &rk, const XReg &rj);      // 00111000011000111     rk      rj   rd
+void amxor_w(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011001000     rk      rj   rd
+void amxor_d(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011001001     rk      rj   rd
+void ammax_w(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011001010     rk      rj   rd
+void ammax_d(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011001011     rk      rj   rd
+void ammin_w(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011001100     rk      rj   rd
+void ammin_d(const XReg &rd, const XReg &rk, const XReg &rj);     // 00111000011001101     rk      rj   rd
+void ammax_wu(const XReg &rd, const XReg &rk, const XReg &rj);    // 00111000011001110     rk      rj   rd
+void ammax_du(const XReg &rd, const XReg &rk, const XReg &rj);    // 00111000011001111     rk      rj   rd
+void ammin_wu(const XReg &rd, const XReg &rk, const XReg &rj);    // 00111000011010000     rk      rj   rd
+void ammin_du(const XReg &rd, const XReg &rk, const XReg &rj);    // 00111000011010001     rk      rj   rd
+void amswap_db_w(const XReg &rd, const XReg &rk, const XReg &rj); // 00111000011010010     rk      rj   rd
+void amswap_db_d(const XReg &rd, const XReg &rk, const XReg &rj); // 00111000011010011     rk      rj   rd
+void amadd_db_w(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011010100     rk      rj   rd
+void amadd_db_d(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011010101     rk      rj   rd
+void amand_db_w(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011010110     rk      rj   rd
+void amand_db_d(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011010111     rk      rj   rd
+void amor_db_w(const XReg &rd, const XReg &rk, const XReg &rj);   // 00111000011011000     rk      rj   rd
+void amor_db_d(const XReg &rd, const XReg &rk, const XReg &rj);   // 00111000011011001     rk      rj   rd
+void amxor_db_w(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011011010     rk      rj   rd
+void amxor_db_d(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011011011     rk      rj   rd
+void ammax_db_w(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011011100     rk      rj   rd
+void ammax_db_d(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011011101     rk      rj   rd
+void ammin_db_w(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011011110     rk      rj   rd
+void ammin_db_d(const XReg &rd, const XReg &rk, const XReg &rj);  // 00111000011011111     rk      rj   rd
+void ammax_db_wu(const XReg &rd, const XReg &rk, const XReg &rj); // 00111000011100000     rk      rj   rd
+void ammax_db_du(const XReg &rd, const XReg &rk, const XReg &rj); // 00111000011100001     rk      rj   rd
+void ammin_db_wu(const XReg &rd, const XReg &rk, const XReg &rj); // 00111000011100010     rk      rj   rd
+void ammin_db_du(const XReg &rd, const XReg &rk, const XReg &rj); // 00111000011100011     rk      rj   rd
 
-void dbar(const int32_t hint);                                                      // 00111000011100100       hint
-void ibar(const int32_t hint);                                                      // 00111000011100101       hint
+void dbar(const int32_t hint); // 00111000011100100       hint
+void ibar(const int32_t hint); // 00111000011100101       hint
 
-void fldgt_s(const XReg& fd, const XReg& rj, const XReg& rk);                       // 00111000011101000     rk      rj   fd
-void fldgt_d(const XReg& fd, const XReg& rj, const XReg& rk);                       // 00111000011101001     rk      rj   fd
-void fldle_s(const XReg& fd, const XReg& rj, const XReg& rk);                       // 00111000011101010     rk      rj   fd
-void fldle_d(const XReg& fd, const XReg& rj, const XReg& rk);                       // 00111000011101011     rk      rj   fd
-void fstgt_s(const XReg& fd, const XReg& rj, const XReg& rk);                       // 00111000011101100     rk      rj   fd
-void fstgt_d(const XReg& fd, const XReg& rj, const XReg& rk);                       // 00111000011101101     rk      rj   fd
-void fstle_s(const XReg& fd, const XReg& rj, const XReg& rk);                       // 00111000011101110     rk      rj   fd
-void fstle_d(const XReg& fd, const XReg& rj, const XReg& rk);                       // 00111000011101111     rk      rj   fd
+void fldgt_s(const XReg &fd, const XReg &rj, const XReg &rk); // 00111000011101000     rk      rj   fd
+void fldgt_d(const XReg &fd, const XReg &rj, const XReg &rk); // 00111000011101001     rk      rj   fd
+void fldle_s(const XReg &fd, const XReg &rj, const XReg &rk); // 00111000011101010     rk      rj   fd
+void fldle_d(const XReg &fd, const XReg &rj, const XReg &rk); // 00111000011101011     rk      rj   fd
+void fstgt_s(const XReg &fd, const XReg &rj, const XReg &rk); // 00111000011101100     rk      rj   fd
+void fstgt_d(const XReg &fd, const XReg &rj, const XReg &rk); // 00111000011101101     rk      rj   fd
+void fstle_s(const XReg &fd, const XReg &rj, const XReg &rk); // 00111000011101110     rk      rj   fd
+void fstle_d(const XReg &fd, const XReg &rj, const XReg &rk); // 00111000011101111     rk      rj   fd
 
-void ldgt_b(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011110000     rk      rj   rd
-void ldgt_h(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011110001     rk      rj   rd
-void ldgt_w(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011110010     rk      rj   rd
-void ldgt_d(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011110011     rk      rj   rd
-void ldle_b(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011110100     rk      rj   rd
-void ldle_h(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011110101     rk      rj   rd
-void ldle_w(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011110110     rk      rj   rd
-void ldle_d(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011110111     rk      rj   rd
-void stgt_b(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011111000     rk      rj   rd
-void stgt_h(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011111001     rk      rj   rd
-void stgt_w(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011111010     rk      rj   rd
-void stgt_d(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011111011     rk      rj   rd
-void stle_b(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011111100     rk      rj   rd
-void stle_h(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011111101     rk      rj   rd
-void stle_w(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011111110     rk      rj   rd
-void stle_d(const XReg& rd, const XReg& rj, const XReg& rk);                        // 00111000011111111     rk      rj   rd
+void ldgt_b(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011110000     rk      rj   rd
+void ldgt_h(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011110001     rk      rj   rd
+void ldgt_w(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011110010     rk      rj   rd
+void ldgt_d(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011110011     rk      rj   rd
+void ldle_b(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011110100     rk      rj   rd
+void ldle_h(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011110101     rk      rj   rd
+void ldle_w(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011110110     rk      rj   rd
+void ldle_d(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011110111     rk      rj   rd
+void stgt_b(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011111000     rk      rj   rd
+void stgt_h(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011111001     rk      rj   rd
+void stgt_w(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011111010     rk      rj   rd
+void stgt_d(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011111011     rk      rj   rd
+void stle_b(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011111100     rk      rj   rd
+void stle_h(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011111101     rk      rj   rd
+void stle_w(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011111110     rk      rj   rd
+void stle_d(const XReg &rd, const XReg &rj, const XReg &rk); // 00111000011111111     rk      rj   rd
 
 void nop();
 
-void jirl(const XReg& rd, const XReg& rj, int64_t offset);                          // 010011        offset          rj   rd
-void bltu(const XReg& rj, const XReg& rd, int64_t offset);                          // 011010        offset          rj   rd
-void bgeu(const XReg& rj, const XReg& rd, int64_t offset);                          // 011011        offset          rj   rd
-void beqz(const XReg& rj, int64_t offset21);                                        // 010000        offset21[15:0]  rj  offset21[20:16]
-void bnez(const XReg& rj, int64_t offset21);                                        // 010001        offset21[15:0]  rj  offset21[20:16]
-void bceqz(const uint32_t cj, int64_t offset21);                                    // 010010        offset21[15:0] 00cj  offset21[20:16]
-void bcnez(const uint32_t cj, int64_t offset21);                                    // 010010        offset21[15:0] 01cj  offset21[20:16]
-void beq(const XReg& rj, const XReg& rd, int64_t offset);                           // 010110        offset          rj   rd
-void bne(const XReg& rj, const XReg& rd, int64_t offset);                           // 010111        offset          rj   rd
-void blt(const XReg& rj, const XReg& rd, int64_t offset);                           // 011000        offset          rj   rd
-void bge(const XReg& rj, const XReg& rd, int64_t offset);                           // 011001        offset          rj   rd
-void b(int64_t offset26);                                                           // 010100        offset26[15:0]    offset26[25:16]
-void bl(int64_t offset26);                                                          // 010101        offset26[15:0]    offset26[25:16]
+void jirl(const XReg &rd, const XReg &rj, int64_t offset); // 010011        offset          rj   rd
+void bltu(const XReg &rj, const XReg &rd, int64_t offset); // 011010        offset          rj   rd
+void bgeu(const XReg &rj, const XReg &rd, int64_t offset); // 011011        offset          rj   rd
+void beqz(const XReg &rj, int64_t offset21);               // 010000        offset21[15:0]  rj  offset21[20:16]
+void bnez(const XReg &rj, int64_t offset21);               // 010001        offset21[15:0]  rj  offset21[20:16]
+void bceqz(const uint32_t cj, int64_t offset21);           // 010010        offset21[15:0] 00cj  offset21[20:16]
+void bcnez(const uint32_t cj, int64_t offset21);           // 010010        offset21[15:0] 01cj  offset21[20:16]
+void beq(const XReg &rj, const XReg &rd, int64_t offset);  // 010110        offset          rj   rd
+void bne(const XReg &rj, const XReg &rd, int64_t offset);  // 010111        offset          rj   rd
+void blt(const XReg &rj, const XReg &rd, int64_t offset);  // 011000        offset          rj   rd
+void bge(const XReg &rj, const XReg &rd, int64_t offset);  // 011001        offset          rj   rd
+void b(int64_t offset26);                                  // 010100        offset26[15:0]    offset26[25:16]
+void bl(int64_t offset26);                                 // 010101        offset26[15:0]    offset26[25:16]
 
-void jirl(const XReg& rd, const XReg& rj, const Label& label);                      // 010011        offset          rj   rd
-void bltu(const XReg& rj, const XReg& rd, const Label& label);                      // 011010        offset          rj   rd
-void bgeu(const XReg& rj, const XReg& rd, const Label& label);                      // 011011        offset          rj   rd
-void beqz(const XReg& rj, const Label& label);                                      // 010000        offset21[15:0]  rj  offset21[20:16]
-void bnez(const XReg& rj, const Label& label);                                      // 010001        offset21[15:0]  rj  offset21[20:16]
-void bceqz(const uint32_t cj, const Label& label);                                  // 010010        offset21[15:0] 00cj  offset21[20:16]
-void bcnez(const uint32_t cj, const Label& label);                                  // 010010        offset21[15:0] 01cj  offset21[20:16]
-void beq(const XReg& rj, const XReg& rd, const Label& label);                       // 010110        offset          rj   rd
-void bne(const XReg& rj, const XReg& rd, const Label& label);                       // 010111        offset          rj   rd
-void blt(const XReg& rj, const XReg& rd, const Label& label);                       // 011000        offset          rj   rd
-void bge(const XReg& rj, const XReg& rd, const Label& label);                       // 011001        offset          rj   rd
-void b(const Label& label);                                                         // 010100        offset26[15:0]    offset26[25:16]
-void bl(const Label& label);                                                        // 010101        offset26[15:0]    offset26[25:16]
+void jirl(const XReg &rd, const XReg &rj, const Label &label); // 010011        offset          rj   rd
+void bltu(const XReg &rj, const XReg &rd, const Label &label); // 011010        offset          rj   rd
+void bgeu(const XReg &rj, const XReg &rd, const Label &label); // 011011        offset          rj   rd
+void beqz(const XReg &rj, const Label &label);                 // 010000        offset21[15:0]  rj  offset21[20:16]
+void bnez(const XReg &rj, const Label &label);                 // 010001        offset21[15:0]  rj  offset21[20:16]
+void bceqz(const uint32_t cj, const Label &label);             // 010010        offset21[15:0] 00cj  offset21[20:16]
+void bcnez(const uint32_t cj, const Label &label);             // 010010        offset21[15:0] 01cj  offset21[20:16]
+void beq(const XReg &rj, const XReg &rd, const Label &label);  // 010110        offset          rj   rd
+void bne(const XReg &rj, const XReg &rd, const Label &label);  // 010111        offset          rj   rd
+void blt(const XReg &rj, const XReg &rd, const Label &label);  // 011000        offset          rj   rd
+void bge(const XReg &rj, const XReg &rd, const Label &label);  // 011001        offset          rj   rd
+void b(const Label &label);                                    // 010100        offset26[15:0]    offset26[25:16]
+void bl(const Label &label);                                   // 010101        offset26[15:0]    offset26[25:16]
 
 /*Base end*/

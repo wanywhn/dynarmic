@@ -16,6 +16,7 @@
 // clang-format off
 #include "../xbyak_loongarch64/xbyak_loongarch64.h"
 #include <cstring>
+#include <limits>
 
 using namespace Xbyak_loongarch64;
 

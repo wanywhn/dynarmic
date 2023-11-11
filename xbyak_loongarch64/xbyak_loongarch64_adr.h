@@ -27,7 +27,6 @@ class Adr {
   AdrKind kind_;
 
 protected:
-
 public:
   explicit Adr(AdrKind kind) : kind_(kind) {}
   AdrKind getKind() { return kind_; }
@@ -65,11 +64,8 @@ public:
   const XReg &getXReg() const { return xn_; }
   uint32_t getOffset() const { return offset_; }
   uint32_t getIdx() const { return xn_.getIdx(); }
-  bool operator==(const Address& rhs) const
-  {
-    return getIdx() == rhs.getIdx() && getOffset() == rhs.getOffset() && getBroadcast() == rhs.getBroadcast();
-  }
-  bool operator!=(const Address& rhs) const { return !operator==(rhs); }
+  bool operator==(const Address &rhs) const { return getIdx() == rhs.getIdx() && getOffset() == rhs.getOffset() && getBroadcast() == rhs.getBroadcast(); }
+  bool operator!=(const Address &rhs) const { return !operator==(rhs); }
   bool getBroadcast() const { return broadcast_; }
 };
 
@@ -83,4 +79,3 @@ inline AdrImm ptr(const XReg &xn, int32_t imm) { return AdrImm(xn, imm); }
 inline Address ptr_a(const XReg &xn, size_t offset) { return Address(xn, offset); }
 
 inline Address ptr_b(const XReg &xn, size_t offset) { return Address(xn, offset, true); }
-

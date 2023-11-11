@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *******************************************************************************/
+#include <gtest/gtest.h>
 #include <xbyak_loongarch64/xbyak_loongarch64.h>
 using namespace Xbyak_loongarch64;
 class Generator : public CodeGenerator {
@@ -22,12 +23,17 @@ public:
     jirl(zero, ra, 0);
   }
 };
-int main() {
+
+TEST(testMul, simpleMul) {
   Generator gen;
   gen.ready();
   auto f = gen.getCode<int (*)(int, int)>();
   int a = 566;
   int b = 843;
   gen.dump();
-  printf("%d x %d = %d\n", a, b, f(a, b));
+  EXPECT_EQ(a * b, f(a, b));
+}
+int main(int argc, char *argv[]) {
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
