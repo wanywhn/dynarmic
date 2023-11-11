@@ -399,6 +399,69 @@ if ("arm64" IN_LIST ARCHITECTURE)
     endif()
 endif()
 
+if ("loongarch64" IN_LIST ARCHITECTURE)
+    target_link_libraries(dynarmic PRIVATE xbyak_loongarch64::xbyak_loongarch64)
+    
+    target_architecture_specific_sources(dynarmic "loongarch64"
+    backend/loongarch64/a32_jitstate.cpp
+    backend/loongarch64/a32_jitstate.h
+    backend/loongarch64/a64_jitstate.h
+    backend/loongarch64/abi.cpp
+    backend/loongarch64/abi.h
+    backend/loongarch64/address_space.cpp
+    backend/loongarch64/address_space.h
+    backend/loongarch64/devirtualize.h
+    backend/loongarch64/emit_arm64.cpp
+    backend/loongarch64/emit_arm64.h
+    backend/loongarch64/emit_arm64_a32.cpp
+    backend/loongarch64/emit_arm64_a32_coprocessor.cpp
+    backend/loongarch64/emit_arm64_a32_memory.cpp
+    backend/loongarch64/emit_arm64_a64.cpp
+    backend/loongarch64/emit_arm64_a64_memory.cpp
+    backend/loongarch64/emit_arm64_cryptography.cpp
+    backend/loongarch64/emit_arm64_data_processing.cpp
+    backend/loongarch64/emit_arm64_floating_point.cpp
+    backend/loongarch64/emit_arm64_memory.cpp
+    backend/loongarch64/emit_arm64_memory.h
+    backend/loongarch64/emit_arm64_packed.cpp
+    backend/loongarch64/emit_arm64_saturation.cpp
+    backend/loongarch64/emit_arm64_vector.cpp
+    backend/loongarch64/emit_arm64_vector_floating_point.cpp
+    backend/loongarch64/emit_arm64_vector_saturation.cpp
+    backend/loongarch64/emit_context.h
+    backend/loongarch64/exclusive_monitor.cpp
+    backend/loongarch64/fastmem.h
+    backend/loongarch64/fpsr_manager.cpp
+    backend/loongarch64/fpsr_manager.h
+    backend/loongarch64/reg_alloc.cpp
+    backend/loongarch64/reg_alloc.h
+    backend/loongarch64/stack_layout.h
+    backend/loongarch64/verbose_debugging_output.cpp
+    backend/loongarch64/verbose_debugging_output.h
+    common/spin_lock_arm64.cpp
+    common/spin_lock_arm64.h
+    )
+
+
+    if ("A32" IN_LIST DYNARMIC_FRONTENDS)
+        target_architecture_specific_sources(dynarmic "loongarch64"
+        backend/loongarch64/a32_address_space.cpp
+        backend/loongarch64/a32_address_space.h
+        backend/loongarch64/a32_core.h
+        backend/loongarch64/a32_interface.cpp
+        )
+    endif()
+
+    if ("A64" IN_LIST DYNARMIC_FRONTENDS)
+        target_architecture_specific_sources(dynarmic "loongarch64"
+        backend/loongarch64/a64_address_space.cpp
+        backend/loongarch64/a64_address_space.h
+        backend/loongarch64/a64_core.h
+        backend/loongarch64/a64_interface.cpp
+        )
+    endif()
+endif()
+
 if (WIN32)
     target_sources(dynarmic PRIVATE backend/exception_handler_windows.cpp)
 elseif (APPLE)

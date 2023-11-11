@@ -61,4 +61,6 @@ detect_architecture("__riscv" riscv)
 
 detect_architecture("__EMSCRIPTEN__" wasm)
 
-detect_architecture("__loongarch__" loongarch)
+detect_architecture("__loongarch__" loongarch64)
+#detect_architecture("__loongarch_arch" loongarch64)
+#detect_architecture("__loongarch64__" loongarch64)
