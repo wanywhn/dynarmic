@@ -6,7 +6,6 @@
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
 
 #include <mcl/bit/bit_field.hpp>
-#include <mcl/stdint.hpp>
 
 namespace Dynarmic::Backend::LoongArch64 {
 

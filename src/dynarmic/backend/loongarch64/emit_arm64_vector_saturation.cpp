@@ -5,8 +5,6 @@
 
 #include <mcl/mp/metavalue/lift_value.hpp>
 
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
 #include "dynarmic/backend/loongarch64/abi.h"
 #include "dynarmic/backend/loongarch64/emit_arm64.h"
@@ -17,6 +15,8 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 

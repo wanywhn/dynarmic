@@ -17,14 +17,14 @@
 
 namespace Dynarmic::Backend::LoongArch64 {
 
-constexpr Xbyak_loongarch64::XReg Xstate{28};
-constexpr Xbyak_loongarch64::XReg Xhalt{27};
-constexpr Xbyak_loongarch64::XReg Xticks{26};
-constexpr Xbyak_loongarch64::XReg Xfastmem{25};
-constexpr Xbyak_loongarch64::XReg Xpagetable{24};
+constexpr Xbyak_loongarch64::XReg Xstate{31};
+constexpr Xbyak_loongarch64::XReg Xhalt{30};
+constexpr Xbyak_loongarch64::XReg Xticks{29};
+constexpr Xbyak_loongarch64::XReg Xfastmem{28};
+constexpr Xbyak_loongarch64::XReg Xpagetable{27};
 
-constexpr Xbyak_loongarch64::XReg Xscratch0{16}, Xscratch1{17}, Xscratch2{30};
-constexpr Xbyak_loongarch64::WReg Wscratch0{16}, Wscratch1{17}, Wscratch2{30};
+constexpr Xbyak_loongarch64::XReg Xscratch0{18}, Xscratch1{19}, Xscratch2{20};
+constexpr Xbyak_loongarch64::WReg Wscratch0{18}, Wscratch1{19}, Wscratch2{20};
 
 template<size_t bitsize>
 constexpr auto Rscratch0() {
@@ -55,7 +55,7 @@ using RegisterList = u64;
 
 constexpr RegisterList ToRegList(Xbyak_loongarch64::Reg reg) {
     // if (reg.is_vector()) {
-        // return RegisterList{1} << (reg.getIdx() + 32);
+    // return RegisterList{1} << (reg.getIdx() + 32);
     // }
 
     if (reg.getIdx() == 0) {
@@ -63,14 +63,17 @@ constexpr RegisterList ToRegList(Xbyak_loongarch64::Reg reg) {
     }
 
     // if (reg.getIdx() == -1) {
-        // return RegisterList{1} << 31;
+    // return RegisterList{1} << 31;
     // }
 
     return RegisterList{1} << reg.getIdx();
 }
 
-constexpr RegisterList ABI_CALLEE_SAVE = 0x0000ff00'7ff80000;
-constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'4000ffff;
+// constexpr RegisterList ABI_CALLEE_SAVE = 0x0000ff00'7ff80000;
+//  !FIXME 0xff00??
+constexpr RegisterList ABI_CALLEE_SAVE = 0x0000ff00'ffc0000A;
+// constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'4000ffff;
+constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'001FFFF2;
 
 void ABI_PushRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, size_t stack_space);
 void ABI_PopRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, size_t stack_space);

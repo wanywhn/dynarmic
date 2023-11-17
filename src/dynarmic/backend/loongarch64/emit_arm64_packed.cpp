@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: 0BSD
  */
 
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
-
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
 #include "dynarmic/backend/loongarch64/abi.h"
 #include "dynarmic/backend/loongarch64/emit_arm64.h"
@@ -15,6 +12,8 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -96,7 +95,7 @@ void EmitIR<IR::Opcode::PackedSubU8>(Xbyak_loongarch64::CodeGenerator& code, Emi
     auto Vb = ctx.reg_alloc.ReadD(args[1]);
     RegAlloc::Realize(Vresult, Va, Vb);
 
-    code.SUB(Vresult->B8(), Va->B8(), Vb->B8());
+    code.sub_imm(Vresult->B8(), Va->B8(), Vb->B8(), code.t0);
 
     if (ge_inst) {
         auto Vge = ctx.reg_alloc.WriteD(ge_inst);
@@ -117,7 +116,7 @@ void EmitIR<IR::Opcode::PackedSubS8>(Xbyak_loongarch64::CodeGenerator& code, Emi
     auto Vb = ctx.reg_alloc.ReadD(args[1]);
     RegAlloc::Realize(Vresult, Va, Vb);
 
-    code.SUB(Vresult->B8(), Va->B8(), Vb->B8());
+    code.sub_imm(Vresult->B8(), Va->B8(), Vb->B8(), code.t0);
 
     if (ge_inst) {
         auto Vge = ctx.reg_alloc.WriteD(ge_inst);
@@ -179,7 +178,7 @@ void EmitIR<IR::Opcode::PackedSubU16>(Xbyak_loongarch64::CodeGenerator& code, Em
     auto Vb = ctx.reg_alloc.ReadD(args[1]);
     RegAlloc::Realize(Vresult, Va, Vb);
 
-    code.SUB(Vresult->H4(), Va->H4(), Vb->H4());
+    code.sub_imm(Vresult->H4(), Va->H4(), Vb->H4(), code.t0);
 
     if (ge_inst) {
         auto Vge = ctx.reg_alloc.WriteD(ge_inst);
@@ -200,7 +199,7 @@ void EmitIR<IR::Opcode::PackedSubS16>(Xbyak_loongarch64::CodeGenerator& code, Em
     auto Vb = ctx.reg_alloc.ReadD(args[1]);
     RegAlloc::Realize(Vresult, Va, Vb);
 
-    code.SUB(Vresult->H4(), Va->H4(), Vb->H4());
+    code.sub_imm(Vresult->H4(), Va->H4(), Vb->H4(), code.t0);
 
     if (ge_inst) {
         auto Vge = ctx.reg_alloc.WriteD(ge_inst);
@@ -233,8 +232,8 @@ static void EmitPackedAddSub(Xbyak_loongarch64::CodeGenerator& code, EmitContext
     code.MOVI(D2, Xbyak_loongarch64::RepImm{add_is_hi ? 0b11110000 : 0b00001111});
 
     code.EOR(V1.B8(), V1.B8(), V2.B8());
-    code.SUB(V1.S2(), V1.S2(), V2.S2());
-    code.SUB(Vresult->S2(), V0.S2(), V1.S2());
+    code.sub_imm(V1.S2(), V1.S2(), V2.S2(), code.t0);
+    code.sub_imm(Vresult->S2(), V0.S2(), V1.S2(), code.t0);
 
     if (is_halving) {
         if (is_signed) {

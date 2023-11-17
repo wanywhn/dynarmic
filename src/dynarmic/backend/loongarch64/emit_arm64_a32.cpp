@@ -4,8 +4,6 @@
  */
 
 #include <mcl/bit/bit_field.hpp>
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
 
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
 #include "dynarmic/backend/loongarch64/abi.h"
@@ -18,6 +16,8 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -26,7 +26,7 @@ using namespace Xbyak_loongarch64::util;
 Xbyak_loongarch64::Label EmitA32Cond(Xbyak_loongarch64::CodeGenerator& code, EmitContext&, IR::Cond cond) {
     Xbyak_loongarch64::Label pass;
     // TODO: Flags in host flags
-    code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+    code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
     code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
     code.B(static_cast<Xbyak_loongarch64::Cond>(cond), pass);
     return pass;
@@ -55,7 +55,7 @@ static void EmitSetUpperLocationDescriptor(Xbyak_loongarch64::CodeGenerator& cod
 
     if (old_upper != new_upper) {
         code.add_d(Wscratch0, new_upper, code.zero);
-        code.STR(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
+        code.st_d(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
     }
 }
 
@@ -70,15 +70,15 @@ void EmitA32Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, I
             code.B(LE, fail);
             EmitBlockLinkRelocation(code, ctx, terminal.next, BlockRelocationType::Branch);
         } else {
-            code.LDAR(Wscratch0, Xhalt);
-            code.CBNZ(Wscratch0, fail);
+            code.ll_acq_w(Wscratch0, Xhalt);
+            code.bnez(Wscratch0, fail);
             EmitBlockLinkRelocation(code, ctx, terminal.next, BlockRelocationType::Branch);
         }
     }
 
     code.L(fail);
     code.add_d(Wscratch0, A32::LocationDescriptor{terminal.next}.PC(), code.zero);
-    code.STR(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
+    code.st_d(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
     EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
 }
 
@@ -90,7 +90,7 @@ void EmitA32Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, I
     }
 
     code.add_d(Wscratch0, A32::LocationDescriptor{terminal.next}.PC(), code.zero);
-    code.STR(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
+    code.st_d(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
     EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
 }
 
@@ -98,18 +98,18 @@ void EmitA32Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, I
     if (ctx.conf.HasOptimization(OptimizationFlag::ReturnStackBuffer) && !is_single_step) {
         Xbyak_loongarch64::Label fail;
 
-        code.pcaddi(Wscratch2, SP, offsetof(StackLayout, rsb_ptr));
+        code.ld_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
         code.andi(Wscratch2, Wscratch2, RSBIndexMask);
-        code.ADD(X2, SP, Xscratch2);
-        code.SUB(Wscratch2, Wscratch2, sizeof(RSBEntry));
-        code.STR(Wscratch2, SP, offsetof(StackLayout, rsb_ptr));
+        code.ADD(code.a2, code.sp, Xscratch2);
+        code.sub_imm(Wscratch2, Wscratch2, sizeof(RSBEntry), code.t0);
+        code.st_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
 
-        code.LDP(Xscratch0, Xscratch1, X2, offsetof(StackLayout, rsb));
+        code.LDP(Xscratch0, Xscratch1, code.a2, offsetof(StackLayout, rsb));
 
         static_assert(offsetof(A32JitState, regs) + 16 * sizeof(u32) == offsetof(A32JitState, upper_location_descriptor));
-        code.LDUR(X0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
+        code.LDUR(code.a0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
 
-        code.CMP(X0, Xscratch0);
+        code.CMP(code.a0, Xscratch0);
         code.B(NE, fail);
         code.jirl(code.zero, Xscratch1, 0);
 
@@ -134,7 +134,7 @@ void EmitA32Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, I
 
 void EmitA32Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Term::CheckBit terminal, IR::LocationDescriptor initial_location, bool is_single_step) {
     Xbyak_loongarch64::Label fail;
-    code.LDRB(Wscratch0, SP, offsetof(StackLayout, check_bit));
+    code.LDRB(Wscratch0, code.sp, offsetof(StackLayout, check_bit));
     code.CBZ(Wscratch0, fail);
     EmitA32Terminal(code, ctx, terminal.then_, initial_location, is_single_step);
     code.L(fail);
@@ -143,8 +143,8 @@ void EmitA32Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, I
 
 void EmitA32Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Term::CheckHalt terminal, IR::LocationDescriptor initial_location, bool is_single_step) {
     Xbyak_loongarch64::Label fail;
-    code.LDAR(Wscratch0, Xhalt);
-    code.CBNZ(Wscratch0, fail);
+    code.ll_acq_w(Wscratch0, Xhalt);
+    code.bnez(Wscratch0, fail);
     EmitA32Terminal(code, ctx, terminal.else_, initial_location, is_single_step);
     code.L(fail);
     EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
@@ -171,12 +171,12 @@ void EmitA32CheckMemoryAbort(Xbyak_loongarch64::CodeGenerator& code, EmitContext
 
     const A32::LocationDescriptor current_location{IR::LocationDescriptor{inst->GetArg(0).GetU64()}};
 
-    code.LDAR(Xscratch0, Xhalt);
+    code.ll_acq_w(Xscratch0, Xhalt);
     code.TST(Xscratch0, static_cast<u32>(HaltReason::MemoryAbort));
     code.B(EQ, end);
     EmitSetUpperLocationDescriptor(code, ctx, current_location, ctx.block.Location());
     code.add_d(Wscratch0, current_location.PC(), code.zero);
-    code.STR(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
+    code.st_d(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
     EmitRelocation(code, ctx, LinkTarget::ReturnFromRunCode);
 }
 
@@ -187,14 +187,14 @@ void EmitIR<IR::Opcode::A32SetCheckBit>(Xbyak_loongarch64::CodeGenerator& code, 
     if (args[0].IsImmediate()) {
         if (args[0].GetImmediateU1()) {
             code.add_d(Wscratch0, 1, code.zero);
-            code.STRB(Wscratch0, SP, offsetof(StackLayout, check_bit));
+            code.STRB(Wscratch0, code.sp, offsetof(StackLayout, check_bit));
         } else {
-            code.STRB(WZR, SP, offsetof(StackLayout, check_bit));
+            code.STRB(WZR, code.sp, offsetof(StackLayout, check_bit));
         }
     } else {
         auto Wbit = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wbit);
-        code.STRB(Wbit, SP, offsetof(StackLayout, check_bit));
+        code.STRB(Wbit, code.sp, offsetof(StackLayout, check_bit));
     }
 }
 
@@ -207,7 +207,7 @@ void EmitIR<IR::Opcode::A32GetRegister>(Xbyak_loongarch64::CodeGenerator& code, 
 
     // TODO: Detect if Gpr vs Fpr is more appropriate
 
-    code.pcaddi(Wresult, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * static_cast<size_t>(reg));
+    code.ld_d(Wresult, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * static_cast<size_t>(reg));
 }
 
 template<>
@@ -221,7 +221,7 @@ void EmitIR<IR::Opcode::A32GetExtendedRegister32>(Xbyak_loongarch64::CodeGenerat
 
     // TODO: Detect if Gpr vs Fpr is more appropriate
 
-    code.pcaddi(Sresult, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
+    code.ld_d(Sresult, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
 }
 
 template<>
@@ -233,12 +233,12 @@ void EmitIR<IR::Opcode::A32GetVector>(Xbyak_loongarch64::CodeGenerator& code, Em
         const size_t index = static_cast<size_t>(reg) - static_cast<size_t>(A32::ExtReg::D0);
         auto Dresult = ctx.reg_alloc.WriteD(inst);
         RegAlloc::Realize(Dresult);
-        code.pcaddi(Dresult, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u64) * index);
+        code.ld_d(Dresult, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u64) * index);
     } else {
         const size_t index = static_cast<size_t>(reg) - static_cast<size_t>(A32::ExtReg::Q0);
         auto Qresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Qresult);
-        code.pcaddi(Qresult, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u64) * index);
+        code.ld_d(Qresult, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u64) * index);
     }
 }
 
@@ -253,7 +253,7 @@ void EmitIR<IR::Opcode::A32GetExtendedRegister64>(Xbyak_loongarch64::CodeGenerat
 
     // TODO: Detect if Gpr vs Fpr is more appropriate
 
-    code.pcaddi(Dresult, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
+    code.ld_d(Dresult, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
 }
 
 template<>
@@ -267,7 +267,7 @@ void EmitIR<IR::Opcode::A32SetRegister>(Xbyak_loongarch64::CodeGenerator& code, 
 
     // TODO: Detect if Gpr vs Fpr is more appropriate
 
-    code.STR(Wvalue, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * static_cast<size_t>(reg));
+    code.st_d(Wvalue, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * static_cast<size_t>(reg));
 }
 
 template<>
@@ -282,7 +282,7 @@ void EmitIR<IR::Opcode::A32SetExtendedRegister32>(Xbyak_loongarch64::CodeGenerat
 
     // TODO: Detect if Gpr vs Fpr is more appropriate
 
-    code.STR(Svalue, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
+    code.st_d(Svalue, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
 }
 
 template<>
@@ -297,7 +297,7 @@ void EmitIR<IR::Opcode::A32SetExtendedRegister64>(Xbyak_loongarch64::CodeGenerat
 
     // TODO: Detect if Gpr vs Fpr is more appropriate
 
-    code.STR(Dvalue, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
+    code.st_d(Dvalue, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
 }
 
 template<>
@@ -310,12 +310,12 @@ void EmitIR<IR::Opcode::A32SetVector>(Xbyak_loongarch64::CodeGenerator& code, Em
         const size_t index = static_cast<size_t>(reg) - static_cast<size_t>(A32::ExtReg::D0);
         auto Dvalue = ctx.reg_alloc.ReadD(args[1]);
         RegAlloc::Realize(Dvalue);
-        code.STR(Dvalue, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u64) * index);
+        code.st_d(Dvalue, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u64) * index);
     } else {
         const size_t index = static_cast<size_t>(reg) - static_cast<size_t>(A32::ExtReg::Q0);
         auto Qvalue = ctx.reg_alloc.ReadQ(args[1]);
         RegAlloc::Realize(Qvalue);
-        code.STR(Qvalue, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u64) * index);
+        code.st_d(Qvalue, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u64) * index);
     }
 }
 
@@ -327,18 +327,18 @@ void EmitIR<IR::Opcode::A32GetCpsr>(Xbyak_loongarch64::CodeGenerator& code, Emit
     static_assert(offsetof(A32JitState, cpsr_nzcv) + sizeof(u32) == offsetof(A32JitState, cpsr_q));
 
     code.LDP(Wscratch0, Wscratch1, Xstate, offsetof(A32JitState, cpsr_nzcv));
-    code.pcaddi(Wcpsr, Xstate, offsetof(A32JitState, cpsr_jaifm));
+    code.ld_d(Wcpsr, Xstate, offsetof(A32JitState, cpsr_jaifm));
     code.ORR(Wcpsr, Wcpsr, Wscratch0);
     code.ORR(Wcpsr, Wcpsr, Wscratch1);
 
-    code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, cpsr_ge));
+    code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_ge));
     code.andi(Wscratch0, Wscratch0, 0x80808080);
     code.add_d(Wscratch1, 0x00204081, code.zero);
     code.MUL(Wscratch0, Wscratch0, Wscratch1);
     code.andi(Wscratch0, Wscratch0, 0xf0000000);
     code.ORR(Wcpsr, Wcpsr, Wscratch0, LSR, 12);
 
-    code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
+    code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
     code.andi(Wscratch0, Wscratch0, 0b11);
     // 9 8 7 6 5
     //       E T
@@ -371,7 +371,7 @@ void EmitIR<IR::Opcode::A32SetCpsr>(Xbyak_loongarch64::CodeGenerator& code, Emit
     code.MUL(Wscratch0, Wscratch0, Wscratch1);
     code.andi(Wscratch0, Wscratch0, 0x01010101);
     code.LSL(Wscratch1, Wscratch0, 8);
-    code.SUB(Wscratch0, Wscratch1, Wscratch0);
+    code.sub_d(Wscratch0, Wscratch1, Wscratch0);
 
     // Other flags
     code.add_d(Wscratch1, 0x010001DF, code.zero);
@@ -390,11 +390,11 @@ void EmitIR<IR::Opcode::A32SetCpsr>(Xbyak_loongarch64::CodeGenerator& code, Emit
     code.LSR(Wscratch1, Wcpsr, 8);
     code.andi(Wscratch1, Wscratch1, 0x2);
     code.ORR(Wscratch0, Wscratch0, Wscratch1);
-    code.pcaddi(Wscratch1, Xstate, offsetof(A32JitState, upper_location_descriptor));
+    code.ld_d(Wscratch1, Xstate, offsetof(A32JitState, upper_location_descriptor));
     code.BFXIL(Wscratch0, Wcpsr, 5, 1);
     code.andi(Wscratch1, Wscratch1, 0xFFFF0000);
     code.ORR(Wscratch0, Wscratch0, Wscratch1);
-    code.STR(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
+    code.st_d(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
 }
 
 template<>
@@ -403,7 +403,7 @@ void EmitIR<IR::Opcode::A32SetCpsrNZCV>(Xbyak_loongarch64::CodeGenerator& code, 
     auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wnzcv);
 
-    code.STR(Wnzcv, Xstate, offsetof(A32JitState, cpsr_nzcv));
+    code.st_d(Wnzcv, Xstate, offsetof(A32JitState, cpsr_nzcv));
 }
 
 template<>
@@ -412,7 +412,7 @@ void EmitIR<IR::Opcode::A32SetCpsrNZCVRaw>(Xbyak_loongarch64::CodeGenerator& cod
     auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wnzcv);
 
-    code.STR(Wnzcv, Xstate, offsetof(A32JitState, cpsr_nzcv));
+    code.st_d(Wnzcv, Xstate, offsetof(A32JitState, cpsr_nzcv));
 }
 
 template<>
@@ -437,10 +437,10 @@ void EmitIR<IR::Opcode::A32SetCpsrNZ>(Xbyak_loongarch64::CodeGenerator& code, Em
 
     // TODO: Track latent value
 
-    code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+    code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
     code.andi(Wscratch0, Wscratch0, 0x30000000);
     code.ORR(Wscratch0, Wscratch0, Wnz);
-    code.STR(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+    code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
 }
 
 template<>
@@ -453,20 +453,20 @@ void EmitIR<IR::Opcode::A32SetCpsrNZC>(Xbyak_loongarch64::CodeGenerator& code, E
         if (args[1].IsImmediate()) {
             const u32 carry = args[1].GetImmediateU1() ? 0x2000'0000 : 0;
 
-            code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+            code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
             code.andi(Wscratch0, Wscratch0, 0x10000000);
             if (carry) {
                 code.ORR(Wscratch0, Wscratch0, carry);
             }
-            code.STR(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+            code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
         } else {
             auto Wc = ctx.reg_alloc.ReadW(args[1]);
             RegAlloc::Realize(Wc);
 
-            code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+            code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
             code.andi(Wscratch0, Wscratch0, 0x10000000);
             code.ORR(Wscratch0, Wscratch0, Wc);
-            code.STR(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+            code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
         }
     } else {
         if (args[1].IsImmediate()) {
@@ -474,23 +474,23 @@ void EmitIR<IR::Opcode::A32SetCpsrNZC>(Xbyak_loongarch64::CodeGenerator& code, E
             auto Wnz = ctx.reg_alloc.ReadW(args[0]);
             RegAlloc::Realize(Wnz);
 
-            code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+            code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
             code.andi(Wscratch0, Wscratch0, 0x10000000);
             code.ORR(Wscratch0, Wscratch0, Wnz);
             if (carry) {
                 code.ORR(Wscratch0, Wscratch0, carry);
             }
-            code.STR(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+            code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
         } else {
             auto Wnz = ctx.reg_alloc.ReadW(args[0]);
             auto Wc = ctx.reg_alloc.ReadW(args[1]);
             RegAlloc::Realize(Wnz, Wc);
 
-            code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+            code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
             code.andi(Wscratch0, Wscratch0, 0x10000000);
             code.ORR(Wscratch0, Wscratch0, Wnz);
             code.ORR(Wscratch0, Wscratch0, Wc);
-            code.STR(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+            code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
         }
     }
 }
@@ -500,7 +500,7 @@ void EmitIR<IR::Opcode::A32GetCFlag>(Xbyak_loongarch64::CodeGenerator& code, Emi
     auto Wflag = ctx.reg_alloc.WriteW(inst);
     RegAlloc::Realize(Wflag);
 
-    code.pcaddi(Wflag, Xstate, offsetof(A32JitState, cpsr_nzcv));
+    code.ld_d(Wflag, Xstate, offsetof(A32JitState, cpsr_nzcv));
     code.andi(Wflag, Wflag, 1 << 29);
 }
 
@@ -510,9 +510,9 @@ void EmitIR<IR::Opcode::A32OrQFlag>(Xbyak_loongarch64::CodeGenerator& code, Emit
     auto Wflag = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wflag);
 
-    code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, cpsr_q));
+    code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_q));
     code.ORR(Wscratch0, Wscratch0, Wflag, LSL, 27);
-    code.STR(Wscratch0, Xstate, offsetof(A32JitState, cpsr_q));
+    code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_q));
 }
 
 template<>
@@ -520,7 +520,7 @@ void EmitIR<IR::Opcode::A32GetGEFlags>(Xbyak_loongarch64::CodeGenerator& code, E
     auto Snzcv = ctx.reg_alloc.WriteS(inst);
     RegAlloc::Realize(Snzcv);
 
-    code.pcaddi(Snzcv, Xstate, offsetof(A32JitState, cpsr_ge));
+    code.ld_d(Snzcv, Xstate, offsetof(A32JitState, cpsr_ge));
 }
 
 template<>
@@ -530,7 +530,7 @@ void EmitIR<IR::Opcode::A32SetGEFlags>(Xbyak_loongarch64::CodeGenerator& code, E
     auto Snzcv = ctx.reg_alloc.ReadS(args[0]);
     RegAlloc::Realize(Snzcv);
 
-    code.STR(Snzcv, Xstate, offsetof(A32JitState, cpsr_ge));
+    code.st_d(Snzcv, Xstate, offsetof(A32JitState, cpsr_ge));
 }
 
 template<>
@@ -544,8 +544,8 @@ void EmitIR<IR::Opcode::A32SetGEFlagsCompressed>(Xbyak_loongarch64::CodeGenerato
     code.MUL(Wscratch0, Wscratch0, Wscratch1);
     code.andi(Wscratch0, Wscratch0, 0x01010101);
     code.LSL(Wscratch1, Wscratch0, 8);
-    code.SUB(Wscratch0, Wscratch1, Wscratch0);
-    code.STR(Wscratch0, Xstate, offsetof(A32JitState, cpsr_ge));
+    code.sub_d(Wscratch0, Wscratch1, Wscratch0);
+    code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_ge));
 }
 
 template<>
@@ -594,8 +594,8 @@ void EmitIR<IR::Opcode::A32CallSupervisor>(Xbyak_loongarch64::CodeGenerator& cod
     ctx.reg_alloc.PrepareForCall();
 
     if (ctx.conf.enable_cycle_counting) {
-        code.pcaddi(X1, SP, offsetof(StackLayout, cycles_to_run));
-        code.SUB(X1, X1, Xticks);
+        code.ld_d(code.a1, code.sp, offsetof(StackLayout, cycles_to_run));
+        code.sub_d(code.a1, code.a1, Xticks);
         EmitRelocation(code, ctx, LinkTarget::AddTicks);
     }
 
@@ -604,8 +604,8 @@ void EmitIR<IR::Opcode::A32CallSupervisor>(Xbyak_loongarch64::CodeGenerator& cod
 
     if (ctx.conf.enable_cycle_counting) {
         EmitRelocation(code, ctx, LinkTarget::GetTicksRemaining);
-        code.STR(X0, SP, offsetof(StackLayout, cycles_to_run));
-        code.add_d(Xticks, X0, code.zero);
+        code.st_d(code.a0, code.sp, offsetof(StackLayout, cycles_to_run));
+        code.add_d(Xticks, code.a0, code.zero);
     }
 }
 
@@ -615,8 +615,8 @@ void EmitIR<IR::Opcode::A32ExceptionRaised>(Xbyak_loongarch64::CodeGenerator& co
     ctx.reg_alloc.PrepareForCall();
 
     if (ctx.conf.enable_cycle_counting) {
-        code.pcaddi(X1, SP, offsetof(StackLayout, cycles_to_run));
-        code.SUB(X1, X1, Xticks);
+        code.ld_d(code.a1, code.sp, offsetof(StackLayout, cycles_to_run));
+        code.sub_d(code.a1, code.a1, Xticks);
         EmitRelocation(code, ctx, LinkTarget::AddTicks);
     }
 
@@ -626,8 +626,8 @@ void EmitIR<IR::Opcode::A32ExceptionRaised>(Xbyak_loongarch64::CodeGenerator& co
 
     if (ctx.conf.enable_cycle_counting) {
         EmitRelocation(code, ctx, LinkTarget::GetTicksRemaining);
-        code.STR(X0, SP, offsetof(StackLayout, cycles_to_run));
-        code.add_d(Xticks, X0, code.zero);
+        code.st_d(code.a0, code.sp, offsetof(StackLayout, cycles_to_run));
+        code.add_d(Xticks, code.a0, code.zero);
     }
 }
 
@@ -659,7 +659,7 @@ void EmitIR<IR::Opcode::A32GetFpscr>(Xbyak_loongarch64::CodeGenerator& code, Emi
 
     static_assert(offsetof(A32JitState, fpsr) + sizeof(u32) == offsetof(A32JitState, fpsr_nzcv));
 
-    code.pcaddi(Wfpscr, Xstate, offsetof(A32JitState, upper_location_descriptor));
+    code.ld_d(Wfpscr, Xstate, offsetof(A32JitState, upper_location_descriptor));
     code.LDP(Wscratch0, Wscratch1, Xstate, offsetof(A32JitState, fpsr));
     code.andi(Wfpscr, Wfpscr, 0xffff'0000);
     code.ORR(Wscratch0, Wscratch0, Wscratch1);
@@ -675,12 +675,12 @@ void EmitIR<IR::Opcode::A32SetFpscr>(Xbyak_loongarch64::CodeGenerator& code, Emi
 
     static_assert(offsetof(A32JitState, fpsr) + sizeof(u32) == offsetof(A32JitState, fpsr_nzcv));
 
-    code.pcaddi(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
+    code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
     code.add_d(Wscratch1, 0x07f7'0000, code.zero);
     code.andi(Wscratch1, Wfpscr, Wscratch1);
     code.andi(Wscratch0, Wscratch0, 0x0000'ffff);
     code.ORR(Wscratch0, Wscratch0, Wscratch1);
-    code.STR(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
+    code.st_d(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
 
     code.add_d(Wscratch0, 0x0800'009f, code.zero);
     code.andi(Wscratch0, Wfpscr, Wscratch0);
@@ -693,7 +693,7 @@ void EmitIR<IR::Opcode::A32GetFpscrNZCV>(Xbyak_loongarch64::CodeGenerator& code,
     auto Wnzcv = ctx.reg_alloc.WriteW(inst);
     RegAlloc::Realize(Wnzcv);
 
-    code.pcaddi(Wnzcv, Xstate, offsetof(A32JitState, fpsr_nzcv));
+    code.ld_d(Wnzcv, Xstate, offsetof(A32JitState, fpsr_nzcv));
 }
 
 template<>
@@ -702,7 +702,7 @@ void EmitIR<IR::Opcode::A32SetFpscrNZCV>(Xbyak_loongarch64::CodeGenerator& code,
     auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wnzcv);
 
-    code.STR(Wnzcv, Xstate, offsetof(A32JitState, fpsr_nzcv));
+    code.st_d(Wnzcv, Xstate, offsetof(A32JitState, fpsr_nzcv));
 }
 
 }  // namespace Dynarmic::Backend::LoongArch64

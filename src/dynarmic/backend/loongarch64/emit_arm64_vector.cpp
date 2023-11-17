@@ -4,7 +4,6 @@
  */
 
 #include <mcl/mp/metavalue/lift_value.hpp>
-#include "xbyak_loongarch64.h"
 
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
 #include "dynarmic/backend/loongarch64/abi.h"
@@ -16,6 +15,7 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -322,22 +322,26 @@ static void EmitSetElement(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, 
 
 template<>
 void EmitIR<IR::Opcode::VectorSetElement8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSetElement<8>(code, ctx, inst, [&](auto& Qvector, auto& Wvalue, u8 index) { code.add_d(Qvector->Belem()[index], Wvalue); }, code.zero);
+    EmitSetElement<8>(
+        code, ctx, inst, [&](auto& Qvector, auto& Wvalue, u8 index) { code.add_d(Qvector->Belem()[index], Wvalue); }, code.zero);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSetElement16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSetElement<16>(code, ctx, inst, [&](auto& Qvector, auto& Wvalue, u8 index) { code.add_d(Qvector->Helem()[index], Wvalue); }, code.zero);
+    EmitSetElement<16>(
+        code, ctx, inst, [&](auto& Qvector, auto& Wvalue, u8 index) { code.add_d(Qvector->Helem()[index], Wvalue); }, code.zero);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSetElement32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSetElement<32>(code, ctx, inst, [&](auto& Qvector, auto& Wvalue, u8 index) { code.add_d(Qvector->Selem()[index], Wvalue); }, code.zero);
+    EmitSetElement<32>(
+        code, ctx, inst, [&](auto& Qvector, auto& Wvalue, u8 index) { code.add_d(Qvector->Selem()[index], Wvalue); }, code.zero);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSetElement64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSetElement<64>(code, ctx, inst, [&](auto& Qvector, auto& Xvalue, u8 index) { code.add_d(Qvector->Delem()[index], Xvalue); }, code.zero);
+    EmitSetElement<64>(
+        code, ctx, inst, [&](auto& Qvector, auto& Xvalue, u8 index) { code.add_d(Qvector->Delem()[index], Xvalue); }, code.zero);
 }
 
 template<>
@@ -1579,22 +1583,26 @@ void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeftUnsigned64>(Xbyak_loongarc
 
 template<>
 void EmitIR<IR::Opcode::VectorSub8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SUB(Vresult, Va, Vb); });
+    EmitThreeOpArranged<8>(
+        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.sub_imm(Vresult, Va, Vb); }, code.t0);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSub16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SUB(Vresult, Va, Vb); });
+    EmitThreeOpArranged<16>(
+        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.sub_imm(Vresult, Va, Vb); }, code.t0);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSub32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SUB(Vresult, Va, Vb); });
+    EmitThreeOpArranged<32>(
+        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.sub_imm(Vresult, Va, Vb); }, code.t0);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSub64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SUB(Vresult, Va, Vb); });
+    EmitThreeOpArranged<64>(
+        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.sub_imm(Vresult, Va, Vb); }, code.t0);
 }
 
 template<>

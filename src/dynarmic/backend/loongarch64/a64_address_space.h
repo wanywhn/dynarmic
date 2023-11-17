@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "dynarmic/backend/loongarch64/address_space.h"
 #include "dynarmic/backend/block_range_information.h"
+#include "dynarmic/backend/loongarch64/address_space.h"
 #include "dynarmic/interface/A64/config.h"
 
 namespace Dynarmic::Backend::LoongArch64 {

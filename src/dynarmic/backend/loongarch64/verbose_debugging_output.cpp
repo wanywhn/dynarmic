@@ -7,49 +7,49 @@
 
 #include <fmt/format.h>
 
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
 #include "dynarmic/backend/loongarch64/emit_context.h"
 #include "dynarmic/ir/type.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
 using namespace Xbyak_loongarch64::util;
 
 void EmitVerboseDebuggingOutput(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx) {
-    code.SUB(SP, SP, sizeof(RegisterData));
+    code.sub_imm(code.sp, code.sp, sizeof(RegisterData), code.t0);
     for (int i = 0; i < 30; i++) {
         if (i == 18) {
             continue;  // Platform register
         }
-        code.STR(Xbyak_loongarch64::XReg{i}, SP, offsetof(RegisterData, x) + i * sizeof(u64));
+        code.st_d(Xbyak_loongarch64::XReg{i}, code.sp, offsetof(RegisterData, x) + i * sizeof(u64));
     }
     for (int i = 0; i < 32; i++) {
-        code.STR(Xbyak_loongarch64::QReg{i}, SP, offsetof(RegisterData, q) + i * sizeof(Vector));
+        code.st_d(Xbyak_loongarch64::QReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
     }
-    code.MRS(X0, Xbyak_loongarch64::SystemReg::NZCV);
-    code.STR(X0, SP, offsetof(RegisterData, nzcv));
-    code.ADD(X0, SP, sizeof(RegisterData) + offsetof(StackLayout, spill));
-    code.STR(X0, SP, offsetof(RegisterData, spill));
-    code.MRS(X0, Xbyak_loongarch64::SystemReg::FPSR);
-    code.STR(X0, SP, offsetof(RegisterData, fpsr));
+    code.MRS(code.a0, Xbyak_loongarch64::SystemReg::NZCV);
+    code.st_d(code.a0, code.sp, offsetof(RegisterData, nzcv));
+    code.add_imm(code.a0, code.sp, sizeof(RegisterData) + offsetof(StackLayout, spill), t0);
+    code.st_d(code.a0, code.sp, offsetof(RegisterData, spill));
+    code.MRS(code.a0, Xbyak_loongarch64::SystemReg::FPSR);
+    code.st_d(code.a0, code.sp, offsetof(RegisterData, fpsr));
 
     ctx.reg_alloc.EmitVerboseDebuggingOutput();
 
-    code.pcaddi(X0, SP, offsetof(RegisterData, fpsr));
-    code.MSR(Xbyak_loongarch64::SystemReg::FPSR, X0);
-    code.pcaddi(X0, SP, offsetof(RegisterData, nzcv));
-    code.MSR(Xbyak_loongarch64::SystemReg::NZCV, X0);
+    code.ld_d(code.a0, code.sp, offsetof(RegisterData, fpsr));
+    code.MSR(Xbyak_loongarch64::SystemReg::FPSR, code.a0);
+    code.ld_d(code.a0, code.sp, offsetof(RegisterData, nzcv));
+    code.MSR(Xbyak_loongarch64::SystemReg::NZCV, code.a0);
     for (int i = 0; i < 32; i++) {
-        code.pcaddi(Xbyak_loongarch64::QReg{i}, SP, offsetof(RegisterData, q) + i * sizeof(Vector));
+        code.ld_d(Xbyak_loongarch64::QReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
     }
     for (int i = 0; i < 30; i++) {
         if (i == 18) {
             continue;  // Platform register
         }
-        code.pcaddi(Xbyak_loongarch64::XReg{i}, SP, offsetof(RegisterData, x) + i * sizeof(u64));
+        code.ld_d(Xbyak_loongarch64::XReg{i}, code.sp, offsetof(RegisterData, x) + i * sizeof(u64));
     }
-    code.ADD(SP, SP, sizeof(RegisterData));
+    code.add_imm(code.sp, code.sp, sizeof(RegisterData), t0);
 }
 
 void PrintVerboseDebuggingOutputLine(RegisterData& reg_data, HostLocType reg_type, size_t reg_index, size_t inst_index, IR::Type inst_type) {

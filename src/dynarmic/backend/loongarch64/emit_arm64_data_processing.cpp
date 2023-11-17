@@ -6,8 +6,6 @@
 #include <cstddef>
 
 #include <fmt/ostream.h>
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
 
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
 #include "dynarmic/backend/loongarch64/abi.h"
@@ -17,6 +15,8 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -212,7 +212,7 @@ void EmitIR<IR::Opcode::ConditionalSelect32>(Xbyak_loongarch64::CodeGenerator& c
 
     // TODO: FSEL for fprs
 
-    code.pcaddi(Wscratch0, Xstate, ctx.conf.state_nzcv_offset);
+    code.ld_d(Wscratch0, Xstate, ctx.conf.state_nzcv_offset);
     code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
     code.CSEL(Wresult, Wthen, Welse, static_cast<Xbyak_loongarch64::Cond>(cond));
 }
@@ -229,7 +229,7 @@ void EmitIR<IR::Opcode::ConditionalSelect64>(Xbyak_loongarch64::CodeGenerator& c
 
     // TODO: FSEL for fprs
 
-    code.pcaddi(Wscratch0, Xstate, ctx.conf.state_nzcv_offset);
+    code.ld_d(Wscratch0, Xstate, ctx.conf.state_nzcv_offset);
     code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
     code.CSEL(Xresult, Xthen, Xelse, static_cast<Xbyak_loongarch64::Cond>(cond));
 }
@@ -463,7 +463,7 @@ void EmitIR<IR::Opcode::LogicalShiftRight32>(Xbyak_loongarch64::CodeGenerator& c
             code.ANDS(Wscratch1, Wshift, 0xff);
             code.B(EQ, zero);
 
-            code.SUB(Wscratch0, Wshift, 1);
+            code.sub_imm(Wscratch0, Wshift, 1, code.t0);
             code.LSR(Wcarry_out, Woperand, Wscratch0);
             code.LSR(Wresult, Woperand, Wshift);
             code.UBFIZ(Wcarry_out, Wcarry_out, 29, 1);
@@ -596,7 +596,7 @@ void EmitIR<IR::Opcode::ArithmeticShiftRight32>(Xbyak_loongarch64::CodeGenerator
             code.CSEL(Wscratch0, Wscratch0, Wscratch1, LS);
 
             code.SXTW(Wresult->toX(), Woperand);
-            code.SUB(Wscratch1, Wscratch0, 1);
+            code.sub_imm(Wscratch1, Wscratch0, 1, code.t0);
 
             code.ASR(Wcarry_out->toX(), Wresult->toX(), Xscratch1);
             code.ASR(Wresult->toX(), Wresult->toX(), Xscratch0);
@@ -969,7 +969,8 @@ static void EmitAddSub(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx,
 
             if (args[2].IsImmediate()) {
                 if (args[2].GetImmediateU1()) {
-                    MaybeAddSubImm<bitsize>(code, sub ? imm : ~imm, [&](const auto b) { code.SUB(Rresult, *Ra, b); });
+                    MaybeAddSubImm<bitsize>(
+                        code, sub ? imm : ~imm, [&](const auto b) { code.sub_imm(Rresult, *Ra, b); }, code.t0);
                 } else {
                     MaybeAddSubImm<bitsize>(code, sub ? ~imm : imm, [&](const auto b) { code.ADD(Rresult, *Ra, b); });
                 }
@@ -995,10 +996,10 @@ static void EmitAddSub(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx,
             if (args[2].IsImmediate()) {
                 if (args[2].GetImmediateU1()) {
                     if (sub) {
-                        code.SUB(Rresult, *Ra, Rb);
+                        code.sub_imm(Rresult, *Ra, Rb, code.t0);
                     } else {
                         code.MVN(Rscratch0<bitsize>(), Rb);
-                        code.SUB(Rresult, *Ra, Rscratch0<bitsize>());
+                        code.sub_imm(Rresult, *Ra, Rscratch0<bitsize>(), code.t0);
                     }
                 } else {
                     if (sub) {

@@ -5,10 +5,9 @@
 
 #include "dynarmic/backend/loongarch64/fpsr_manager.h"
 
+#include "dynarmic/backend/loongarch64/abi.h"
 #include "xbyak_loongarch64.h"
 #include "xbyak_loongarch64_util.h"
-
-#include "dynarmic/backend/loongarch64/abi.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -21,10 +20,10 @@ void FpsrManager::Spill() {
     if (!fpsr_loaded)
         return;
 
-    code.pcaddi(Wscratch0, Xstate, state_fpsr_offset);
+    code.ld_d(Wscratch0, Xstate, state_fpsr_offset);
     code.MRS(Xscratch1, Xbyak_loongarch64::SystemReg::FPSR);
     code.ORR(Wscratch0, Wscratch0, Wscratch1);
-    code.STR(Wscratch0, Xstate, state_fpsr_offset);
+    code.st_d(Wscratch0, Xstate, state_fpsr_offset);
 
     fpsr_loaded = false;
 }

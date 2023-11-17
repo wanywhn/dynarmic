@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: 0BSD
  */
 
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
-
 #include "dynarmic/backend/loongarch64/a64_jitstate.h"
 #include "dynarmic/backend/loongarch64/abi.h"
 #include "dynarmic/backend/loongarch64/emit_arm64.h"
@@ -16,6 +13,8 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -23,7 +22,7 @@ using namespace Xbyak_loongarch64::util;
 
 template<>
 void EmitIR<IR::Opcode::A64ClearExclusive>(Xbyak_loongarch64::CodeGenerator& code, EmitContext&, IR::Inst*) {
-    code.STR(WZR, Xstate, offsetof(A64JitState, exclusive_state));
+    code.st_d(WZR, Xstate, offsetof(A64JitState, exclusive_state));
 }
 
 template<>

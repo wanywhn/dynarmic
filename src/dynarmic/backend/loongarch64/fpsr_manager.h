@@ -6,6 +6,7 @@
 #pragma once
 
 #include <mcl/stdint.hpp>
+
 #include "xbyak_loongarch64.h"
 
 namespace oaknut {

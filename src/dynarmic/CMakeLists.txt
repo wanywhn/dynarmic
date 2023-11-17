@@ -406,10 +406,15 @@ if ("loongarch64" IN_LIST ARCHITECTURE)
     backend/loongarch64/a32_jitstate.cpp
     backend/loongarch64/a32_jitstate.h
     backend/loongarch64/a64_jitstate.h
+    backend/loongarch64/a64_jitstate.cpp
     backend/loongarch64/abi.cpp
     backend/loongarch64/abi.h
     backend/loongarch64/address_space.cpp
     backend/loongarch64/address_space.h
+    backend/loongarch64/block_of_code.cpp
+    backend/loongarch64/block_of_code.h
+    backend/loongarch64/callback.cpp
+    backend/loongarch64/callback.h
     backend/loongarch64/devirtualize.h
     backend/loongarch64/emit_arm64.cpp
     backend/loongarch64/emit_arm64.h
@@ -433,6 +438,7 @@ if ("loongarch64" IN_LIST ARCHITECTURE)
     backend/loongarch64/fastmem.h
     backend/loongarch64/fpsr_manager.cpp
     backend/loongarch64/fpsr_manager.h
+    backend/loongarch64/jitstate_info.h
     backend/loongarch64/reg_alloc.cpp
     backend/loongarch64/reg_alloc.h
     backend/loongarch64/stack_layout.h

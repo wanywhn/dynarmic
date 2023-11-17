@@ -5,9 +5,6 @@
 
 #include "dynarmic/backend/loongarch64/emit_arm64.h"
 
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
-
 #include "dynarmic/backend/loongarch64/abi.h"
 #include "dynarmic/backend/loongarch64/emit_context.h"
 #include "dynarmic/backend/loongarch64/fpsr_manager.h"
@@ -16,6 +13,8 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -55,11 +54,11 @@ void EmitIR<IR::Opcode::PushRSB>(Xbyak_loongarch64::CodeGenerator& code, EmitCon
     ASSERT(args[0].IsImmediate());
     const IR::LocationDescriptor target{args[0].GetImmediateU64()};
 
-    code.pcaddi(Wscratch2, SP, offsetof(StackLayout, rsb_ptr));
-    code.ADD(Wscratch2, Wscratch2, sizeof(RSBEntry));
+    code.ld_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
+    code.add_imm(Wscratch2, Wscratch2, sizeof(RSBEntry), t0);
     code.andi(Wscratch2, Wscratch2, RSBIndexMask);
-    code.STR(Wscratch2, SP, offsetof(StackLayout, rsb_ptr));
-    code.ADD(Xscratch2, SP, Xscratch2);
+    code.st_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
+    code.ADD(Xscratch2, code.sp, Xscratch2);
 
     code.add_d(Xscratch0, target.Value(), code.zero);
     EmitBlockLinkRelocation(code, ctx, target, BlockRelocationType::MoveToScratch1);
@@ -185,10 +184,10 @@ static void EmitAddCycles(Xbyak_loongarch64::CodeGenerator& code, EmitContext& c
     }
 
     if (Xbyak_loongarch64::AddSubImm::is_valid(cycles_to_add)) {
-        code.SUB(Xticks, Xticks, cycles_to_add);
+        code.sub_imm(Xticks, Xticks, cycles_to_add, code.t0);
     } else {
         code.add_d(Xscratch1, cycles_to_add, code.zero);
-        code.SUB(Xticks, Xticks, Xscratch1);
+        code.sub_d(Xticks, Xticks, Xscratch1);
     }
 }
 
@@ -203,7 +202,7 @@ EmittedBlockInfo EmitArm64(Xbyak_loongarch64::CodeGenerator& code, IR::Block blo
     RegAlloc reg_alloc{code, fpsr_manager, GPR_ORDER, FPR_ORDER};
     EmitContext ctx{block, reg_alloc, conf, ebi, fpsr_manager, fastmem_manager, {}};
 
-    ebi.entry_point = code.ptr<CodePtr>();
+    ebi.entry_point = code.getCurr<CodePtr>();
 
     if (ctx.block.GetCondition() == IR::Cond::AL) {
         ASSERT(!ctx.block.HasConditionFailedLocation());
@@ -264,17 +263,17 @@ EmittedBlockInfo EmitArm64(Xbyak_loongarch64::CodeGenerator& code, IR::Block blo
     }
     code.BRK(0);
 
-    ebi.size = code.ptr<CodePtr>() - ebi.entry_point;
+    ebi.size = code.getCurr<CodePtr>() - ebi.entry_point;
     return ebi;
 }
 
 void EmitRelocation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, LinkTarget link_target) {
-    ctx.ebi.relocations.emplace_back(Relocation{code.ptr<CodePtr>() - ctx.ebi.entry_point, link_target});
+    ctx.ebi.relocations.emplace_back(Relocation{code.getCurr<CodePtr>() - ctx.ebi.entry_point, link_target});
     code.NOP();
 }
 
 void EmitBlockLinkRelocation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, const IR::LocationDescriptor& descriptor, BlockRelocationType type) {
-    ctx.ebi.block_relocations[descriptor].emplace_back(BlockRelocation{code.ptr<CodePtr>() - ctx.ebi.entry_point, type});
+    ctx.ebi.block_relocations[descriptor].emplace_back(BlockRelocation{code.getCurr<CodePtr>() - ctx.ebi.entry_point, type});
     switch (type) {
     case BlockRelocationType::Branch:
         code.NOP();

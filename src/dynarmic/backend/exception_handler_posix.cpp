@@ -32,6 +32,8 @@
 #    include <oaknut/code_block.hpp>
 
 #    include "dynarmic/backend/arm64/abi.h"
+#elif defined(MCL_ARCHITECTURE_LOONGARCH64)
+#    include "dynarmic/backend/loongarch64/block_of_code.h"
 #else
 #    error "Invalid architecture"
 #endif
@@ -243,6 +245,9 @@ void SigHandler::SigAction(int sig, siginfo_t* info, void* raw_context) {
 
     fmt::print(stderr, "Unhandled {} at pc {:#018x}\n", sig == SIGSEGV ? "SIGSEGV" : "SIGBUS", CTX_PC);
 
+#elif defined(MCL_ARCHITECTURE_LOONGARCH64)
+    // ! FIXME
+
 #else
 
 #    error "Invalid architecture"
@@ -302,6 +307,12 @@ void ExceptionHandler::Register(X64::BlockOfCode& code) {
 void ExceptionHandler::Register(oaknut::CodeBlock& mem, std::size_t size) {
     const u64 code_begin = mcl::bit_cast<u64>(mem.ptr());
     const u64 code_end = code_begin + size;
+    impl = std::make_unique<Impl>(code_begin, code_end);
+}
+#elif defined(MCL_ARCHITECTURE_LOONGARCH64)
+void ExceptionHandler::Register(LoongArch64::BlockOfCode& code) {
+    const u64 code_begin = mcl::bit_cast<u64>(code.getCode());
+    const u64 code_end = code_begin + code.GetTotalCodeSize();
     impl = std::make_unique<Impl>(code_begin, code_end);
 }
 #else

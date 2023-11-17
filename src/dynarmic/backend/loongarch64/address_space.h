@@ -9,8 +9,6 @@
 #include <optional>
 
 #include <mcl/stdint.hpp>
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
 #include <tsl/robin_map.h>
 #include <tsl/robin_set.h>
 
@@ -19,6 +17,8 @@
 #include "dynarmic/interface/halt_reason.h"
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/location_descriptor.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 

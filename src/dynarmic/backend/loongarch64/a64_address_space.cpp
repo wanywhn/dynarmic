@@ -27,8 +27,8 @@ static void* EmitCallTrampoline(Xbyak_loongarch64::CodeGenerator& code, T* this_
 
     Xbyak_loongarch64::Label l_addr, l_this;
 
-    void* target = code.getCurr();
-    code.pcaddi(X0, l_this);
+    void* target = code.getCurr<void*>();
+    code.pcaddi(code.a0, l_this);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
 
@@ -51,15 +51,16 @@ static void* EmitWrappedReadCallTrampoline(Xbyak_loongarch64::CodeGenerator& cod
 
     constexpr u64 save_regs = ABI_CALLER_SAVE & ~ToRegList(Xscratch0);
 
-    void* target = (void *)code.getCode();
+    void* target = (void*)code.getCode();
     ABI_PushRegisters(code, save_regs, 0);
-    code.pcaddi(X0, l_this);
-    code.add_d(X1, Xscratch0, code.zero);
+    code.pcaddi(code.a0, l_this);
+    code.add_d(code.a1, Xscratch0, code.zero);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.add_d(Xscratch0, X0, code.zero);
+    code.add_d(Xscratch0, code.a0, code.zero);
     ABI_PopRegisters(code, save_regs, 0);
-    code.jirl(code.zero, code.ra, 0);();
+    code.jirl(code.zero, code.ra, 0);
+    ();
 
     code.align(8);
     code.L(l_this);
@@ -82,8 +83,8 @@ static void* EmitExclusiveReadCallTrampoline(Xbyak_loongarch64::CodeGenerator& c
         });
     };
 
-    void* target = (void *)code.getCode();
-    code.pcaddi(X0, l_this);
+    void* target = (void*)code.getCode();
+    code.pcaddi(code.a0, l_this);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
 
@@ -106,15 +107,16 @@ static void* EmitWrappedWriteCallTrampoline(Xbyak_loongarch64::CodeGenerator& co
 
     constexpr u64 save_regs = ABI_CALLER_SAVE;
 
-    void* target = (void *)code.getCode();
+    void* target = (void*)code.getCode();
     ABI_PushRegisters(code, save_regs, 0);
-    code.pcaddi(X0, l_this);
-    code.add_d(X1, Xscratch0, code.zero);
-    code.add_d(X2, Xscratch1, code.zero);
+    code.pcaddi(code.a0, l_this);
+    code.add_d(code.a1, Xscratch0, code.zero);
+    code.add_d(code.a2, Xscratch1, code.zero);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
     ABI_PopRegisters(code, save_regs, 0);
-    code.jirl(code.zero, code.ra, 0);();
+    code.jirl(code.zero, code.ra, 0);
+    ();
 
     code.align(8);
     code.L(l_this);
@@ -140,8 +142,8 @@ static void* EmitExclusiveWriteCallTrampoline(Xbyak_loongarch64::CodeGenerator& 
                  : 1;
     };
 
-    void* target = (void *)code.getCode();
-    code.pcaddi(X0, l_this);
+    void* target = (void*)code.getCode();
+    code.pcaddi(code.a0, l_this);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
 
@@ -161,15 +163,16 @@ static void* EmitRead128CallTrampoline(Xbyak_loongarch64::CodeGenerator& code, A
 
     Xbyak_loongarch64::Label l_addr, l_this;
 
-    void* target = (void *)code.getCode();
+    void* target = (void*)code.getCode();
     ABI_PushRegisters(code, (1ull << 29) | (1ull << 30), 0);
-    code.pcaddi(X0, l_this);
+    code.pcaddi(code.a0, l_this);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.FMOV(D0, X0);
-    code.FMOV(V0.D()[1], X1);
+    code.FMOV(D0, code.a0);
+    code.FMOV(V0.D()[1], code.a1);
     ABI_PopRegisters(code, (1ull << 29) | (1ull << 30), 0);
-    code.jirl(code.zero, code.ra, 0);();
+    code.jirl(code.zero, code.ra, 0);
+    ();
 
     code.align(8);
     code.L(l_this);
@@ -189,16 +192,17 @@ static void* EmitWrappedRead128CallTrampoline(Xbyak_loongarch64::CodeGenerator& 
 
     constexpr u64 save_regs = ABI_CALLER_SAVE & ~ToRegList(Q0);
 
-    void* target = (void *)code.getCode();
+    void* target = (void*)code.getCode();
     ABI_PushRegisters(code, save_regs, 0);
-    code.pcaddi(X0, l_this);
-    code.add_d(X1, Xscratch0, code.zero);
+    code.pcaddi(code.a0, l_this);
+    code.add_d(code.a1, Xscratch0, code.zero);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.FMOV(D0, X0);
-    code.FMOV(V0.D()[1], X1);
+    code.FMOV(D0, code.a0);
+    code.FMOV(V0.D()[1], code.a1);
     ABI_PopRegisters(code, save_regs, 0);
-    code.jirl(code.zero, code.ra, 0);();
+    code.jirl(code.zero, code.ra, 0);
+    ();
 
     code.align(8);
     code.L(l_this);
@@ -220,15 +224,16 @@ static void* EmitExclusiveRead128CallTrampoline(Xbyak_loongarch64::CodeGenerator
         });
     };
 
-    void* target = (void *)code.getCode();
+    void* target = (void*)code.getCode();
     ABI_PushRegisters(code, (1ull << 29) | (1ull << 30), 0);
-    code.pcaddi(X0, l_this);
+    code.pcaddi(code.a0, l_this);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.FMOV(D0, X0);
-    code.FMOV(V0.D()[1], X1);
+    code.FMOV(D0, code.a0);
+    code.FMOV(V0.D()[1], code.a1);
     ABI_PopRegisters(code, (1ull << 29) | (1ull << 30), 0);
-    code.jirl(code.zero, code.ra, 0);();
+    code.jirl(code.zero, code.ra, 0);
+    ();
 
     code.align(8);
     code.L(l_this);
@@ -246,9 +251,9 @@ static void* EmitWrite128CallTrampoline(Xbyak_loongarch64::CodeGenerator& code, 
 
     Xbyak_loongarch64::Label l_addr, l_this;
 
-    void* target = (void *)code.getCode();
-    code.pcaddi(X0, l_this);
-    code.FMOV(X2, D0);
+    void* target = (void*)code.getCode();
+    code.pcaddi(code.a0, l_this);
+    code.FMOV(code.a2, D0);
     code.FMOV(X3, V0.D()[1]);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
@@ -271,16 +276,17 @@ static void* EmitWrappedWrite128CallTrampoline(Xbyak_loongarch64::CodeGenerator&
 
     constexpr u64 save_regs = ABI_CALLER_SAVE;
 
-    void* target = (void *)code.getCode();
+    void* target = (void*)code.getCode();
     ABI_PushRegisters(code, save_regs, 0);
-    code.pcaddi(X0, l_this);
-    code.add_d(X1, Xscratch0, code.zero);
-    code.FMOV(X2, D0);
+    code.pcaddi(code.a0, l_this);
+    code.add_d(code.a1, Xscratch0, code.zero);
+    code.FMOV(code.a2, D0);
     code.FMOV(X3, V0.D()[1]);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
     ABI_PopRegisters(code, save_regs, 0);
-    code.jirl(code.zero, code.ra, 0);();
+    code.jirl(code.zero, code.ra, 0);
+    ();
 
     code.align(8);
     code.L(l_this);
@@ -305,9 +311,9 @@ static void* EmitExclusiveWrite128CallTrampoline(Xbyak_loongarch64::CodeGenerato
                  : 1;
     };
 
-    void* target = (void *)code.getCode();
-    code.pcaddi(X0, l_this);
-    code.FMOV(X2, D0);
+    void* target = (void*)code.getCode();
+    code.pcaddi(code.a0, l_this);
+    code.FMOV(code.a2, D0);
     code.FMOV(X3, V0.D()[1]);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
@@ -357,7 +363,7 @@ void A64AddressSpace::InvalidateCacheRanges(const boost::icl::interval_set<u64>&
 void A64AddressSpace::EmitPrelude() {
     using namespace Xbyak_loongarch64::util;
 
-    mem.unprotect();
+    //    mem.unprotect();
 
     prelude_info.read_memory_8 = EmitCallTrampoline<&A64::UserCallbacks::MemoryRead8>(code, conf.callbacks);
     prelude_info.read_memory_16 = EmitCallTrampoline<&A64::UserCallbacks::MemoryRead16>(code, conf.callbacks);
@@ -400,13 +406,13 @@ void A64AddressSpace::EmitPrelude() {
 
     Xbyak_loongarch64::Label return_from_run_code, l_return_to_dispatcher;
 
-    prelude_info.run_code = code.ptr<PreludeInfo::RunCodeFuncType>();
+    prelude_info.run_code = code.getCurr<PreludeInfo::RunCodeFuncType>();
     {
         ABI_PushRegisters(code, ABI_CALLEE_SAVE | (1 << 30), sizeof(StackLayout));
 
-        code.add_d(X19, X0, code.zero);
-        code.add_d(Xstate, X1, code.zero);
-        code.add_d(Xhalt, X2, code.zero);
+        code.add_d(code.s0, code.a0, code.zero);
+        code.add_d(Xstate, code.a1, code.zero);
+        code.add_d(Xhalt, code.a2, code.zero);
         if (conf.page_table) {
             code.add_d(Xpagetable, mcl::bit_cast<u64>(conf.page_table), code.zero);
         }
@@ -417,34 +423,34 @@ void A64AddressSpace::EmitPrelude() {
         if (conf.HasOptimization(OptimizationFlag::ReturnStackBuffer)) {
             code.pcaddi(Xscratch0, l_return_to_dispatcher);
             for (size_t i = 0; i < RSBCount; i++) {
-                code.STR(Xscratch0, SP, offsetof(StackLayout, rsb) + offsetof(RSBEntry, code_ptr) + i * sizeof(RSBEntry));
+                code.st_d(Xscratch0, code.sp, offsetof(StackLayout, rsb) + offsetof(RSBEntry, code_ptr) + i * sizeof(RSBEntry));
             }
         }
 
         if (conf.enable_cycle_counting) {
             code.bl(prelude_info.get_ticks_remaining);
-            code.add_d(Xticks, X0, code.zero);
-            code.STR(Xticks, SP, offsetof(StackLayout, cycles_to_run));
+            code.add_d(Xticks, code.a0, code.zero);
+            code.st_d(Xticks, code.sp, offsetof(StackLayout, cycles_to_run));
         }
 
         code.MRS(Xscratch1, Xbyak_loongarch64::SystemReg::FPCR);
-        code.STR(Wscratch1, SP, offsetof(StackLayout, save_host_fpcr));
-        code.pcaddi(Wscratch0, Xstate, offsetof(A64JitState, fpcr));
+        code.st_d(Wscratch1, code.sp, offsetof(StackLayout, save_host_fpcr));
+        code.ld_d(Wscratch0, Xstate, offsetof(A64JitState, fpcr));
         code.MSR(Xbyak_loongarch64::SystemReg::FPCR, Xscratch0);
 
-        code.LDAR(Wscratch0, Xhalt);
-        code.CBNZ(Wscratch0, return_from_run_code);
+        code.ll_acq_w(Wscratch0, Xhalt);
+        code.bnez(Wscratch0, return_from_run_code);
 
-        code.jirl(code.zero, X19, 0);
+        code.jirl(code.zero, code.s0, 0);
     }
 
-    prelude_info.step_code = code.ptr<PreludeInfo::RunCodeFuncType>();
+    prelude_info.step_code = code.getCurr<PreludeInfo::RunCodeFuncType>();
     {
         ABI_PushRegisters(code, ABI_CALLEE_SAVE | (1 << 30), sizeof(StackLayout));
 
-        code.add_d(X19, X0, code.zero);
-        code.add_d(Xstate, X1, code.zero);
-        code.add_d(Xhalt, X2, code.zero);
+        code.add_d(code.s0, code.a0, code.zero);
+        code.add_d(Xstate, code.a1, code.zero);
+        code.add_d(Xhalt, code.a2, code.zero);
         if (conf.page_table) {
             code.add_d(Xpagetable, mcl::bit_cast<u64>(conf.page_table), code.zero);
         }
@@ -455,48 +461,48 @@ void A64AddressSpace::EmitPrelude() {
         if (conf.HasOptimization(OptimizationFlag::ReturnStackBuffer)) {
             code.pcaddi(Xscratch0, l_return_to_dispatcher);
             for (size_t i = 0; i < RSBCount; i++) {
-                code.STR(Xscratch0, SP, offsetof(StackLayout, rsb) + offsetof(RSBEntry, code_ptr) + i * sizeof(RSBEntry));
+                code.st_d(Xscratch0, code.sp, offsetof(StackLayout, rsb) + offsetof(RSBEntry, code_ptr) + i * sizeof(RSBEntry));
             }
         }
 
         if (conf.enable_cycle_counting) {
             code.add_d(Xticks, 1, code.zero);
-            code.STR(Xticks, SP, offsetof(StackLayout, cycles_to_run));
+            code.st_d(Xticks, code.sp, offsetof(StackLayout, cycles_to_run));
         }
 
         code.MRS(Xscratch1, Xbyak_loongarch64::SystemReg::FPCR);
-        code.STR(Wscratch1, SP, offsetof(StackLayout, save_host_fpcr));
-        code.pcaddi(Wscratch0, Xstate, offsetof(A64JitState, fpcr));
+        code.st_d(Wscratch1, code.sp, offsetof(StackLayout, save_host_fpcr));
+        code.ld_d(Wscratch0, Xstate, offsetof(A64JitState, fpcr));
         code.MSR(Xbyak_loongarch64::SystemReg::FPCR, Xscratch0);
 
         Xbyak_loongarch64::Label step_hr_loop;
         code.L(step_hr_loop);
         code.LDAXR(Wscratch0, Xhalt);
-        code.CBNZ(Wscratch0, return_from_run_code);
+        code.bnez(Wscratch0, return_from_run_code);
         code.ORR(Wscratch0, Wscratch0, static_cast<u32>(HaltReason::Step));
         code.STLXR(Wscratch1, Wscratch0, Xhalt);
-        code.CBNZ(Wscratch1, step_hr_loop);
+        code.bnez(Wscratch1, step_hr_loop);
 
-        code.jirl(code.zero, X19, 0);
+        code.jirl(code.zero, code.s0, 0);
     }
 
     prelude_info.return_to_dispatcher = code.getCurr<void (*)()>();
     {
         Xbyak_loongarch64::Label l_this, l_addr;
 
-        code.LDAR(Wscratch0, Xhalt);
-        code.CBNZ(Wscratch0, return_from_run_code);
+        code.ll_acq_w(Wscratch0, Xhalt);
+        code.bnez(Wscratch0, return_from_run_code);
 
         if (conf.enable_cycle_counting) {
-            code.CMP(Xticks, 0);
-            code.B(LE, return_from_run_code);
+            code.blt(Xticks, code.zero, return_from_run_code);
+            code.beqz(Xticks, return_from_run_code);
         }
 
-        code.pcaddi(X0, l_this);
-        code.add_d(X1, Xstate, code.zero);
+        code.pcaddi(code.a0, l_this);
+        code.add_d(code.a1, Xstate, code.zero);
         code.pcaddi(Xscratch0, l_addr);
         code.jirl(code.ra, Xscratch0, 0);
-        code.jirl(code.zero, X0, 0);
+        code.jirl(code.zero, code.a0, 0);
 
         const auto fn = [](A64AddressSpace& self, A64JitState& context) -> CodePtr {
             return self.GetOrEmit(context.GetLocationDescriptor());
@@ -509,37 +515,38 @@ void A64AddressSpace::EmitPrelude() {
         code.dx(mcl::bit_cast<u64>(Common::FptrCast(fn)));
     }
 
-    prelude_info.return_from_run_code = code.getCurr<void (*)()>();
+    prelude_info.return_from_run_code = code.getCurr<void*>();
     {
         code.L(return_from_run_code);
 
         if (conf.enable_cycle_counting) {
-            code.pcaddi(X1, SP, offsetof(StackLayout, cycles_to_run));
-            code.SUB(X1, X1, Xticks);
+            code.ld_d(code.a1, code.sp, offsetof(StackLayout, cycles_to_run));
+            code.sub_d(code.a1, code.a1, Xticks);
             code.bl(prelude_info.add_ticks);
         }
 
-        code.pcaddi(Wscratch0, SP, offsetof(StackLayout, save_host_fpcr));
+        code.ld_d(Wscratch0, code.sp, offsetof(StackLayout, save_host_fpcr));
         code.MSR(Xbyak_loongarch64::SystemReg::FPCR, Xscratch0);
 
         Xbyak_loongarch64::Label exit_hr_loop;
         code.L(exit_hr_loop);
         code.LDAXR(W0, Xhalt);
         code.STLXR(Wscratch0, WZR, Xhalt);
-        code.CBNZ(Wscratch0, exit_hr_loop);
+        code.bnez(Wscratch0, exit_hr_loop);
 
         ABI_PopRegisters(code, ABI_CALLEE_SAVE | (1 << 30), sizeof(StackLayout));
-        code.jirl(code.zero, code.ra, 0);();
+        code.jirl(code.zero, code.ra, 0);
+        ();
     }
 
     code.align(8);
     code.L(l_return_to_dispatcher);
     code.dx(mcl::bit_cast<u64>(prelude_info.return_to_dispatcher));
 
-    prelude_info.end_of_prelude = code.ptr<u32*>();
+    prelude_info.end_of_prelude = code.getCurr<u32*>();
 
-    mem.invalidate_all();
-    mem.protect();
+    //    mem.invalidate_all();
+    //    mem.protect();
 }
 
 EmitConfig A64AddressSpace::GetEmitConfig() {

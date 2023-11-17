@@ -14,13 +14,13 @@
 #include <mcl/assert.hpp>
 #include <mcl/stdint.hpp>
 #include <mcl/type_traits/is_instance_of_template.hpp>
-#include "xbyak_loongarch64.h"
 #include <tsl/robin_set.h>
 
 #include "dynarmic/backend/loongarch64/stack_layout.h"
 #include "dynarmic/ir/cond.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/value.h"
+#include "xbyak_loongarch64.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -95,17 +95,17 @@ public:
 
     operator T() const { return reg.value(); }
 
-    operator Xbyak_loongarch64::WRegWsp() const
-    requires(std::is_same_v<T, Xbyak_loongarch64::WReg>)
-    {
-        return reg.value();
-    }
-
-    operator Xbyak_loongarch64::XRegSp() const
-    requires(std::is_same_v<T, Xbyak_loongarch64::XReg>)
-    {
-        return reg.value();
-    }
+    //    operator Xbyak_loongarch64::WRegWsp() const
+    //    requires(std::is_same_v<T, Xbyak_loongarch64::WReg>)
+    //    {
+    //        return reg.value();
+    //    }
+    //
+    //    operator Xbyak_loongarch64::XRegSp() const
+    //    requires(std::is_same_v<T, Xbyak_loongarch64::XReg>)
+    //    {
+    //        return reg.value();
+    //    }
 
     T operator*() const { return reg.value(); }
     const T* operator->() const { return &reg.value(); }

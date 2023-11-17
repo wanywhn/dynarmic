@@ -9,8 +9,6 @@
 #include <utility>
 
 #include <mcl/bit_cast.hpp>
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
 
 #include "dynarmic/backend/loongarch64/abi.h"
 #include "dynarmic/backend/loongarch64/emit_arm64.h"
@@ -22,6 +20,8 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -144,7 +144,7 @@ void CallbackOnlyEmitReadMemory(Xbyak_loongarch64::CodeGenerator& code, EmitCont
         code.add_d(Q8.B16(), Q0.B16(), code.zero);
         ctx.reg_alloc.DefineAsRegister(inst, Q8);
     } else {
-        ctx.reg_alloc.DefineAsRegister(inst, X0);
+        ctx.reg_alloc.DefineAsRegister(inst, code.a0);
     }
 }
 
@@ -165,7 +165,7 @@ void CallbackOnlyEmitExclusiveReadMemory(Xbyak_loongarch64::CodeGenerator& code,
         code.add_d(Q8.B16(), Q0.B16(), code.zero);
         ctx.reg_alloc.DefineAsRegister(inst, Q8);
     } else {
-        ctx.reg_alloc.DefineAsRegister(inst, X0);
+        ctx.reg_alloc.DefineAsRegister(inst, code.a0);
     }
 }
 
@@ -204,7 +204,7 @@ void CallbackOnlyEmitExclusiveWriteMemory(Xbyak_loongarch64::CodeGenerator& code
         code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
     }
     code.L(end);
-    ctx.reg_alloc.DefineAsRegister(inst, X0);
+    ctx.reg_alloc.DefineAsRegister(inst, code.a0);
 }
 
 constexpr size_t page_bits = 12;
@@ -266,7 +266,7 @@ std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg> InlinePageTableEmitV
         code.B(NE, *fallback);
     }
 
-    code.pcaddi(Xscratch0, Xpagetable, Xscratch0, LSL, 3);
+    code.ld_d(Xscratch0, Xpagetable, Xscratch0, LSL, 3);
 
     if (ctx.conf.page_table_pointer_mask_bits != 0) {
         const u64 mask = u64(~u64(0)) << ctx.conf.page_table_pointer_mask_bits;
@@ -288,12 +288,12 @@ CodePtr EmitMemoryLdr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
     const auto add_ext = extend32 ? Xbyak_loongarch64::AddSubExt::UXTW : Xbyak_loongarch64::AddSubExt::LSL;
     const auto Roffset = extend32 ? Xbyak_loongarch64::RReg{Xoffset.toW()} : Xbyak_loongarch64::RReg{Xoffset};
 
-    CodePtr fastmem_location = code.ptr<CodePtr>();
+    CodePtr fastmem_location = code.getCurr<CodePtr>();
 
     if (ordered) {
         code.ADD(Xscratch0, Xbase, Roffset, add_ext);
 
-        fastmem_location = code.ptr<CodePtr>();
+        fastmem_location = code.getCurr<CodePtr>();
 
         switch (bitsize) {
         case 8:
@@ -303,20 +303,20 @@ CodePtr EmitMemoryLdr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
             code.LDARH(Xbyak_loongarch64::WReg{value_idx}, Xscratch0);
             break;
         case 32:
-            code.LDAR(Xbyak_loongarch64::WReg{value_idx}, Xscratch0);
+            code.ll_acq_w(Xbyak_loongarch64::WReg{value_idx}, Xscratch0);
             break;
         case 64:
-            code.LDAR(Xbyak_loongarch64::XReg{value_idx}, Xscratch0);
+            code.ll_acq_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0);
             break;
         case 128:
-            code.pcaddi(Xbyak_loongarch64::QReg{value_idx}, Xscratch0);
+            code.ld_d(Xbyak_loongarch64::QReg{value_idx}, Xscratch0, 0);
             code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
             break;
         default:
             ASSERT_FALSE("Invalid bitsize");
         }
     } else {
-        fastmem_location = code.ptr<CodePtr>();
+        fastmem_location = code.getCurr<CodePtr>();
 
         switch (bitsize) {
         case 8:
@@ -326,13 +326,13 @@ CodePtr EmitMemoryLdr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
             code.LDRH(Xbyak_loongarch64::WReg{value_idx}, Xbase, Roffset, index_ext);
             break;
         case 32:
-            code.pcaddi(Xbyak_loongarch64::WReg{value_idx}, Xbase, Roffset, index_ext);
+            code.ld_d(Xbyak_loongarch64::WReg{value_idx}, Xbase, Roffset, index_ext);
             break;
         case 64:
-            code.pcaddi(Xbyak_loongarch64::XReg{value_idx}, Xbase, Roffset, index_ext);
+            code.ld_d(Xbyak_loongarch64::XReg{value_idx}, Xbase, Roffset, index_ext);
             break;
         case 128:
-            code.pcaddi(Xbyak_loongarch64::QReg{value_idx}, Xbase, Roffset, index_ext);
+            code.ld_d(Xbyak_loongarch64::QReg{value_idx}, Xbase, Roffset, index_ext);
             break;
         default:
             ASSERT_FALSE("Invalid bitsize");
@@ -353,7 +353,7 @@ CodePtr EmitMemoryStr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
     if (ordered) {
         code.ADD(Xscratch0, Xbase, Roffset, add_ext);
 
-        fastmem_location = code.ptr<CodePtr>();
+        fastmem_location = code.getCurr<CodePtr>();
 
         switch (bitsize) {
         case 8:
@@ -363,21 +363,21 @@ CodePtr EmitMemoryStr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
             code.STLRH(Xbyak_loongarch64::WReg{value_idx}, Xscratch0);
             break;
         case 32:
-            code.STLR(Xbyak_loongarch64::WReg{value_idx}, Xscratch0);
+            code.sc_rel_w(Xbyak_loongarch64::WReg{value_idx}, Xscratch0);
             break;
         case 64:
-            code.STLR(Xbyak_loongarch64::XReg{value_idx}, Xscratch0);
+            code.sc_rel_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0);
             break;
         case 128:
             code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
-            code.STR(Xbyak_loongarch64::QReg{value_idx}, Xscratch0);
+            code.stx_d(Xbyak_loongarch64::QReg{value_idx}, Xscratch0, code.zero);
             code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
             break;
         default:
             ASSERT_FALSE("Invalid bitsize");
         }
     } else {
-        fastmem_location = code.ptr<CodePtr>();
+        fastmem_location = code.getCurr<CodePtr>();
 
         switch (bitsize) {
         case 8:
@@ -518,7 +518,7 @@ std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg> FastmemEmitVAddrLook
     }
 
     code.LSR(Xscratch0, Xaddr, ctx.conf.fastmem_address_space_bits);
-    code.CBNZ(Xscratch0, *fallback);
+    code.bnez(Xscratch0, *fallback);
     return std::make_pair(Xfastmem, Xaddr);
 }
 

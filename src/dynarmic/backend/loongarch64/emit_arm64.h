@@ -12,12 +12,12 @@
 
 #include <mcl/stdint.hpp>
 #include <tsl/robin_map.h>
-#include "xbyak_loongarch64.h"
 
 #include "dynarmic/backend/loongarch64/fastmem.h"
 #include "dynarmic/interface/A32/coprocessor.h"
 #include "dynarmic/interface/optimization_flags.h"
 #include "dynarmic/ir/location_descriptor.h"
+#include "xbyak_loongarch64.h"
 
 namespace oaknut {
 struct PointerCodeGeneratorPolicy;

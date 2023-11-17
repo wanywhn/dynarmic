@@ -9,12 +9,11 @@
 #include <memory>
 #include <vector>
 
-#include "xbyak_loongarch64.h"
-
 #include "dynarmic/backend/loongarch64/emit_arm64.h"
 #include "dynarmic/backend/loongarch64/reg_alloc.h"
 #include "dynarmic/common/fp/fpcr.h"
 #include "dynarmic/ir/basic_block.h"
+#include "xbyak_loongarch64.h"
 
 namespace Dynarmic::IR {
 class Block;

@@ -12,8 +12,6 @@
 #include <mcl/mp/typelist/lower_to_tuple.hpp>
 #include <mcl/type_traits/function_info.hpp>
 #include <mcl/type_traits/integer_of_size.hpp>
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
 
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
 #include "dynarmic/backend/loongarch64/a64_jitstate.h"
@@ -33,6 +31,8 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -270,13 +270,13 @@ static void EmitTwoOpFallbackWithoutRegAlloc(Xbyak_loongarch64::CodeGenerator& c
     ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Qresult.getIdx()), stack_size);
 
     code.add_d(Xscratch0, mcl::bit_cast<u64>(fn), code.zero);
-    code.ADD(X0, SP, 0 * 16);
-    code.ADD(X1, SP, 1 * 16);
-    code.add_d(X2, fpcr, code.zero);
-    code.ADD(X3, Xstate, ctx.conf.state_fpsr_offset);
-    code.STR(Qarg1, X1);
+    code.add_imm(code.a0, code.sp, 0 * 16, t0);
+    code.add_imm(code.a1, code.sp, 1 * 16, t0);
+    code.add_d(code.a2, fpcr, code.zero);
+    code.add_imm(X3, Xstate, ctx.conf.state_fpsr_offset, t0);
+    code.stx_d(Qarg1, code.a1, code.zero);
     code.jirl(code.ra, Xscratch0, 0);
-    code.pcaddi(Qresult, SP);
+    code.ld_d(Qresult, SP, 0);
 
     ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Qresult.getIdx()), stack_size);
 }

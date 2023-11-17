@@ -243,17 +243,17 @@ void RegAlloc::AssertNoMoreUses() const {
 }
 
 void RegAlloc::EmitVerboseDebuggingOutput() {
-    code.add_d(X19, mcl::bit_cast<u64>(&PrintVerboseDebuggingOutputLine), code.zero);  // Non-volatile register
+    code.add_d(code.s0, mcl::bit_cast<u64>(&PrintVerboseDebuggingOutputLine), code.zero);  // Non-volatile register
 
     const auto do_location = [&](HostLocInfo& info, HostLocType type, size_t index) {
         using namespace Xbyak_loongarch64::util;
         for (const IR::Inst* value : info.values) {
-            code.add_d(X0, SP, code.zero);
-            code.add_d(X1, static_cast<u64>(type), code.zero);
-            code.add_d(X2, index, code.zero);
+            code.add_d(code.a0, code.sp, code.zero);
+            code.add_d(code.a1, static_cast<u64>(type), code.zero);
+            code.add_d(code.a2, index, code.zero);
             code.add_d(X3, value->GetName(), code.zero);
             code.add_d(X4, static_cast<u64>(value->GetType()), code.zero);
-            code.jirl(code.ra, X19, 0);
+            code.jirl(code.ra, code.s0, 0);
         }
     };
 
@@ -332,7 +332,7 @@ int RegAlloc::RealizeReadImpl(const IR::Value& value) {
             // ASSERT size fits
             break;
         case HostLoc::Kind::Spill:
-            code.pcaddi(Xbyak_loongarch64::XReg{new_location_index}, SP, spill_offset + current_location->index * spill_slot_size);
+            code.ld_d(Xbyak_loongarch64::XReg{new_location_index}, code.sp, spill_offset + current_location->index * spill_slot_size);
             break;
         case HostLoc::Kind::Flags:
             code.MRS(Xbyak_loongarch64::XReg{new_location_index}, Xbyak_loongarch64::SystemReg::NZCV);
@@ -354,7 +354,7 @@ int RegAlloc::RealizeReadImpl(const IR::Value& value) {
             ASSERT_FALSE("Logic error");
             break;
         case HostLoc::Kind::Spill:
-            code.pcaddi(Xbyak_loongarch64::QReg{new_location_index}, SP, spill_offset + current_location->index * spill_slot_size);
+            code.ld_d(Xbyak_loongarch64::QReg{new_location_index}, code.sp, spill_offset + current_location->index * spill_slot_size);
             break;
         case HostLoc::Kind::Flags:
             ASSERT_FALSE("Moving from flags into fprs is not currently supported");
@@ -447,7 +447,7 @@ void RegAlloc::SpillGpr(int index) {
         return;
     }
     const int new_location_index = FindFreeSpill();
-    code.STR(Xbyak_loongarch64::XReg{index}, SP, spill_offset + new_location_index * spill_slot_size);
+    code.st_d(Xbyak_loongarch64::XReg{index}, code.sp, spill_offset + new_location_index * spill_slot_size);
     spills[new_location_index] = std::exchange(gprs[index], {});
 }
 
@@ -457,7 +457,7 @@ void RegAlloc::SpillFpr(int index) {
         return;
     }
     const int new_location_index = FindFreeSpill();
-    code.STR(Xbyak_loongarch64::QReg{index}, SP, spill_offset + new_location_index * spill_slot_size);
+    code.st_d(Xbyak_loongarch64::QReg{index}, code.sp, spill_offset + new_location_index * spill_slot_size);
     spills[new_location_index] = std::exchange(fprs[index], {});
 }
 
@@ -480,7 +480,7 @@ void RegAlloc::ReadWriteFlags(Argument& read, IR::Inst* write) {
         if (!flags.values.empty()) {
             SpillFlags();
         }
-        code.pcaddi(Wscratch0, SP, spill_offset + current_location->index * spill_slot_size);
+        code.ld_d(Wscratch0, code.sp, spill_offset + current_location->index * spill_slot_size);
         code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
     } else {
         ASSERT_FALSE("Invalid current location for flags");
@@ -526,7 +526,7 @@ void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::XReg reg)
         // ASSERT size fits
         break;
     case HostLoc::Kind::Spill:
-        code.pcaddi(reg, SP, spill_offset + current_location->index * spill_slot_size);
+        code.ld_d(reg, code.sp, spill_offset + current_location->index * spill_slot_size);
         break;
     case HostLoc::Kind::Flags:
         code.MRS(reg, Xbyak_loongarch64::SystemReg::NZCV);
@@ -552,7 +552,7 @@ void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::QReg reg)
         break;
     case HostLoc::Kind::Spill:
         // TODO: Minimize move size to max value width
-        code.pcaddi(reg, SP, spill_offset + current_location->index * spill_slot_size);
+        code.ld_d(reg, code.sp, spill_offset + current_location->index * spill_slot_size);
         break;
     case HostLoc::Kind::Flags:
         ASSERT_FALSE("Moving from flags into fprs is not currently supported");

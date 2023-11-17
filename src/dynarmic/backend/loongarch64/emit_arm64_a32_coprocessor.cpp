@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: 0BSD
  */
 
-#include "xbyak_loongarch64.h"
-#include "xbyak_loongarch64_util.h"
-
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
 #include "dynarmic/backend/loongarch64/abi.h"
 #include "dynarmic/backend/loongarch64/emit_arm64.h"
@@ -15,6 +12,8 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include "xbyak_loongarch64.h"
+#include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -28,14 +27,14 @@ static void CallCoprocCallback(Xbyak_loongarch64::CodeGenerator& code, EmitConte
     ctx.reg_alloc.PrepareForCall({}, arg0, arg1);
 
     if (callback.user_arg) {
-        code.add_d(X0, reinterpret_cast<u64>(*callback.user_arg), code.zero);
+        code.add_d(code.a0, reinterpret_cast<u64>(*callback.user_arg), code.zero);
     }
 
     code.add_d(Xscratch0, reinterpret_cast<u64>(callback.function), code.zero);
     code.jirl(code.ra, Xscratch0, 0);
 
     if (inst) {
-        ctx.reg_alloc.DefineAsRegister(inst, X0);
+        ctx.reg_alloc.DefineAsRegister(inst, code.a0);
     }
 }
 
@@ -99,7 +98,7 @@ void EmitIR<IR::Opcode::A32CoprocSendOneWord>(Xbyak_loongarch64::CodeGenerator& 
         RegAlloc::Realize(Wvalue);
 
         code.add_d(Xscratch0, reinterpret_cast<u64>(*destination_ptr), code.zero);
-        code.STR(Wvalue, Xscratch0);
+        code.stx_d(Wvalue, Xscratch0, code.zero);
 
         return;
     }
@@ -142,8 +141,8 @@ void EmitIR<IR::Opcode::A32CoprocSendTwoWords>(Xbyak_loongarch64::CodeGenerator&
 
         code.add_d(Xscratch0, reinterpret_cast<u64>((*destination_ptrs)[0]), code.zero);
         code.add_d(Xscratch1, reinterpret_cast<u64>((*destination_ptrs)[1]), code.zero);
-        code.STR(Wvalue1, Xscratch0);
-        code.STR(Wvalue2, Xscratch1);
+        code.stx_d(Wvalue1, Xscratch0, code.zero);
+        code.stx_d(Wvalue2, Xscratch1, code.zero);
 
         return;
     }
@@ -185,7 +184,7 @@ void EmitIR<IR::Opcode::A32CoprocGetOneWord>(Xbyak_loongarch64::CodeGenerator& c
         RegAlloc::Realize(Wvalue);
 
         code.add_d(Xscratch0, reinterpret_cast<u64>(*source_ptr), code.zero);
-        code.pcaddi(Wvalue, Xscratch0);
+        code.ld_d(Wvalue, Xscratch0, 0);
 
         return;
     }
@@ -225,8 +224,8 @@ void EmitIR<IR::Opcode::A32CoprocGetTwoWords>(Xbyak_loongarch64::CodeGenerator& 
 
         code.add_d(Xscratch0, reinterpret_cast<u64>((*source_ptrs)[0]), code.zero);
         code.add_d(Xscratch1, reinterpret_cast<u64>((*source_ptrs)[1]), code.zero);
-        code.pcaddi(Xvalue, Xscratch0);
-        code.pcaddi(Wscratch1, Xscratch1);
+        code.ld_d(Xvalue, Xscratch0, 0);
+        code.ld_d(Wscratch1, Xscratch1, 0);
         code.BFI(Xvalue, Xscratch1, 32, 32);
 
         return;

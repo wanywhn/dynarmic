@@ -17,12 +17,12 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 AddressSpace::AddressSpace(size_t code_cache_size)
         : code_cache_size(code_cache_size)
-        , mem(code_cache_size)
-        , code(mem.ptr())
+        //        , mem(code_cache_size)
+        , code(code_cache_size)
         , fastmem_manager(exception_handler) {
     ASSERT_MSG(code_cache_size <= 128 * 1024 * 1024, "code_cache_size > 128 MiB not currently supported");
 
-    exception_handler.Register(mem, code_cache_size);
+    exception_handler.Register(&code);
     exception_handler.SetFastmemCallback([this](u64 host_pc) {
         return FastmemCallback(host_pc);
     });
@@ -93,7 +93,7 @@ void AddressSpace::ClearCache() {
 }
 
 size_t AddressSpace::GetRemainingSize() {
-    return code_cache_size - (code.ptr<CodePtr>() - reinterpret_cast<CodePtr>(mem.ptr()));
+    return code_cache_size - (code.getCurr<CodePtr>() - reinterpret_cast<CodePtr>(mem.ptr()));
 }
 
 EmittedBlockInfo AddressSpace::Emit(IR::Block block) {
