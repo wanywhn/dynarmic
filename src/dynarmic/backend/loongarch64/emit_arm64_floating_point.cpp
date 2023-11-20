@@ -86,7 +86,7 @@ static void EmitToFixed(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx
                 code.FCVTZS(Rto, Vfrom, fbits + 16);
                 code.ASR(Wscratch0, Rto, 31);
                 code.ADD(Rto, Rto, Wscratch0, LSR, 16);  // Round towards zero when truncating
-                code.LSR(Rto, Rto, 16);
+                code.srli_w(Rto, Rto, 16);
             } else if (fbits) {
                 code.FCVTZS(Rto, Vfrom, fbits);
             } else {
@@ -95,7 +95,7 @@ static void EmitToFixed(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx
         } else {
             if constexpr (bitsize_to == 16) {
                 code.FCVTZU(Rto, Vfrom, fbits + 16);
-                code.LSR(Rto, Rto, 16);
+                code.srli_w(Rto, Rto, 16);
             } else if (fbits) {
                 code.FCVTZU(Rto, Vfrom, fbits);
             } else {
@@ -707,7 +707,7 @@ void EmitIR<IR::Opcode::FPSingleToFixedU64>(Xbyak_loongarch64::CodeGenerator& co
 template<>
 void EmitIR<IR::Opcode::FPFixedU16ToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
-        code.LSL(Wscratch0, Wfrom, 16);
+        code.slli_w(Wscratch0, Wfrom, 16);
         code.UCVTF(Sto, Wscratch0, fbits + 16);
     });
 }
@@ -715,7 +715,7 @@ void EmitIR<IR::Opcode::FPFixedU16ToSingle>(Xbyak_loongarch64::CodeGenerator& co
 template<>
 void EmitIR<IR::Opcode::FPFixedS16ToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
-        code.LSL(Wscratch0, Wfrom, 16);
+        code.slli_w(Wscratch0, Wfrom, 16);
         code.SCVTF(Sto, Wscratch0, fbits + 16);
     });
 }
@@ -723,7 +723,7 @@ void EmitIR<IR::Opcode::FPFixedS16ToSingle>(Xbyak_loongarch64::CodeGenerator& co
 template<>
 void EmitIR<IR::Opcode::FPFixedU16ToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
-        code.LSL(Wscratch0, Wfrom, 16);
+        code.slli_w(Wscratch0, Wfrom, 16);
         code.UCVTF(Dto, Wscratch0, fbits + 16);
     });
 }
@@ -731,7 +731,7 @@ void EmitIR<IR::Opcode::FPFixedU16ToDouble>(Xbyak_loongarch64::CodeGenerator& co
 template<>
 void EmitIR<IR::Opcode::FPFixedS16ToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
-        code.LSL(Wscratch0, Wfrom, 16);
+        code.slli_w(Wscratch0, Wfrom, 16);
         code.SCVTF(Dto, Wscratch0, fbits + 16);
     });
 }

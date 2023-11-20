@@ -137,7 +137,7 @@ void CallbackOnlyEmitReadMemory(Xbyak_loongarch64::CodeGenerator& code, EmitCont
 
     EmitRelocation(code, ctx, ReadMemoryLinkTarget(bitsize));
     if (ordered) {
-        code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(Xbyak_loongarch64::BarrierOp::ISH);
     }
 
     if constexpr (bitsize == 128) {
@@ -155,10 +155,10 @@ void CallbackOnlyEmitExclusiveReadMemory(Xbyak_loongarch64::CodeGenerator& code,
     const bool ordered = IsOrdered(args[2].GetImmediateAccType());
 
     code.add_d(Wscratch0, 1, code.zero);
-    code.STRB(Wscratch0, Xstate, ctx.conf.state_exclusive_state_offset);
+    code.st_b(Wscratch0, Xstate, ctx.conf.state_exclusive_state_offset);
     EmitRelocation(code, ctx, ExclusiveReadMemoryLinkTarget(bitsize));
     if (ordered) {
-        code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(Xbyak_loongarch64::BarrierOp::ISH);
     }
 
     if constexpr (bitsize == 128) {
@@ -176,11 +176,11 @@ void CallbackOnlyEmitWriteMemory(Xbyak_loongarch64::CodeGenerator& code, EmitCon
     const bool ordered = IsOrdered(args[3].GetImmediateAccType());
 
     if (ordered) {
-        code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(Xbyak_loongarch64::BarrierOp::ISH);
     }
     EmitRelocation(code, ctx, WriteMemoryLinkTarget(bitsize));
     if (ordered) {
-        code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(Xbyak_loongarch64::BarrierOp::ISH);
     }
 }
 
@@ -198,7 +198,7 @@ void CallbackOnlyEmitExclusiveWriteMemory(Xbyak_loongarch64::CodeGenerator& code
     code.add_d(W0, 1, code.zero);
     code.LDRB(Wscratch0, Xstate, ctx.conf.state_exclusive_state_offset);
     code.CBZ(Wscratch0, end);
-    code.STRB(WZR, Xstate, ctx.conf.state_exclusive_state_offset);
+    code.st_b(code.zero, Xstate, ctx.conf.state_exclusive_state_offset);
     EmitRelocation(code, ctx, ExclusiveWriteMemoryLinkTarget(bitsize));
     if (ordered) {
         code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
@@ -261,7 +261,7 @@ std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg> InlinePageTableEmitV
     if (ctx.conf.silently_mirror_page_table || unused_top_bits == 0) {
         code.UBFX(Xscratch0, Xaddr, page_bits, valid_page_index_bits);
     } else {
-        code.LSR(Xscratch0, Xaddr, page_bits);
+        code.srli_d(Xscratch0, Xaddr, page_bits);
         code.TST(Xscratch0, u64(~u64(0)) << valid_page_index_bits);
         code.B(NE, *fallback);
     }
@@ -381,7 +381,7 @@ CodePtr EmitMemoryStr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
 
         switch (bitsize) {
         case 8:
-            code.STRB(Xbyak_loongarch64::WReg{value_idx}, Xbase, Roffset, index_ext);
+            code.st_b(Xbyak_loongarch64::WReg{value_idx}, Xbase, Roffset, index_ext);
             break;
         case 16:
             code.STRH(Xbyak_loongarch64::WReg{value_idx}, Xbase, Roffset, index_ext);
@@ -517,7 +517,7 @@ std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg> FastmemEmitVAddrLook
         return std::make_pair(Xfastmem, Xscratch0);
     }
 
-    code.LSR(Xscratch0, Xaddr, ctx.conf.fastmem_address_space_bits);
+    code.srli_d(Xscratch0, Xaddr, ctx.conf.fastmem_address_space_bits);
     code.bnez(Xscratch0, *fallback);
     return std::make_pair(Xfastmem, Xaddr);
 }

@@ -22,7 +22,7 @@ using namespace Xbyak_loongarch64::util;
 
 template<>
 void EmitIR<IR::Opcode::A64ClearExclusive>(Xbyak_loongarch64::CodeGenerator& code, EmitContext&, IR::Inst*) {
-    code.st_d(WZR, Xstate, offsetof(A64JitState, exclusive_state));
+    code.st_d(code.zero, Xstate, offsetof(A64JitState, exclusive_state));
 }
 
 template<>

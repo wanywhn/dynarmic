@@ -353,7 +353,7 @@ void A32AddressSpace::EmitPrelude() {
         Xbyak_loongarch64::Label exit_hr_loop;
         code.L(exit_hr_loop);
         code.LDAXR(W0, Xhalt);
-        code.STLXR(Wscratch0, WZR, Xhalt);
+        code.STLXR(Wscratch0, code.zero, Xhalt);
         code.bnez(Wscratch0, exit_hr_loop);
 
         ABI_PopRegisters(code, ABI_CALLEE_SAVE | (1 << 30), sizeof(StackLayout));

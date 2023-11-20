@@ -140,13 +140,13 @@ void EmitIR<IR::Opcode::MostSignificantWord>(Xbyak_loongarch64::CodeGenerator& c
     auto Xoperand = ctx.reg_alloc.ReadX(args[0]);
     RegAlloc::Realize(Wresult, Xoperand);
 
-    code.LSR(Wresult->toX(), Xoperand, 32);
+    code.srli_w(Wresult->toX(), Xoperand, 32);
 
     if (carry_inst) {
         auto Wcarry = ctx.reg_alloc.WriteW(carry_inst);
         RegAlloc::Realize(Wcarry);
 
-        code.LSR(Wcarry, Xoperand->toW(), 31 - 29);
+        code.srli_w(Wcarry, Xoperand->toW(), 31 - 29);
         code.andi(Wcarry, Wcarry, 1 << 29);
     }
 }
@@ -159,7 +159,7 @@ void EmitIR<IR::Opcode::MostSignificantBit>(Xbyak_loongarch64::CodeGenerator& co
     auto Woperand = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wresult, Woperand);
 
-    code.LSR(Wresult, Woperand, 31);
+    code.srli_w(Wresult, Woperand, 31);
 }
 
 template<>
@@ -256,9 +256,9 @@ void EmitIR<IR::Opcode::LogicalShiftLeft32>(Xbyak_loongarch64::CodeGenerator& co
             RegAlloc::Realize(Wresult, Woperand);
 
             if (shift <= 31) {
-                code.LSL(Wresult, Woperand, shift);
+                code.slli_w(Wresult, Woperand, shift);
             } else {
-                code.add_d(Wresult, WZR, code.zero);
+                code.add_d(Wresult, code.zero, code.zero);
             }
         } else {
             auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -268,9 +268,9 @@ void EmitIR<IR::Opcode::LogicalShiftLeft32>(Xbyak_loongarch64::CodeGenerator& co
             ctx.reg_alloc.SpillFlags();
 
             code.andi(Wscratch0, Wshift, 0xff);
-            code.LSL(Wresult, Woperand, Wscratch0);
+            code.sll_w(Wresult, Woperand, Wscratch0);
             code.CMP(Wscratch0, 32);
-            code.CSEL(Wresult, Wresult, WZR, LT);
+            code.CSEL(Wresult, Wresult, code.zero, LT);
         }
     } else {
         if (shift_arg.IsImmediate() && shift_arg.GetImmediateU8() == 0) {
@@ -287,15 +287,15 @@ void EmitIR<IR::Opcode::LogicalShiftLeft32>(Xbyak_loongarch64::CodeGenerator& co
                 RegAlloc::Realize(Wresult, Wcarry_out, Woperand);
 
                 code.UBFX(Wcarry_out, Woperand, 32 - shift, 1);
-                code.LSL(Wcarry_out, Wcarry_out, 29);
-                code.LSL(Wresult, Woperand, shift);
+                code.slli_w(Wcarry_out, Wcarry_out, 29);
+                code.slli_w(Wresult, Woperand, shift);
             } else if (shift > 32) {
                 auto Wresult = ctx.reg_alloc.WriteW(inst);
                 auto Wcarry_out = ctx.reg_alloc.WriteW(carry_inst);
                 RegAlloc::Realize(Wresult, Wcarry_out);
 
-                code.add_d(Wresult, WZR, code.zero);
-                code.add_d(Wcarry_out, WZR, code.zero);
+                code.add_d(Wresult, code.zero, code.zero);
+                code.add_d(Wcarry_out, code.zero, code.zero);
             } else {
                 auto Wresult = ctx.reg_alloc.WriteW(inst);
                 auto Wcarry_out = ctx.reg_alloc.WriteW(carry_inst);
@@ -303,7 +303,7 @@ void EmitIR<IR::Opcode::LogicalShiftLeft32>(Xbyak_loongarch64::CodeGenerator& co
                 RegAlloc::Realize(Wresult, Wcarry_out, Woperand);
 
                 code.UBFIZ(Wcarry_out, Woperand, 29, 1);
-                code.add_d(Wresult, WZR, code.zero);
+                code.add_d(Wresult, code.zero, code.zero);
             }
         } else {
             auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -322,16 +322,16 @@ void EmitIR<IR::Opcode::LogicalShiftLeft32>(Xbyak_loongarch64::CodeGenerator& co
 
             Xbyak_loongarch64::Label zero, end;
 
-            code.ANDS(Wscratch1, Wshift, 0xff);
+            code.andi(Wscratch1, Wshift, 0xff);
             code.B(EQ, zero);
 
             code.NEG(Wscratch0, Wshift);
-            code.LSR(Wcarry_out, Woperand, Wscratch0);
-            code.LSL(Wresult, Woperand, Wshift);
+            code.srli_w(Wcarry_out, Woperand, Wscratch0);
+            code.slli_w(Wresult, Woperand, Wshift);
             code.UBFIZ(Wcarry_out, Wcarry_out, 29, 1);
             code.CMP(Wscratch1, 32);
-            code.CSEL(Wresult, Wresult, WZR, LT);
-            code.CSEL(Wcarry_out, Wcarry_out, WZR, LE);
+            code.CSEL(Wresult, Wresult, code.zero, LT);
+            code.CSEL(Wcarry_out, Wcarry_out, code.zero, LE);
             code.B(end);
 
             code.L(zero);
@@ -358,7 +358,7 @@ void EmitIR<IR::Opcode::LogicalShiftLeft64>(Xbyak_loongarch64::CodeGenerator& co
         RegAlloc::Realize(Xresult, Xoperand);
 
         if (shift <= 63) {
-            code.LSL(Xresult, Xoperand, shift);
+            code.slli_w(Xresult, Xoperand, shift);
         } else {
             code.add_d(Xresult, XZR, code.zero);
         }
@@ -370,7 +370,7 @@ void EmitIR<IR::Opcode::LogicalShiftLeft64>(Xbyak_loongarch64::CodeGenerator& co
         ctx.reg_alloc.SpillFlags();
 
         code.andi(Xscratch0, Xshift, 0xff);
-        code.LSL(Xresult, Xoperand, Xscratch0);
+        code.sll_d(Xresult, Xoperand, Xscratch0);
         code.CMP(Xscratch0, 64);
         code.CSEL(Xresult, Xresult, XZR, LT);
     }
@@ -393,9 +393,9 @@ void EmitIR<IR::Opcode::LogicalShiftRight32>(Xbyak_loongarch64::CodeGenerator& c
             RegAlloc::Realize(Wresult, Woperand);
 
             if (shift <= 31) {
-                code.LSR(Wresult, Woperand, shift);
+                code.srli_w(Wresult, Woperand, shift);
             } else {
-                code.add_d(Wresult, WZR, code.zero);
+                code.add_d(Wresult, code.zero, code.zero);
             }
         } else {
             auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -405,9 +405,9 @@ void EmitIR<IR::Opcode::LogicalShiftRight32>(Xbyak_loongarch64::CodeGenerator& c
             ctx.reg_alloc.SpillFlags();
 
             code.andi(Wscratch0, Wshift, 0xff);
-            code.LSR(Wresult, Woperand, Wscratch0);
+            code.srli_w(Wresult, Woperand, Wscratch0);
             code.CMP(Wscratch0, 32);
-            code.CSEL(Wresult, Wresult, WZR, LT);
+            code.CSEL(Wresult, Wresult, code.zero, LT);
         }
     } else {
         if (shift_arg.IsImmediate() && shift_arg.GetImmediateU8() == 0) {
@@ -424,24 +424,24 @@ void EmitIR<IR::Opcode::LogicalShiftRight32>(Xbyak_loongarch64::CodeGenerator& c
                 RegAlloc::Realize(Wresult, Wcarry_out, Woperand);
 
                 code.UBFX(Wcarry_out, Woperand, shift - 1, 1);
-                code.LSL(Wcarry_out, Wcarry_out, 29);
-                code.LSR(Wresult, Woperand, shift);
+                code.slli_w(Wcarry_out, Wcarry_out, 29);
+                code.srli_w(Wresult, Woperand, shift);
             } else if (shift > 32) {
                 auto Wresult = ctx.reg_alloc.WriteW(inst);
                 auto Wcarry_out = ctx.reg_alloc.WriteW(carry_inst);
                 RegAlloc::Realize(Wresult, Wcarry_out);
 
-                code.add_d(Wresult, WZR, code.zero);
-                code.add_d(Wcarry_out, WZR, code.zero);
+                code.add_d(Wresult, code.zero, code.zero);
+                code.add_d(Wcarry_out, code.zero, code.zero);
             } else {
                 auto Wresult = ctx.reg_alloc.WriteW(inst);
                 auto Wcarry_out = ctx.reg_alloc.WriteW(carry_inst);
                 auto Woperand = ctx.reg_alloc.ReadW(operand_arg);
                 RegAlloc::Realize(Wresult, Wcarry_out, Woperand);
 
-                code.LSR(Wcarry_out, Woperand, 31 - 29);
+                code.srli_w(Wcarry_out, Woperand, 31 - 29);
                 code.andi(Wcarry_out, Wcarry_out, 1 << 29);
-                code.add_d(Wresult, WZR, code.zero);
+                code.add_d(Wresult, code.zero, code.zero);
             }
         } else {
             auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -460,16 +460,16 @@ void EmitIR<IR::Opcode::LogicalShiftRight32>(Xbyak_loongarch64::CodeGenerator& c
 
             Xbyak_loongarch64::Label zero, end;
 
-            code.ANDS(Wscratch1, Wshift, 0xff);
+            code.andi(Wscratch1, Wshift, 0xff);
             code.B(EQ, zero);
 
             code.sub_imm(Wscratch0, Wshift, 1, code.t0);
-            code.LSR(Wcarry_out, Woperand, Wscratch0);
-            code.LSR(Wresult, Woperand, Wshift);
+            code.srli_w(Wcarry_out, Woperand, Wscratch0);
+            code.srli_w(Wresult, Woperand, Wshift);
             code.UBFIZ(Wcarry_out, Wcarry_out, 29, 1);
             code.CMP(Wscratch1, 32);
-            code.CSEL(Wresult, Wresult, WZR, LT);
-            code.CSEL(Wcarry_out, Wcarry_out, WZR, LE);
+            code.CSEL(Wresult, Wresult, code.zero, LT);
+            code.CSEL(Wcarry_out, Wcarry_out, code.zero, LE);
             code.B(end);
 
             code.L(zero);
@@ -496,7 +496,7 @@ void EmitIR<IR::Opcode::LogicalShiftRight64>(Xbyak_loongarch64::CodeGenerator& c
         RegAlloc::Realize(Xresult, Xoperand);
 
         if (shift <= 63) {
-            code.LSR(Xresult, Xoperand, shift);
+            code.srli_d(Xresult, Xoperand, shift);
         } else {
             code.add_d(Xresult, XZR, code.zero);
         }
@@ -508,7 +508,7 @@ void EmitIR<IR::Opcode::LogicalShiftRight64>(Xbyak_loongarch64::CodeGenerator& c
         ctx.reg_alloc.SpillFlags();
 
         code.andi(Xscratch0, Xshift, 0xff);
-        code.LSR(Xresult, Xoperand, Xscratch0);
+        code.srli_d(Xresult, Xoperand, Xscratch0);
         code.CMP(Xscratch0, 64);
         code.CSEL(Xresult, Xresult, XZR, LT);
     }
@@ -560,7 +560,7 @@ void EmitIR<IR::Opcode::ArithmeticShiftRight32>(Xbyak_loongarch64::CodeGenerator
                 RegAlloc::Realize(Wresult, Wcarry_out, Woperand);
 
                 code.UBFX(Wcarry_out, Woperand, shift - 1, 1);
-                code.LSL(Wcarry_out, Wcarry_out, 29);
+                code.slli_w(Wcarry_out, Wcarry_out, 29);
                 code.ASR(Wresult, Woperand, shift);
             } else {
                 auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -588,7 +588,7 @@ void EmitIR<IR::Opcode::ArithmeticShiftRight32>(Xbyak_loongarch64::CodeGenerator
 
             Xbyak_loongarch64::Label zero, end;
 
-            code.ANDS(Wscratch0, Wshift, 0xff);
+            code.andi(Wscratch0, Wshift, 0xff);
             code.B(EQ, zero);
 
             code.add_d(Wscratch1, 63, code.zero);
@@ -684,13 +684,13 @@ void EmitIR<IR::Opcode::RotateRight32>(Xbyak_loongarch64::CodeGenerator& code, E
             ctx.reg_alloc.SpillFlags();
 
             code.TST(Wshift, 0xff);
-            code.LSR(Wcarry_out, Wresult, 31 - 29);
+            code.srli_w(Wcarry_out, Wresult, 31 - 29);
             code.andi(Wcarry_out, Wcarry_out, 1 << 29);
             if (carry_in) {
                 code.add_d(Wscratch0, carry_in, code.zero);
                 code.CSEL(Wcarry_out, Wscratch0, Wcarry_out, EQ);
             } else {
-                code.CSEL(Wcarry_out, WZR, Wcarry_out, EQ);
+                code.CSEL(Wcarry_out, code.zero, Wcarry_out, EQ);
             }
         } else if (carry_inst) {
             auto Wcarry_in = ctx.reg_alloc.ReadW(carry_arg);
@@ -699,7 +699,7 @@ void EmitIR<IR::Opcode::RotateRight32>(Xbyak_loongarch64::CodeGenerator& code, E
             ctx.reg_alloc.SpillFlags();
 
             code.TST(Wshift, 0xff);
-            code.LSR(Wcarry_out, Wresult, 31 - 29);
+            code.srli_w(Wcarry_out, Wresult, 31 - 29);
             code.andi(Wcarry_out, Wcarry_out, 1 << 29);
             code.CSEL(Wcarry_out, Wcarry_in, Wcarry_out, EQ);
         }
@@ -738,7 +738,7 @@ void EmitIR<IR::Opcode::RotateRightExtended>(Xbyak_loongarch64::CodeGenerator& c
     if (args[1].IsImmediate()) {
         RegAlloc::Realize(Wresult, Woperand);
 
-        code.LSR(Wresult, Woperand, 1);
+        code.srli_w(Wresult, Woperand, 1);
         if (args[1].GetImmediateU1()) {
             code.ORR(Wresult, Wresult, 0x8000'0000);
         }
@@ -746,7 +746,7 @@ void EmitIR<IR::Opcode::RotateRightExtended>(Xbyak_loongarch64::CodeGenerator& c
         auto Wcarry_in = ctx.reg_alloc.ReadW(args[1]);
         RegAlloc::Realize(Wresult, Woperand, Wcarry_in);
 
-        code.LSR(Wscratch0, Wcarry_in, 29);
+        code.srli_w(Wscratch0, Wcarry_in, 29);
         code.EXTR(Wresult, Wscratch0, Woperand, 1);
     }
 
@@ -807,32 +807,32 @@ template<>
 void EmitIR<IR::Opcode::LogicalShiftLeftMasked32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitMaskedShift32(
         code, ctx, inst,
-        [&](auto& Wresult, auto& Woperand, auto shift) { code.LSL(Wresult, Woperand, shift); },
-        [&](auto& Wresult, auto& Woperand, auto& Wshift) { code.LSL(Wresult, Woperand, Wshift); });
+        [&](auto& Wresult, auto& Woperand, auto shift) { code.slli_w(Wresult, Woperand, shift); },
+        [&](auto& Wresult, auto& Woperand, auto& Wshift) { code.slli_w(Wresult, Woperand, Wshift); });
 }
 
 template<>
 void EmitIR<IR::Opcode::LogicalShiftLeftMasked64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitMaskedShift64(
         code, ctx, inst,
-        [&](auto& Xresult, auto& Xoperand, auto shift) { code.LSL(Xresult, Xoperand, shift); },
-        [&](auto& Xresult, auto& Xoperand, auto& Xshift) { code.LSL(Xresult, Xoperand, Xshift); });
+        [&](auto& Xresult, auto& Xoperand, auto shift) { code.slli_d(Xresult, Xoperand, shift); },
+        [&](auto& Xresult, auto& Xoperand, auto& Xshift) { code.slli_d(Xresult, Xoperand, Xshift); });
 }
 
 template<>
 void EmitIR<IR::Opcode::LogicalShiftRightMasked32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitMaskedShift32(
         code, ctx, inst,
-        [&](auto& Wresult, auto& Woperand, auto shift) { code.LSR(Wresult, Woperand, shift); },
-        [&](auto& Wresult, auto& Woperand, auto& Wshift) { code.LSR(Wresult, Woperand, Wshift); });
+        [&](auto& Wresult, auto& Woperand, auto shift) { code.srli_w(Wresult, Woperand, shift); },
+        [&](auto& Wresult, auto& Woperand, auto& Wshift) { code.srli_w(Wresult, Woperand, Wshift); });
 }
 
 template<>
 void EmitIR<IR::Opcode::LogicalShiftRightMasked64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitMaskedShift64(
         code, ctx, inst,
-        [&](auto& Xresult, auto& Xoperand, auto shift) { code.LSR(Xresult, Xoperand, shift); },
-        [&](auto& Xresult, auto& Xoperand, auto& Xshift) { code.LSR(Xresult, Xoperand, Xshift); });
+        [&](auto& Xresult, auto& Xoperand, auto shift) { code.srli_d(Xresult, Xoperand, shift); },
+        [&](auto& Xresult, auto& Xoperand, auto& Xshift) { code.srli_d(Xresult, Xoperand, Xshift); });
 }
 
 template<>
@@ -923,7 +923,7 @@ static void EmitAddSub(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx,
 
                 if (imm == 0) {
                     if constexpr (bitsize == 32) {
-                        sub ? code.SBCS(Rresult, Ra, WZR) : code.ADCS(Rresult, Ra, WZR);
+                        sub ? code.SBCS(Rresult, Ra, code.zero) : code.ADCS(Rresult, Ra, code.zero);
                     } else {
                         sub ? code.SBCS(Rresult, Ra, XZR) : code.ADCS(Rresult, Ra, XZR);
                     }
@@ -979,7 +979,7 @@ static void EmitAddSub(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx,
 
                 if (imm == 0) {
                     if constexpr (bitsize == 32) {
-                        sub ? code.SBC(Rresult, Ra, WZR) : code.ADC(Rresult, Ra, WZR);
+                        sub ? code.SBC(Rresult, Ra, code.zero) : code.ADC(Rresult, Ra, code.zero);
                     } else {
                         sub ? code.SBC(Rresult, Ra, XZR) : code.ADC(Rresult, Ra, XZR);
                     }
@@ -1042,14 +1042,14 @@ template<>
 void EmitIR<IR::Opcode::Mul32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitThreeOp<32>(
         code, ctx, inst,
-        [&](auto& Wresult, auto& Wa, auto& Wb) { code.MUL(Wresult, Wa, Wb); });
+        [&](auto& Wresult, auto& Wa, auto& Wb) { code.mul_w(Wresult, Wa, Wb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::Mul64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitThreeOp<64>(
         code, ctx, inst,
-        [&](auto& Xresult, auto& Xa, auto& Xb) { code.MUL(Xresult, Xa, Xb); });
+        [&](auto& Xresult, auto& Xa, auto& Xb) { code.mul_d(Xresult, Xa, Xb); });
 }
 
 template<>
@@ -1438,7 +1438,7 @@ void EmitIR<IR::Opcode::ReplicateBit32>(Xbyak_loongarch64::CodeGenerator& code, 
     const u8 bit = args[1].GetImmediateU8();
     RegAlloc::Realize(Wresult, Wvalue);
 
-    code.LSL(Wresult, Wvalue, 31 - bit);
+    code.slli_w(Wresult, Wvalue, 31 - bit);
     code.ASR(Wresult, Wresult, 31);
 }
 
@@ -1452,7 +1452,7 @@ void EmitIR<IR::Opcode::ReplicateBit64>(Xbyak_loongarch64::CodeGenerator& code, 
     const u8 bit = args[1].GetImmediateU8();
     RegAlloc::Realize(Xresult, Xvalue);
 
-    code.LSL(Xresult, Xvalue, 63 - bit);
+    code.slli_d(Xresult, Xvalue, 63 - bit);
     code.ASR(Xresult, Xresult, 63);
 }
 

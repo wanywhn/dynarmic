@@ -5,6 +5,7 @@
 
 #include <mcl/bit_cast.hpp>
 
+#include "nzcv_util.h"
 #include "dynarmic/backend/loongarch64/a64_jitstate.h"
 #include "dynarmic/backend/loongarch64/abi.h"
 #include "dynarmic/backend/loongarch64/emit_arm64.h"
@@ -23,11 +24,76 @@ using namespace Xbyak_loongarch64::util;
 
 Xbyak_loongarch64::Label EmitA64Cond(Xbyak_loongarch64::CodeGenerator& code, EmitContext&, IR::Cond cond) {
     Xbyak_loongarch64::Label pass;
-    // TODO: Flags in host flags
-    code.ld_d(Wscratch0, Xstate, offsetof(A64JitState, cpsr_nzcv));
-    code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
-    code.B(static_cast<Xbyak_loongarch64::Cond>(cond), pass);
-    return pass;
+        // TODO: Flags in host flags
+        code.ld_d(Xscratch0, Xstate, offsetof(A64JitState, cpsr_nzcv));
+        switch (cond) {
+            case IR::Cond::EQ:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_n_flag_mask);
+                code.bnez(Xscratch0, pass);
+                break;
+            case IR::Cond::NE:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_n_flag_mask);
+                code.beqz(Xscratch0, pass);
+                break;
+            case IR::Cond::CS:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_c_flag_mask);
+                code.bnez(Xscratch0, pass);
+                break;
+            case IR::Cond::CC:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_c_flag_mask);
+                code.beqz(Xscratch0, pass);
+                break;
+            case IR::Cond::MI:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_n_flag_mask);
+                code.bnez(Xscratch0, pass);
+                break;
+            case IR::Cond::PL:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_n_flag_mask);
+                code.beqz(Xscratch0, pass);
+                break;
+            case IR::Cond::VS:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_v_flag_mask);
+                code.bnez(Xscratch0, pass);
+                break;
+            case IR::Cond::VC:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_v_flag_mask);
+                code.beqz(Xscratch0, pass);
+                break;
+            case IR::Cond::HI:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_c_flag_mask | NZCV::arm_z_flag_mask);
+                code.addi_d(Xscratch1, code.zero, NZCV::arm_hi_flag_mask);
+                code.beq(Xscratch0, Xscratch1, pass);
+                break;
+            case IR::Cond::LS:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_c_flag_mask | NZCV::arm_z_flag_mask);
+                code.addi_d(Xscratch1, code.zero, NZCV::arm_ls_flag_mask);
+                code.beq(Xscratch0, Xscratch1, pass);
+                break;
+            case IR::Cond::GT:
+            case IR::Cond::GE:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_gt_flag_mask1);
+                if (cond == IR::Cond::GE) {
+                    code.andi(Xscratch0, Xscratch0, NZCV::arm_ge_flag_mask);
+                }
+                code.beqz(Xscratch0, pass);
+                code.addi_d(Xscratch1, code.zero, NZCV::arm_ge_flag_mask);
+                code.beq(Xscratch0, Xscratch1, pass);
+                break;
+            case IR::Cond::LE:
+                code.andi(Xscratch1, Xscratch0, NZCV::arm_z_flag_mask);
+                code.bnez(Xscratch1, pass);
+            case IR::Cond::LT:
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_n_flag_mask | NZCV::arm_v_flag_mask);
+                code.addi_d(Xscratch1, code.zero, NZCV::arm_v_flag_mask);
+                code.beq(Xscratch0, Xscratch1, pass);
+                code.addi_d(Xscratch1, code.zero, NZCV::arm_n_flag_mask);
+                code.beq(Xscratch0, Xscratch1, pass);
+                break;
+            default:
+                ASSERT_MSG(false, "Unknown cond {}", static_cast<size_t>(cond));
+                break;
+        }
+        return pass;
 }
 
 void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Term::Terminal terminal, IR::LocationDescriptor initial_location, bool is_single_step);
@@ -80,8 +146,8 @@ void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, I
         code.ld_d(code.a1, Xstate, offsetof(A64JitState, pc));
         code.andi(W0, W0, Wscratch0);
         code.andi(code.a1, code.a1, A64::LocationDescriptor::pc_mask);
-        code.LSL(code.a0, code.a0, A64::LocationDescriptor::fpcr_shift);
-        code.ORR(code.a0, code.a0, code.a1);
+        code.slli_w(code.a0, code.a0, A64::LocationDescriptor::fpcr_shift);
+        code.or_(code.a0, code.a0, code.a1);
 
         code.ld_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
         code.andi(Wscratch2, Wscratch2, RSBIndexMask);
@@ -168,14 +234,14 @@ void EmitIR<IR::Opcode::A64SetCheckBit>(Xbyak_loongarch64::CodeGenerator& code, 
     if (args[0].IsImmediate()) {
         if (args[0].GetImmediateU1()) {
             code.add_d(Wscratch0, 1, code.zero);
-            code.STRB(Wscratch0, code.sp, offsetof(StackLayout, check_bit));
+            code.st_b(Wscratch0, code.sp, offsetof(StackLayout, check_bit));
         } else {
-            code.STRB(WZR, code.sp, offsetof(StackLayout, check_bit));
+            code.st_b(code.zero, code.sp, offsetof(StackLayout, check_bit));
         }
     } else {
         auto Wbit = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wbit);
-        code.STRB(Wbit, code.sp, offsetof(StackLayout, check_bit));
+        code.st_b(Wbit, code.sp, offsetof(StackLayout, check_bit));
     }
 }
 
@@ -437,12 +503,12 @@ void EmitIR<IR::Opcode::A64InstructionCacheOperationRaised>(Xbyak_loongarch64::C
 
 template<>
 void EmitIR<IR::Opcode::A64DataSynchronizationBarrier>(Xbyak_loongarch64::CodeGenerator& code, EmitContext&, IR::Inst*) {
-    code.DSB(Xbyak_loongarch64::BarrierOp::SY);
+    code.dbar(Xbyak_loongarch64::BarrierOp::SY);
 }
 
 template<>
 void EmitIR<IR::Opcode::A64DataMemoryBarrier>(Xbyak_loongarch64::CodeGenerator& code, EmitContext&, IR::Inst*) {
-    code.DMB(Xbyak_loongarch64::BarrierOp::SY);
+    code.dbar(Xbyak_loongarch64::BarrierOp::SY);
 }
 
 template<>

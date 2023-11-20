@@ -964,11 +964,11 @@ void EmitIR<IR::Opcode::VectorMultiply64>(Xbyak_loongarch64::CodeGenerator& code
     EmitThreeOp(code, ctx, inst, [&](auto& Qresult, auto& Qa, auto& Qb) {
         code.FMOV(Xscratch0, Qa->toD());
         code.FMOV(Xscratch1, Qb->toD());
-        code.MUL(Xscratch0, Xscratch0, Xscratch1);
+        code.mul_d(Xscratch0, Xscratch0, Xscratch1);
         code.FMOV(Qresult->toD(), Xscratch0);
         code.FMOV(Xscratch0, Qa->Delem()[1]);
         code.FMOV(Xscratch1, Qb->Delem()[1]);
-        code.MUL(Xscratch0, Xscratch0, Xscratch1);
+        code.mul_d(Xscratch0, Xscratch0, Xscratch1);
         code.FMOV(Qresult->Delem()[1], Xscratch0);
     });
 }

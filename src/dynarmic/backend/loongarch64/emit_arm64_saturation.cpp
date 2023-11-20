@@ -71,7 +71,7 @@ void EmitIR<IR::Opcode::SignedSaturation>(Xbyak_loongarch64::CodeGenerator& code
         if (overflow_inst) {
             auto Woverflow = ctx.reg_alloc.WriteW(overflow_inst);
             RegAlloc::Realize(Woverflow);
-            code.add_d(*Woverflow, WZR, code.zero);
+            code.add_d(*Woverflow, code.zero, code.zero);
         }
         return;
     }
@@ -115,7 +115,7 @@ void EmitIR<IR::Opcode::UnsignedSaturation>(Xbyak_loongarch64::CodeGenerator& co
 
     code.add_d(Wscratch0, saturated_value, code.zero);
     code.CMP(*Woperand, 0);
-    code.CSEL(Wresult, Woperand, WZR, GT);
+    code.CSEL(Wresult, Woperand, code.zero, GT);
     code.CMP(*Woperand, Wscratch0);
     code.CSEL(Wresult, Wresult, Wscratch0, LT);
 
