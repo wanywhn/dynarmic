@@ -121,9 +121,9 @@ EmittedBlockInfo AddressSpace::Emit(IR::Block block) {
 }
 
 static void LinkBlockLinks(const CodePtr entry_point, const CodePtr target_ptr, const std::vector<BlockRelocation>& block_relocations_list, void* return_to_dispatcher) {
-    using namespace oaknut;
+//    using namespace oaknut;
     using namespace Xbyak_loongarch64::util;
-
+    using namespace Xbyak_loongarch64;
     for (auto [ptr_offset, type] : block_relocations_list) {
         CodeGenerator c{reinterpret_cast<u32*>(entry_point + ptr_offset)};
 
@@ -132,7 +132,7 @@ static void LinkBlockLinks(const CodePtr entry_point, const CodePtr target_ptr, 
             if (target_ptr) {
                 c.B((void*)target_ptr);
             } else {
-                c.NOP();
+                c.nop();
             }
             break;
         case BlockRelocationType::MoveToScratch1:
@@ -149,8 +149,9 @@ static void LinkBlockLinks(const CodePtr entry_point, const CodePtr target_ptr, 
 }
 
 void AddressSpace::Link(EmittedBlockInfo& block_info) {
-    using namespace oaknut;
+//    using namespace oaknut;
     using namespace Xbyak_loongarch64::util;
+    using namespace Xbyak_loongarch64;
 
     for (auto [ptr_offset, target] : block_info.relocations) {
         CodeGenerator c{reinterpret_cast<u32*>(block_info.entry_point + ptr_offset)};

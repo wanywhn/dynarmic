@@ -505,7 +505,7 @@ void A32EmitLoongArch64::EmitA32SetCpsrNZCVRaw(A32EmitContext& ctx, IR::Inst* in
     if (args[0].IsImmediate()) {
         const u32 imm = args[0].GetImmediateU32();
 
-        code.mov(dword[r15 + offsetof(A32JitState, cpsr_nzcv)], NZCV::ToX64(imm));
+        code.mov(dword[r15 + offsetof(A32JitState, cpsr_nzcv)], NZCV::ToLoongArch64(imm));
     } else if (code.HasHostFeature(HostFeature::FastBMI2)) {
         const Xbyak::Reg32 a = ctx.reg_alloc.UseScratchGpr(args[0]).cvt32();
         const Xbyak::Reg32 b = ctx.reg_alloc.ScratchGpr().cvt32();
@@ -529,7 +529,7 @@ void A32EmitLoongArch64::EmitA32SetCpsrNZCVQ(A32EmitContext& ctx, IR::Inst* inst
     if (args[0].IsImmediate()) {
         const u32 imm = args[0].GetImmediateU32();
 
-        code.mov(dword[r15 + offsetof(A32JitState, cpsr_nzcv)], NZCV::ToX64(imm));
+        code.mov(dword[r15 + offsetof(A32JitState, cpsr_nzcv)], NZCV::ToLoongArch64(imm));
         code.mov(code.byte[r15 + offsetof(A32JitState, cpsr_q)], u8((imm & 0x08000000) != 0 ? 1 : 0));
     } else if (code.HasHostFeature(HostFeature::FastBMI2)) {
         const Xbyak::Reg32 a = ctx.reg_alloc.UseScratchGpr(args[0]).cvt32();
@@ -795,7 +795,7 @@ void A32EmitLoongArch64::EmitA32GetFpscr(A32EmitContext& ctx, IR::Inst* inst) {
     ctx.reg_alloc.HostCall(inst);
     code.mov(code.ABI_PARAM1, code.r15);
 
-    code.stmxcsr(code.dword[code.r15 + offsetof(A32JitState, guest_MXCSR)]);
+    code.stmxcsr(code.dword[code.r15 + offsetof(A32JitState, guest_FCSR)]);
     code.CallFunction(&GetFpscrImpl);
 }
 
@@ -809,7 +809,7 @@ void A32EmitLoongArch64::EmitA32SetFpscr(A32EmitContext& ctx, IR::Inst* inst) {
     code.mov(code.ABI_PARAM2, code.r15);
 
     code.CallFunction(&SetFpscrImpl);
-    code.ldmxcsr(code.dword[code.r15 + offsetof(A32JitState, guest_MXCSR)]);
+    code.ldmxcsr(code.dword[code.r15 + offsetof(A32JitState, guest_FCSR)]);
 }
 
 void A32EmitLoongArch64::EmitA32GetFpscrNZCV(A32EmitContext& ctx, IR::Inst* inst) {

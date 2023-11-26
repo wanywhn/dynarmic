@@ -30,6 +30,10 @@ protected:
 
     const A64::UserConfig conf;
     BlockRangeInformation<u64> block_ranges;
+
+    void SwitchFcsrOnEntry();
+
+    void SwitchFcsrOnExit();
 };
 
 }  // namespace Dynarmic::Backend::LoongArch64

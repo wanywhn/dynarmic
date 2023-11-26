@@ -93,7 +93,9 @@ public:
                                                 : HostLoc::Kind::Gpr
                                             : HostLoc::Kind::Flags;
 
-    operator T() const { return reg.value(); }
+    // operator T() const { return reg.value(); }
+    operator Xbyak_loongarch64::XReg () const { return reg.value(); }
+    operator Xbyak_loongarch64::WReg() const { return reg.value(); }
 
     //    operator Xbyak_loongarch64::WRegWsp() const
     //    requires(std::is_same_v<T, Xbyak_loongarch64::WReg>)
@@ -166,7 +168,7 @@ public:
     auto ReadX(Argument& arg) { return RAReg<Xbyak_loongarch64::XReg>{*this, RWType::Read, arg.value, nullptr}; }
     auto ReadW(Argument& arg) { return RAReg<Xbyak_loongarch64::WReg>{*this, RWType::Read, arg.value, nullptr}; }
 
-    auto ReadQ(Argument& arg) { return RAReg<Xbyak_loongarch64::QReg>{*this, RWType::Read, arg.value, nullptr}; }
+    auto ReadQ(Argument& arg) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Read, arg.value, nullptr}; }
     auto ReadD(Argument& arg) { return RAReg<Xbyak_loongarch64::DReg>{*this, RWType::Read, arg.value, nullptr}; }
     auto ReadS(Argument& arg) { return RAReg<Xbyak_loongarch64::SReg>{*this, RWType::Read, arg.value, nullptr}; }
     auto ReadH(Argument& arg) { return RAReg<Xbyak_loongarch64::HReg>{*this, RWType::Read, arg.value, nullptr}; }
@@ -203,7 +205,7 @@ public:
     auto WriteX(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::XReg>{*this, RWType::Write, {}, inst}; }
     auto WriteW(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::WReg>{*this, RWType::Write, {}, inst}; }
 
-    auto WriteQ(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::QReg>{*this, RWType::Write, {}, inst}; }
+    auto WriteQ(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Write, {}, inst}; }
     auto WriteD(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::DReg>{*this, RWType::Write, {}, inst}; }
     auto WriteS(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::SReg>{*this, RWType::Write, {}, inst}; }
     auto WriteH(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::HReg>{*this, RWType::Write, {}, inst}; }
@@ -242,7 +244,7 @@ public:
     auto ReadWriteX(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::XReg>{*this, RWType::ReadWrite, arg.value, inst}; }
     auto ReadWriteW(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::WReg>{*this, RWType::ReadWrite, arg.value, inst}; }
 
-    auto ReadWriteQ(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::QReg>{*this, RWType::ReadWrite, arg.value, inst}; }
+    auto ReadWriteQ(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::ReadWrite, arg.value, inst}; }
     auto ReadWriteD(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::DReg>{*this, RWType::ReadWrite, arg.value, inst}; }
     auto ReadWriteS(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::SReg>{*this, RWType::ReadWrite, arg.value, inst}; }
     auto ReadWriteH(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::HReg>{*this, RWType::ReadWrite, arg.value, inst}; }
@@ -317,7 +319,7 @@ private:
     int FindFreeSpill() const;
 
     void LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::XReg reg);
-    void LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::QReg reg);
+    void LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::VReg reg);
 
     std::optional<HostLoc> ValueLocation(const IR::Inst* value) const;
     HostLocInfo& ValueInfo(HostLoc host_loc);

@@ -173,7 +173,7 @@ void RegAlloc::PrepareForCall(std::optional<Argument::copyable_reference> arg0, 
         if (args[i]) {
             if (args[i]->get().GetType() == IR::Type::U128) {
                 ASSERT(fprs[nsrn].IsCompletelyEmpty());
-                LoadCopyInto(args[i]->get().value, Xbyak_loongarch64::QReg{nsrn});
+                LoadCopyInto(args[i]->get().value, Xbyak_loongarch64::VReg{nsrn});
                 nsrn++;
             } else {
                 ASSERT(gprs[ngrn].IsCompletelyEmpty());
@@ -243,7 +243,7 @@ void RegAlloc::AssertNoMoreUses() const {
 }
 
 void RegAlloc::EmitVerboseDebuggingOutput() {
-    code.add_d(code.s0, mcl::bit_cast<u64>(&PrintVerboseDebuggingOutputLine), code.zero);  // Non-volatile register
+    code.add_imm(code.s0, code.zero,mcl::bit_cast<u64>(&PrintVerboseDebuggingOutputLine), Xscratch0);  // Non-volatile register
 
     const auto do_location = [&](HostLocInfo& info, HostLocType type, size_t index) {
         using namespace Xbyak_loongarch64::util;
@@ -277,7 +277,7 @@ int RegAlloc::GenerateImmediate(const IR::Value& value) {
         SpillGpr(new_location_index);
         gprs[new_location_index].SetupScratchLocation();
 
-        code.add_d(Xbyak_loongarch64::XReg{new_location_index}, value.GetImmediateAsU64(), code.zero);
+        code.add_imm(Xbyak_loongarch64::XReg{new_location_index}, code.zero, value.GetImmediateAsU64(), Xscratch0);
 
         return new_location_index;
     } else if constexpr (kind == HostLoc::Kind::Fpr) {
@@ -285,15 +285,15 @@ int RegAlloc::GenerateImmediate(const IR::Value& value) {
         SpillFpr(new_location_index);
         fprs[new_location_index].SetupScratchLocation();
 
-        code.add_d(Xscratch0, value.GetImmediateAsU64(), code.zero);
-        code.FMOV(Xbyak_loongarch64::DReg{new_location_index}, Xscratch0);
+        code.add_imm(Xscratch0, code.zero, value.GetImmediateAsU64(), Xscratch1);
+        code.vinsgr2vr_d(Xbyak_loongarch64::VReg{new_location_index}, Xscratch0, 0);
 
         return new_location_index;
     } else if constexpr (kind == HostLoc::Kind::Flags) {
         SpillFlags();
         flags.SetupScratchLocation();
 
-        code.add_d(Xscratch0, value.GetImmediateAsU64(), code.zero);
+        code.add_imm(Xscratch0, code.zero, value.GetImmediateAsU64(), Xscratch1);
         code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
 
         return 0;
@@ -328,7 +328,7 @@ int RegAlloc::RealizeReadImpl(const IR::Value& value) {
             ASSERT_FALSE("Logic error");
             break;
         case HostLoc::Kind::Fpr:
-            code.FMOV(Xbyak_loongarch64::XReg{new_location_index}, Xbyak_loongarch64::DReg{current_location->index});
+            code.vpickve2gr_d(Xbyak_loongarch64::XReg{new_location_index}, Xbyak_loongarch64::VReg{current_location->index}, 0);
             // ASSERT size fits
             break;
         case HostLoc::Kind::Spill:
@@ -348,13 +348,16 @@ int RegAlloc::RealizeReadImpl(const IR::Value& value) {
 
         switch (current_location->kind) {
         case HostLoc::Kind::Gpr:
-            code.FMOV(Xbyak_loongarch64::DReg{new_location_index}, Xbyak_loongarch64::XReg{current_location->index});
+            code.vinsgr2vr_d(Xbyak_loongarch64::VReg{new_location_index}, Xbyak_loongarch64::XReg{current_location->index}, 0);
             break;
         case HostLoc::Kind::Fpr:
             ASSERT_FALSE("Logic error");
             break;
         case HostLoc::Kind::Spill:
-            code.ld_d(Xbyak_loongarch64::QReg{new_location_index}, code.sp, spill_offset + current_location->index * spill_slot_size);
+            code.ld_d(Xscratch0, code.sp, spill_offset + current_location->index * spill_slot_size);
+            code.ld_d(Xscratch1, code.sp, spill_offset + current_location->index * spill_slot_size + 64);
+            code.vinsgr2vr_d(Xbyak_loongarch64::VReg{new_location_index}, Xscratch0, 0);
+            code.vinsgr2vr_d(Xbyak_loongarch64::VReg{new_location_index}, Xscratch1, 1);
             break;
         case HostLoc::Kind::Flags:
             ASSERT_FALSE("Moving from flags into fprs is not currently supported");
@@ -408,7 +411,7 @@ int RegAlloc::RealizeReadWriteImpl(const IR::Value& read_value, const IR::Inst* 
         LoadCopyInto(read_value, Xbyak_loongarch64::XReg{write_loc});
         return write_loc;
     } else if constexpr (kind == HostLoc::Kind::Fpr) {
-        LoadCopyInto(read_value, Xbyak_loongarch64::QReg{write_loc});
+        LoadCopyInto(read_value, Xbyak_loongarch64::VReg{write_loc});
         return write_loc;
     } else if constexpr (kind == HostLoc::Kind::Flags) {
         ASSERT_FALSE("Incorrect function for ReadWrite of flags");
@@ -457,7 +460,7 @@ void RegAlloc::SpillFpr(int index) {
         return;
     }
     const int new_location_index = FindFreeSpill();
-    code.st_d(Xbyak_loongarch64::QReg{index}, code.sp, spill_offset + new_location_index * spill_slot_size);
+    code.st_d(Xbyak_loongarch64::VReg{index}, code.sp, spill_offset + new_location_index * spill_slot_size);
     spills[new_location_index] = std::exchange(fprs[index], {});
 }
 
@@ -511,7 +514,7 @@ int RegAlloc::FindFreeSpill() const {
 
 void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::XReg reg) {
     if (value.IsImmediate()) {
-        code.add_d(reg, value.GetImmediateAsU64(), code.zero);
+        code.add_imm(reg, code.zero, value.GetImmediateAsU64(), Xscratch0);
         return;
     }
 
@@ -522,7 +525,7 @@ void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::XReg reg)
         code.add_d(reg, Xbyak_loongarch64::XReg{current_location->index}, code.zero);
         break;
     case HostLoc::Kind::Fpr:
-        code.FMOV(reg, Xbyak_loongarch64::DReg{current_location->index});
+        code.vpickve2gr_d(reg, Xbyak_loongarch64::VReg{current_location->index}, 0);
         // ASSERT size fits
         break;
     case HostLoc::Kind::Spill:
@@ -534,10 +537,10 @@ void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::XReg reg)
     }
 }
 
-void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::QReg reg) {
+void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::VReg reg) {
     if (value.IsImmediate()) {
-        code.add_d(Xscratch0, value.GetImmediateAsU64(), code.zero);
-        code.FMOV(reg.toD(), Xscratch0);
+        code.add_imm(Xscratch0, code.zero, value.GetImmediateAsU64(), Xscratch1);
+        code.movgr2fr_d(Xbyak_loongarch64::XReg{reg.getIdx()}, Xscratch0);
         return;
     }
 
@@ -545,14 +548,16 @@ void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::QReg reg)
     ASSERT(current_location);
     switch (current_location->kind) {
     case HostLoc::Kind::Gpr:
-        code.FMOV(reg.toD(), Xbyak_loongarch64::XReg{current_location->index});
+        // TODO hi bit to zero?
+        code.vinsgr2vr_d(reg, Xbyak_loongarch64::XReg{current_location->index}, 0);
+
         break;
     case HostLoc::Kind::Fpr:
-        code.add_d(reg.B16(), Xbyak_loongarch64::QReg{current_location->index}.B16(), code.zero);
+        code.vor_v(reg, Xbyak_loongarch64::VReg{current_location->index}, Xbyak_loongarch64::VReg{current_location->index});
         break;
     case HostLoc::Kind::Spill:
         // TODO: Minimize move size to max value width
-        code.ld_d(reg, code.sp, spill_offset + current_location->index * spill_slot_size);
+        code.vld(reg, code.sp, spill_offset + current_location->index * spill_slot_size);
         break;
     case HostLoc::Kind::Flags:
         ASSERT_FALSE("Moving from flags into fprs is not currently supported");

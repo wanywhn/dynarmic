@@ -116,7 +116,6 @@ static void* EmitWrappedWriteCallTrampoline(Xbyak_loongarch64::CodeGenerator& co
     code.jirl(code.ra, Xscratch0, 0);
     ABI_PopRegisters(code, save_regs, 0);
     code.jirl(code.zero, code.ra, 0);
-    ();
 
     code.align(8);
     code.L(l_this);
@@ -168,11 +167,10 @@ static void* EmitRead128CallTrampoline(Xbyak_loongarch64::CodeGenerator& code, A
     code.pcaddi(code.a0, l_this);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.FMOV(D0, code.a0);
-    code.FMOV(V0.D()[1], code.a1);
+    code.vinsgr2vr_d(code.vr0, code.a0, 0);
+    code.vinsgr2vr_d(code.vr0, code.a1, 1);
     ABI_PopRegisters(code, (1ull << 29) | (1ull << 30), 0);
     code.jirl(code.zero, code.ra, 0);
-    ();
 
     code.align(8);
     code.L(l_this);
@@ -198,11 +196,10 @@ static void* EmitWrappedRead128CallTrampoline(Xbyak_loongarch64::CodeGenerator& 
     code.add_d(code.a1, Xscratch0, code.zero);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.FMOV(D0, code.a0);
-    code.FMOV(V0.D()[1], code.a1);
+    code.vinsgr2vr_d(code.vr0, code.a0, 0);
+    code.vinsgr2vr_d(code.vr0, code.a1, 1);
     ABI_PopRegisters(code, save_regs, 0);
     code.jirl(code.zero, code.ra, 0);
-    ();
 
     code.align(8);
     code.L(l_this);
@@ -229,11 +226,10 @@ static void* EmitExclusiveRead128CallTrampoline(Xbyak_loongarch64::CodeGenerator
     code.pcaddi(code.a0, l_this);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.FMOV(D0, code.a0);
-    code.FMOV(V0.D()[1], code.a1);
+    code.vinsgr2vr_d(code.vr0, code.a0, 0);
+    code.vinsgr2vr_d(code.vr0, code.a1, 1);
     ABI_PopRegisters(code, (1ull << 29) | (1ull << 30), 0);
     code.jirl(code.zero, code.ra, 0);
-    ();
 
     code.align(8);
     code.L(l_this);
@@ -253,8 +249,8 @@ static void* EmitWrite128CallTrampoline(Xbyak_loongarch64::CodeGenerator& code, 
 
     void* target = (void*)code.getCode();
     code.pcaddi(code.a0, l_this);
-    code.FMOV(code.a2, D0);
-    code.FMOV(X3, V0.D()[1]);
+    code.vpickve2gr_d(code.a2, code.vr0, 0);
+    code.vpickve2gr_d(code.a3, code.vr0, 1);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
 
@@ -280,13 +276,12 @@ static void* EmitWrappedWrite128CallTrampoline(Xbyak_loongarch64::CodeGenerator&
     ABI_PushRegisters(code, save_regs, 0);
     code.pcaddi(code.a0, l_this);
     code.add_d(code.a1, Xscratch0, code.zero);
-    code.FMOV(code.a2, D0);
-    code.FMOV(X3, V0.D()[1]);
+    code.vpickve2gr_d(code.a2, code.vr0, 0);
+    code.vpickve2gr_d(code.a3, code.vr0, 1);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
     ABI_PopRegisters(code, save_regs, 0);
     code.jirl(code.zero, code.ra, 0);
-    ();
 
     code.align(8);
     code.L(l_this);
@@ -313,8 +308,8 @@ static void* EmitExclusiveWrite128CallTrampoline(Xbyak_loongarch64::CodeGenerato
 
     void* target = (void*)code.getCode();
     code.pcaddi(code.a0, l_this);
-    code.FMOV(code.a2, D0);
-    code.FMOV(X3, V0.D()[1]);
+    code.vpickve2gr_d(code.a2, code.vr0, 0);
+    code.vpickve2gr_d(code.a3, code.vr0, 1);
     code.pcaddi(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
 
@@ -408,16 +403,17 @@ void A64AddressSpace::EmitPrelude() {
 
     prelude_info.run_code = code.getCurr<PreludeInfo::RunCodeFuncType>();
     {
+        // TODO 30?
         ABI_PushRegisters(code, ABI_CALLEE_SAVE | (1 << 30), sizeof(StackLayout));
 
         code.add_d(code.s0, code.a0, code.zero);
         code.add_d(Xstate, code.a1, code.zero);
         code.add_d(Xhalt, code.a2, code.zero);
         if (conf.page_table) {
-            code.add_d(Xpagetable, mcl::bit_cast<u64>(conf.page_table), code.zero);
+            code.add_imm(Xpagetable, code.zero, mcl::bit_cast<u64>(conf.page_table), Xscratch0);
         }
         if (conf.fastmem_pointer) {
-            code.add_d(Xfastmem, mcl::bit_cast<u64>(conf.fastmem_pointer), code.zero);
+            code.add_imm(Xfastmem, code.zero, mcl::bit_cast<u64>(conf.fastmem_pointer), Xscratch0);
         }
 
         if (conf.HasOptimization(OptimizationFlag::ReturnStackBuffer)) {
@@ -433,10 +429,7 @@ void A64AddressSpace::EmitPrelude() {
             code.st_d(Xticks, code.sp, offsetof(StackLayout, cycles_to_run));
         }
 
-        code.MRS(Xscratch1, Xbyak_loongarch64::SystemReg::FPCR);
-        code.st_d(Wscratch1, code.sp, offsetof(StackLayout, save_host_fpcr));
-        code.ld_d(Wscratch0, Xstate, offsetof(A64JitState, fpcr));
-        code.MSR(Xbyak_loongarch64::SystemReg::FPCR, Xscratch0);
+        SwitchFcsrOnEntry();
 
         code.ll_acq_w(Wscratch0, Xhalt);
         code.bnez(Wscratch0, return_from_run_code);
@@ -452,10 +445,10 @@ void A64AddressSpace::EmitPrelude() {
         code.add_d(Xstate, code.a1, code.zero);
         code.add_d(Xhalt, code.a2, code.zero);
         if (conf.page_table) {
-            code.add_d(Xpagetable, mcl::bit_cast<u64>(conf.page_table), code.zero);
+            code.add_imm(Xpagetable, code.zero, mcl::bit_cast<u64>(conf.page_table), Xscratch0);
         }
         if (conf.fastmem_pointer) {
-            code.add_d(Xfastmem, mcl::bit_cast<u64>(conf.fastmem_pointer), code.zero);
+            code.add_imm(Xfastmem,code.zero, mcl::bit_cast<u64>(conf.fastmem_pointer), Xscratch0);
         }
 
         if (conf.HasOptimization(OptimizationFlag::ReturnStackBuffer)) {
@@ -466,27 +459,25 @@ void A64AddressSpace::EmitPrelude() {
         }
 
         if (conf.enable_cycle_counting) {
-            code.add_d(Xticks, 1, code.zero);
+            code.addi_d(Xticks, Xticks, 1);
             code.st_d(Xticks, code.sp, offsetof(StackLayout, cycles_to_run));
         }
 
-        code.MRS(Xscratch1, Xbyak_loongarch64::SystemReg::FPCR);
-        code.st_d(Wscratch1, code.sp, offsetof(StackLayout, save_host_fpcr));
-        code.ld_d(Wscratch0, Xstate, offsetof(A64JitState, fpcr));
-        code.MSR(Xbyak_loongarch64::SystemReg::FPCR, Xscratch0);
+        SwitchFcsrOnEntry();
 
         Xbyak_loongarch64::Label step_hr_loop;
         code.L(step_hr_loop);
         code.LDAXR(Wscratch0, Xhalt);
         code.bnez(Wscratch0, return_from_run_code);
-        code.ORR(Wscratch0, Wscratch0, static_cast<u32>(HaltReason::Step));
+        code.add_imm(Wscratch1, code.zero, static_cast<u32>(HaltReason::Step), Xscratch2);
+        code.or_(Wscratch0, Wscratch0, Wscratch1);
         code.STLXR(Wscratch1, Wscratch0, Xhalt);
         code.bnez(Wscratch1, step_hr_loop);
 
         code.jirl(code.zero, code.s0, 0);
     }
 
-    prelude_info.return_to_dispatcher = code.getCurr<void (*)()>();
+    prelude_info.return_to_dispatcher = code.getCurr<void *>();
     {
         Xbyak_loongarch64::Label l_this, l_addr;
 
@@ -522,21 +513,20 @@ void A64AddressSpace::EmitPrelude() {
         if (conf.enable_cycle_counting) {
             code.ld_d(code.a1, code.sp, offsetof(StackLayout, cycles_to_run));
             code.sub_d(code.a1, code.a1, Xticks);
-            code.bl(prelude_info.add_ticks);
+            // FIXME is this ok?
+            code.bl(int64_t(prelude_info.add_ticks));
         }
 
-        code.ld_d(Wscratch0, code.sp, offsetof(StackLayout, save_host_fpcr));
-        code.MSR(Xbyak_loongarch64::SystemReg::FPCR, Xscratch0);
+        SwitchFcsrOnExit();
 
         Xbyak_loongarch64::Label exit_hr_loop;
         code.L(exit_hr_loop);
-        code.LDAXR(W0, Xhalt);
+        code.LDAXR(code.a0, Xhalt);
         code.STLXR(Wscratch0, code.zero, Xhalt);
         code.bnez(Wscratch0, exit_hr_loop);
 
         ABI_PopRegisters(code, ABI_CALLEE_SAVE | (1 << 30), sizeof(StackLayout));
         code.jirl(code.zero, code.ra, 0);
-        ();
     }
 
     code.align(8);
@@ -545,11 +535,24 @@ void A64AddressSpace::EmitPrelude() {
 
     prelude_info.end_of_prelude = code.getCurr<u32*>();
 
+    // FIXME how?
     //    mem.invalidate_all();
     //    mem.protect();
 }
 
-EmitConfig A64AddressSpace::GetEmitConfig() {
+    void A64AddressSpace::SwitchFcsrOnExit() {
+        code.ld_d(Wscratch0, code.sp, offsetof(StackLayout, save_host_fpcr));
+        code.movgr2fcsr(code.fcsr0, Wscratch0);
+    }
+
+    void A64AddressSpace::SwitchFcsrOnEntry() {
+        code.movfcsr2gr(Xscratch1, code.fcsr0);
+        code.st_d(Wscratch1, code.sp, offsetof(StackLayout, save_host_fpcr));
+        code.ld_d(Wscratch0, Xstate, offsetof(A64JitState, fpcr));
+        code.movgr2fcsr(code.fcsr0, Xscratch0);
+    }
+
+    EmitConfig A64AddressSpace::GetEmitConfig() {
     return EmitConfig{
         .optimizations = conf.unsafe_optimizations ? conf.optimizations : conf.optimizations & all_safe_optimizations,
 

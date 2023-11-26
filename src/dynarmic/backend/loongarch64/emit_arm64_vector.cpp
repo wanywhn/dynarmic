@@ -1690,7 +1690,7 @@ void EmitIR<IR::Opcode::VectorTableLookup128>(Xbyak_loongarch64::CodeGenerator& 
 
     auto Qresult = is_defaults_zero ? ctx.reg_alloc.WriteQ(inst) : ctx.reg_alloc.ReadWriteQ(args[0], inst);
     auto Qindices = ctx.reg_alloc.ReadQ(args[2]);
-    std::vector<RAReg<Xbyak_loongarch64::QReg>> Qtable;
+    std::vector<RAReg<Xbyak_loongarch64::VReg>> Qtable;
     for (size_t i = 0; i < table_size; i++) {
         Qtable.emplace_back(ctx.reg_alloc.ReadQ(table[i]));
     }

@@ -261,7 +261,7 @@ void EmitToFixed(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::I
 }
 
 template<typename Lambda>
-static void EmitTwoOpFallbackWithoutRegAlloc(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, Xbyak_loongarch64::QReg Qresult, Xbyak_loongarch64::QReg Qarg1, Lambda lambda, bool fpcr_controlled) {
+static void EmitTwoOpFallbackWithoutRegAlloc(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, Xbyak_loongarch64::VReg Qresult, Xbyak_loongarch64::VReg Qarg1, Lambda lambda, bool fpcr_controlled) {
     const auto fn = static_cast<mcl::equivalent_function_type<Lambda>*>(lambda);
 
     const u32 fpcr = ctx.FPCR(fpcr_controlled).Value();
@@ -269,11 +269,11 @@ static void EmitTwoOpFallbackWithoutRegAlloc(Xbyak_loongarch64::CodeGenerator& c
 
     ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Qresult.getIdx()), stack_size);
 
-    code.add_d(Xscratch0, mcl::bit_cast<u64>(fn), code.zero);
-    code.add_imm(code.a0, code.sp, 0 * 16, t0);
-    code.add_imm(code.a1, code.sp, 1 * 16, t0);
+    code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(fn), Xscratch1);
+    code.add_imm(code.a0, code.sp, 0 * 16, Xscratch1);
+    code.add_imm(code.a1, code.sp, 1 * 16, Xscratch1);
     code.add_d(code.a2, fpcr, code.zero);
-    code.add_imm(X3, Xstate, ctx.conf.state_fpsr_offset, t0);
+    code.add_imm(X3, Xstate, ctx.conf.state_fpsr_offset, Xscratch1);
     code.stx_d(Qarg1, code.a1, code.zero);
     code.jirl(code.ra, Xscratch0, 0);
     code.ld_d(Qresult, SP, 0);

@@ -359,7 +359,7 @@ static u32 GetFPSRImpl(A64JitState* jit_state) {
 void A64EmitLoongArch64::EmitA64GetFPSR(A64EmitContext& ctx, IR::Inst* inst) {
     ctx.reg_alloc.HostCall(inst);
     code.mov(code.ABI_PARAM1, code.r15);
-    code.stmxcsr(code.dword[code.r15 + offsetof(A64JitState, guest_MXCSR)]);
+    code.stmxcsr(code.dword[code.r15 + offsetof(A64JitState, guest_FCSR)]);
     code.CallFunction(GetFPSRImpl);
 }
 
@@ -447,7 +447,7 @@ void A64EmitLoongArch64::EmitA64SetFPCR(A64EmitContext& ctx, IR::Inst* inst) {
     ctx.reg_alloc.HostCall(nullptr, {}, args[0]);
     code.mov(code.ABI_PARAM1, code.r15);
     code.CallFunction(SetFPCRImpl);
-    code.ldmxcsr(code.dword[code.r15 + offsetof(A64JitState, guest_MXCSR)]);
+    code.ldmxcsr(code.dword[code.r15 + offsetof(A64JitState, guest_FCSR)]);
 }
 
 static void SetFPSRImpl(A64JitState* jit_state, u32 value) {
@@ -459,7 +459,7 @@ void A64EmitLoongArch64::EmitA64SetFPSR(A64EmitContext& ctx, IR::Inst* inst) {
     ctx.reg_alloc.HostCall(nullptr, {}, args[0]);
     code.mov(code.ABI_PARAM1, code.r15);
     code.CallFunction(SetFPSRImpl);
-    code.ldmxcsr(code.dword[code.r15 + offsetof(A64JitState, guest_MXCSR)]);
+    code.ldmxcsr(code.dword[code.r15 + offsetof(A64JitState, guest_FCSR)]);
 }
 
 void A64EmitLoongArch64::EmitA64SetPC(A64EmitContext& ctx, IR::Inst* inst) {

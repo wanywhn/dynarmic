@@ -58,18 +58,18 @@ void A64JitState::SetFpcr(u32 value) {
     fpcr = value & FPCR_MASK;
 
     asimd_MXCSR &= 0x0000003D;
-    guest_MXCSR &= 0x0000003D;
+    guest_FCSR &= 0x1F000000;
     asimd_MXCSR |= 0x00001f80;
-    guest_MXCSR |= 0x00001f80;  // Mask all exceptions
+    guest_FCSR |= 0x0000001f;  // Mask all exceptions
 
     // RMode
-    const std::array<u32, 4> MXCSR_RMode{0x0, 0x4000, 0x2000, 0x6000};
-    guest_MXCSR |= MXCSR_RMode[(value >> 22) & 0x3];
+    const std::array<u32, 4> MXCSR_RMode{0x0, 0x200, 0x300, 0x100};
+    guest_FCSR |= MXCSR_RMode[(value >> 22) & 0x3];
 
-    if (mcl::bit::get_bit<24>(value)) {
-        guest_MXCSR |= (1 << 15);  // SSE Flush to Zero
-        guest_MXCSR |= (1 << 6);   // SSE Denormals are Zero
-    }
+//    if (mcl::bit::get_bit<24>(value)) {
+//        guest_FCSR |= (1 << 15);  // SSE Flush to Zero
+//        guest_FCSR |= (1 << 6);   // SSE Denormals are Zero
+//    }
 }
 
 /**
@@ -97,20 +97,23 @@ void A64JitState::SetFpcr(u32 value) {
  */
 
 u32 A64JitState::GetFpsr() const {
-    const u32 mxcsr = guest_MXCSR | asimd_MXCSR;
+    const u32 mxcsr = guest_FCSR | asimd_MXCSR;
     u32 fpsr = 0;
-    fpsr |= (mxcsr & 0b0000000000001);       // IOC = IE
-    fpsr |= (mxcsr & 0b0000000111100) >> 1;  // IXC, UFC, OFC, DZC = PE, UE, OE, ZE
+    fpsr |= (mxcsr & 0x10000000 ) >> 28;
+    fpsr |= ((mxcsr & 0x8000000 ) >> 27 ) << 2;
+    fpsr |= ((mxcsr & 0x4000000 ) >> 26 ) << 3;
+    fpsr |= ((mxcsr & 0x2000000 ) >> 25 ) << 4;
+    fpsr |= ((mxcsr & 0x2000000 ) >> 24 ) << 5;
     fpsr |= fpsr_exc;
     fpsr |= (fpsr_qc == 0 ? 0 : 1) << 27;
     return fpsr;
 }
 
 void A64JitState::SetFpsr(u32 value) {
-    guest_MXCSR &= ~0x0000003D;
+    guest_FCSR &= ~0x1F000000;
     asimd_MXCSR &= ~0x0000003D;
     fpsr_qc = (value >> 27) & 1;
     fpsr_exc = value & 0x9F;
 }
 
-}  // namespace Dynarmic::Backend::LoongArch64
+}  // namespace Dynarmic::Backend::X64

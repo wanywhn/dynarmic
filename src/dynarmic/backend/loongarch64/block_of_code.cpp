@@ -407,22 +407,22 @@ void BlockOfCode::GenRunCode(std::function<void(BlockOfCode&)> rcp) {
 
 void BlockOfCode::SwitchMxcsrOnEntry() {
     stmxcsr(dword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, save_host_MXCSR)]);
-    ldmxcsr(dword[r15 + jsi.offsetof_guest_MXCSR]);
+    ldmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
 }
 
 void BlockOfCode::SwitchMxcsrOnExit() {
-    stmxcsr(dword[r15 + jsi.offsetof_guest_MXCSR]);
+    stmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
     ldmxcsr(dword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, save_host_MXCSR)]);
 }
 
 void BlockOfCode::EnterStandardASIMD() {
-    stmxcsr(dword[r15 + jsi.offsetof_guest_MXCSR]);
+    stmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
     ldmxcsr(dword[r15 + jsi.offsetof_asimd_MXCSR]);
 }
 
 void BlockOfCode::LeaveStandardASIMD() {
     stmxcsr(dword[r15 + jsi.offsetof_asimd_MXCSR]);
-    ldmxcsr(dword[r15 + jsi.offsetof_guest_MXCSR]);
+    ldmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
 }
 
 void BlockOfCode::UpdateTicks() {

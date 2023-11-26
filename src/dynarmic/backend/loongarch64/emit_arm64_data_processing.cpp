@@ -332,7 +332,7 @@ void EmitIR<IR::Opcode::LogicalShiftLeft32>(Xbyak_loongarch64::CodeGenerator& co
             code.CMP(Wscratch1, 32);
             code.CSEL(Wresult, Wresult, code.zero, LT);
             code.CSEL(Wcarry_out, Wcarry_out, code.zero, LE);
-            code.B(end);
+            code.b(end);
 
             code.L(zero);
             code.add_d(*Wresult, Woperand, code.zero);
@@ -470,7 +470,7 @@ void EmitIR<IR::Opcode::LogicalShiftRight32>(Xbyak_loongarch64::CodeGenerator& c
             code.CMP(Wscratch1, 32);
             code.CSEL(Wresult, Wresult, code.zero, LT);
             code.CSEL(Wcarry_out, Wcarry_out, code.zero, LE);
-            code.B(end);
+            code.b(end);
 
             code.L(zero);
             code.add_d(*Wresult, Woperand, code.zero);
@@ -604,7 +604,7 @@ void EmitIR<IR::Opcode::ArithmeticShiftRight32>(Xbyak_loongarch64::CodeGenerator
             code.UBFIZ(Wcarry_out, Wcarry_out, 29, 1);
             code.add_d(*Wresult, Wresult, code.zero);
 
-            code.B(end);
+            code.b(end);
 
             code.L(zero);
             code.add_d(*Wresult, Woperand, code.zero);
@@ -660,13 +660,13 @@ void EmitIR<IR::Opcode::RotateRight32>(Xbyak_loongarch64::CodeGenerator& code, E
         auto Woperand = ctx.reg_alloc.ReadW(operand_arg);
         RegAlloc::Realize(Wresult, Woperand);
 
-        code.ROR(Wresult, Woperand, shift);
+        code.rotri_w(Wresult, Woperand, shift);
 
         if (carry_inst) {
             auto Wcarry_out = ctx.reg_alloc.WriteW(carry_inst);
             RegAlloc::Realize(Wcarry_out);
 
-            code.ROR(Wcarry_out, Woperand, ((shift + 31) - 29) % 32);
+            code.rotri_w(Wcarry_out, Woperand, ((shift + 31) - 29) % 32);
             code.andi(Wcarry_out, Wcarry_out, 1 << 29);
         }
     } else {
@@ -675,7 +675,7 @@ void EmitIR<IR::Opcode::RotateRight32>(Xbyak_loongarch64::CodeGenerator& code, E
         auto Wshift = ctx.reg_alloc.ReadW(shift_arg);
         RegAlloc::Realize(Wresult, Woperand, Wshift);
 
-        code.ROR(Wresult, Woperand, Wshift);
+        code.rotr_w(Wresult, Woperand, Wshift);
 
         if (carry_inst && carry_arg.IsImmediate()) {
             const u32 carry_in = carry_arg.GetImmediateU32() << 29;
@@ -717,13 +717,13 @@ void EmitIR<IR::Opcode::RotateRight64>(Xbyak_loongarch64::CodeGenerator& code, E
         auto Xresult = ctx.reg_alloc.WriteX(inst);
         auto Xoperand = ctx.reg_alloc.ReadX(operand_arg);
         RegAlloc::Realize(Xresult, Xoperand);
-        code.ROR(Xresult, Xoperand, shift);
+        code.rotri_d(Xresult, Xoperand, shift);
     } else {
         auto Xresult = ctx.reg_alloc.WriteX(inst);
         auto Xoperand = ctx.reg_alloc.ReadX(operand_arg);
         auto Xshift = ctx.reg_alloc.ReadX(shift_arg);
         RegAlloc::Realize(Xresult, Xoperand, Xshift);
-        code.ROR(Xresult, Xoperand, Xshift);
+        code.rotr_d(Xresult, Xoperand, Xshift);
     }
 }
 
@@ -855,16 +855,16 @@ template<>
 void EmitIR<IR::Opcode::RotateRightMasked32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitMaskedShift32(
         code, ctx, inst,
-        [&](auto& Wresult, auto& Woperand, auto shift) { code.ROR(Wresult, Woperand, shift); },
-        [&](auto& Wresult, auto& Woperand, auto& Wshift) { code.ROR(Wresult, Woperand, Wshift); });
+        [&](auto& Wresult, auto& Woperand, auto shift) { code.rotri_w(Wresult, Woperand, shift); },
+        [&](auto& Wresult, auto& Woperand, auto& Wshift) { code.rotri_w(Wresult, Woperand, Wshift); });
 }
 
 template<>
 void EmitIR<IR::Opcode::RotateRightMasked64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitMaskedShift64(
         code, ctx, inst,
-        [&](auto& Xresult, auto& Xoperand, auto shift) { code.ROR(Xresult, Xoperand, shift); },
-        [&](auto& Xresult, auto& Xoperand, auto& Xshift) { code.ROR(Xresult, Xoperand, Xshift); });
+        [&](auto& Xresult, auto& Xoperand, auto shift) { code.rotri_d(Xresult, Xoperand, shift); },
+        [&](auto& Xresult, auto& Xoperand, auto& Xshift) { code.rotri_d(Xresult, Xoperand, Xshift); });
 }
 
 template<size_t bitsize, typename EmitFn>

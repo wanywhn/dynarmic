@@ -19,9 +19,10 @@ namespace Dynarmic::Backend::LoongArch64::NZCV {
     constexpr size_t arm_ge_flag_mask = arm_n_flag_mask | arm_v_flag_mask;
     constexpr size_t arm_gt_flag_mask1 = arm_ge_flag_mask| arm_z_flag_mask;
     constexpr size_t arm_le_flag_mask2 = arm_gt_flag_mask1;
+    constexpr size_t arm_nzcv_shift = 28;
 
 
-    inline u32 ToX64(u32 nzcv) {
+    inline u32 ToLoongArch64(u32 nzcv) {
         /* Naive implementation:
         u32 x64_flags = 0;
         x64_flags |= mcl::bit::get_bit<31>(cpsr) ? 1 << 15 : 0;
@@ -33,7 +34,7 @@ namespace Dynarmic::Backend::LoongArch64::NZCV {
         return (nzcv >> 28);
     }
 
-    inline u32 FromX64(u32 x64_flags) {
+    inline u32 FromLoongArch64(u32 x64_flags) {
         /* Naive implementation:
         u32 nzcv = 0;
         nzcv |= mcl::bit::get_bit<15>(x64_flags) ? 1 << 31 : 0;

@@ -199,6 +199,7 @@ EmittedBlockInfo EmitArm64(Xbyak_loongarch64::CodeGenerator& code, IR::Block blo
     EmittedBlockInfo ebi;
 
     FpsrManager fpsr_manager{code, conf.state_fpsr_offset};
+    // TODO change to loongarch fr
     RegAlloc reg_alloc{code, fpsr_manager, GPR_ORDER, FPR_ORDER};
     EmitContext ctx{block, reg_alloc, conf, ebi, fpsr_manager, fastmem_manager, {}};
 
@@ -256,12 +257,12 @@ EmittedBlockInfo EmitArm64(Xbyak_loongarch64::CodeGenerator& code, IR::Block blo
 
     EmitAddCycles(code, ctx, block.CycleCount());
     conf.emit_terminal(code, ctx);
-    code.BRK(0);
+    code.break_(0);
 
     for (const auto& deferred_emit : ctx.deferred_emits) {
         deferred_emit();
     }
-    code.BRK(0);
+    code.break_(0);
 
     ebi.size = code.getCurr<CodePtr>() - ebi.entry_point;
     return ebi;
@@ -269,18 +270,18 @@ EmittedBlockInfo EmitArm64(Xbyak_loongarch64::CodeGenerator& code, IR::Block blo
 
 void EmitRelocation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, LinkTarget link_target) {
     ctx.ebi.relocations.emplace_back(Relocation{code.getCurr<CodePtr>() - ctx.ebi.entry_point, link_target});
-    code.NOP();
+    code.nop();
 }
 
 void EmitBlockLinkRelocation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, const IR::LocationDescriptor& descriptor, BlockRelocationType type) {
     ctx.ebi.block_relocations[descriptor].emplace_back(BlockRelocation{code.getCurr<CodePtr>() - ctx.ebi.entry_point, type});
     switch (type) {
     case BlockRelocationType::Branch:
-        code.NOP();
+        code.nop();
         break;
     case BlockRelocationType::MoveToScratch1:
         code.BRK(0);
-        code.NOP();
+        code.nop();
         break;
     default:
         UNREACHABLE();

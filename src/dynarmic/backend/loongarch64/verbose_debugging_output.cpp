@@ -25,7 +25,7 @@ void EmitVerboseDebuggingOutput(Xbyak_loongarch64::CodeGenerator& code, EmitCont
         code.st_d(Xbyak_loongarch64::XReg{i}, code.sp, offsetof(RegisterData, x) + i * sizeof(u64));
     }
     for (int i = 0; i < 32; i++) {
-        code.st_d(Xbyak_loongarch64::QReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
+        code.st_d(Xbyak_loongarch64::VReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
     }
     code.MRS(code.a0, Xbyak_loongarch64::SystemReg::NZCV);
     code.st_d(code.a0, code.sp, offsetof(RegisterData, nzcv));
@@ -41,7 +41,7 @@ void EmitVerboseDebuggingOutput(Xbyak_loongarch64::CodeGenerator& code, EmitCont
     code.ld_d(code.a0, code.sp, offsetof(RegisterData, nzcv));
     code.MSR(Xbyak_loongarch64::SystemReg::NZCV, code.a0);
     for (int i = 0; i < 32; i++) {
-        code.ld_d(Xbyak_loongarch64::QReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
+        code.ld_d(Xbyak_loongarch64::VReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
     }
     for (int i = 0; i < 30; i++) {
         if (i == 18) {

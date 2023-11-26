@@ -137,7 +137,7 @@ void CallbackOnlyEmitReadMemory(Xbyak_loongarch64::CodeGenerator& code, EmitCont
 
     EmitRelocation(code, ctx, ReadMemoryLinkTarget(bitsize));
     if (ordered) {
-        code.dbar(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(0);
     }
 
     if constexpr (bitsize == 128) {
@@ -158,7 +158,7 @@ void CallbackOnlyEmitExclusiveReadMemory(Xbyak_loongarch64::CodeGenerator& code,
     code.st_b(Wscratch0, Xstate, ctx.conf.state_exclusive_state_offset);
     EmitRelocation(code, ctx, ExclusiveReadMemoryLinkTarget(bitsize));
     if (ordered) {
-        code.dbar(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(0);
     }
 
     if constexpr (bitsize == 128) {
@@ -176,11 +176,11 @@ void CallbackOnlyEmitWriteMemory(Xbyak_loongarch64::CodeGenerator& code, EmitCon
     const bool ordered = IsOrdered(args[3].GetImmediateAccType());
 
     if (ordered) {
-        code.dbar(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(0);
     }
     EmitRelocation(code, ctx, WriteMemoryLinkTarget(bitsize));
     if (ordered) {
-        code.dbar(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(0);
     }
 }
 
@@ -193,15 +193,15 @@ void CallbackOnlyEmitExclusiveWriteMemory(Xbyak_loongarch64::CodeGenerator& code
     Xbyak_loongarch64::Label end;
 
     if (ordered) {
-        code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(0x700);
     }
     code.add_d(W0, 1, code.zero);
-    code.LDRB(Wscratch0, Xstate, ctx.conf.state_exclusive_state_offset);
-    code.CBZ(Wscratch0, end);
+    code.ld_b(Wscratch0, Xstate, ctx.conf.state_exclusive_state_offset);
+    code.beqz(Wscratch0, end);
     code.st_b(code.zero, Xstate, ctx.conf.state_exclusive_state_offset);
     EmitRelocation(code, ctx, ExclusiveWriteMemoryLinkTarget(bitsize));
     if (ordered) {
-        code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+        code.dbar(0x700);
     }
     code.L(end);
     ctx.reg_alloc.DefineAsRegister(inst, code.a0);
@@ -236,14 +236,13 @@ void EmitDetectMisalignedVAddr(Xbyak_loongarch64::CodeGenerator& code, EmitConte
                 UNREACHABLE();
             }
         }();
-
-        code.TST(Xaddr, align_mask);
-        code.B(NE, *fallback);
+        code.addi_d(Xscratch0, code.zero, align_mask);
+        code.bne(Xaddr, Xscratch0, *fallback);
     } else {
         // If (addr & page_mask) > page_size - byte_size, use fallback.
         code.andi(Xscratch0, Xaddr, page_mask);
-        code.CMP(Xscratch0, page_size - bitsize / 8);
-        code.B(HI, *fallback);
+        code.addi_d(Xscratch1, code.zero, page_size - bitsize / 8);
+        code.bltu(Xscratch1, Xscratch0, *fallback);
     }
 }
 
@@ -262,8 +261,8 @@ std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg> InlinePageTableEmitV
         code.UBFX(Xscratch0, Xaddr, page_bits, valid_page_index_bits);
     } else {
         code.srli_d(Xscratch0, Xaddr, page_bits);
-        code.TST(Xscratch0, u64(~u64(0)) << valid_page_index_bits);
-        code.B(NE, *fallback);
+        code.addi_d(Xscratch1, code.zero, u64(~u64(0)) << valid_page_index_bits);
+        code.bne(Xscratch1, Xscratch0, *fallback);
     }
 
     code.ld_d(Xscratch0, Xpagetable, Xscratch0, LSL, 3);
@@ -273,7 +272,7 @@ std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg> InlinePageTableEmitV
         code.andi(Xscratch0, Xscratch0, mask);
     }
 
-    code.CBZ(Xscratch0, *fallback);
+    code.beqz(Xscratch0, *fallback);
 
     if (ctx.conf.absolute_offset_page_table) {
         return std::make_pair(Xscratch0, Xaddr);
@@ -309,8 +308,8 @@ CodePtr EmitMemoryLdr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
             code.ll_acq_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0);
             break;
         case 128:
-            code.ld_d(Xbyak_loongarch64::QReg{value_idx}, Xscratch0, 0);
-            code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+            code.ld_d(Xbyak_loongarch64::VReg{value_idx}, Xscratch0, 0);
+            code.dbar(0x700);
             break;
         default:
             ASSERT_FALSE("Invalid bitsize");
@@ -332,7 +331,7 @@ CodePtr EmitMemoryLdr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
             code.ld_d(Xbyak_loongarch64::XReg{value_idx}, Xbase, Roffset, index_ext);
             break;
         case 128:
-            code.ld_d(Xbyak_loongarch64::QReg{value_idx}, Xbase, Roffset, index_ext);
+            code.ld_d(Xbyak_loongarch64::VReg{value_idx}, Xbase, Roffset, index_ext);
             break;
         default:
             ASSERT_FALSE("Invalid bitsize");
@@ -369,9 +368,9 @@ CodePtr EmitMemoryStr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
             code.sc_rel_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0);
             break;
         case 128:
-            code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
-            code.stx_d(Xbyak_loongarch64::QReg{value_idx}, Xscratch0, code.zero);
-            code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+            code.dbar(0x700);
+            code.stx_d(Xbyak_loongarch64::VReg{value_idx}, Xscratch0, code.zero);
+            code.dbar(0x700);
             break;
         default:
             ASSERT_FALSE("Invalid bitsize");
@@ -393,7 +392,7 @@ CodePtr EmitMemoryStr(Xbyak_loongarch64::CodeGenerator& code, int value_idx, Xby
             code.STR(Xbyak_loongarch64::XReg{value_idx}, Xbase, Roffset, index_ext);
             break;
         case 128:
-            code.STR(Xbyak_loongarch64::QReg{value_idx}, Xbase, Roffset, index_ext);
+            code.STR(Xbyak_loongarch64::VReg{value_idx}, Xbase, Roffset, index_ext);
             break;
         default:
             ASSERT_FALSE("Invalid bitsize");
@@ -429,7 +428,7 @@ void InlinePageTableEmitReadMemory(Xbyak_loongarch64::CodeGenerator& code, EmitC
         code.add_d(Xscratch0, Xaddr, code.zero);
         EmitRelocation(code, ctx, WrappedReadMemoryLinkTarget(bitsize));
         if (ordered) {
-            code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+            code.dbar(0x700);
         }
         if constexpr (bitsize == 128) {
             code.add_d(Rvalue.B16(), Q0.B16(), code.zero);
@@ -437,7 +436,7 @@ void InlinePageTableEmitReadMemory(Xbyak_loongarch64::CodeGenerator& code, EmitC
             code.add_d(Rvalue.toX(), Xscratch0, code.zero);
         }
         ctx.conf.emit_check_memory_abort(code, ctx, inst, *end);
-        code.B(*end);
+        code.b(*end);
     });
 
     code.L(*end);
@@ -474,14 +473,14 @@ void InlinePageTableEmitWriteMemory(Xbyak_loongarch64::CodeGenerator& code, Emit
             code.add_d(Xscratch1, Rvalue.toX(), code.zero);
         }
         if (ordered) {
-            code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+            code.dbar(0x700);
         }
         EmitRelocation(code, ctx, WrappedWriteMemoryLinkTarget(bitsize));
         if (ordered) {
-            code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+            code.dbar(0x700);
         }
         ctx.conf.emit_check_memory_abort(code, ctx, inst, *end);
-        code.B(*end);
+        code.b(*end);
     });
 
     code.L(*end);
@@ -558,7 +557,7 @@ void FastmemEmitReadMemory(Xbyak_loongarch64::CodeGenerator& code, EmitContext& 
         code.add_d(Xscratch0, Xaddr, code.zero);
         EmitRelocation(code, ctx, WrappedReadMemoryLinkTarget(bitsize));
         if (ordered) {
-            code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+            code.dbar(0x700);
         }
         if constexpr (bitsize == 128) {
             code.add_d(Rvalue.B16(), Q0.B16(), code.zero);
@@ -566,7 +565,7 @@ void FastmemEmitReadMemory(Xbyak_loongarch64::CodeGenerator& code, EmitContext& 
             code.add_d(Rvalue.toX(), Xscratch0, code.zero);
         }
         ctx.conf.emit_check_memory_abort(code, ctx, inst, *end);
-        code.B(*end);
+        code.b(*end);
     });
 
     code.L(*end);
@@ -613,14 +612,14 @@ void FastmemEmitWriteMemory(Xbyak_loongarch64::CodeGenerator& code, EmitContext&
             code.add_d(Xscratch1, Rvalue.toX(), code.zero);
         }
         if (ordered) {
-            code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+            code.dbar(0x700);
         }
         EmitRelocation(code, ctx, WrappedWriteMemoryLinkTarget(bitsize));
         if (ordered) {
-            code.DMB(Xbyak_loongarch64::BarrierOp::ISH);
+            code.dbar(0x700);
         }
         ctx.conf.emit_check_memory_abort(code, ctx, inst, *end);
-        code.B(*end);
+        code.b(*end);
     });
 
     code.L(*end);
