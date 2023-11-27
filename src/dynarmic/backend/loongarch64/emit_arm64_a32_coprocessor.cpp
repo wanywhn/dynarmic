@@ -27,10 +27,11 @@ static void CallCoprocCallback(Xbyak_loongarch64::CodeGenerator& code, EmitConte
     ctx.reg_alloc.PrepareForCall({}, arg0, arg1);
 
     if (callback.user_arg) {
-        code.add_d(code.a0, reinterpret_cast<u64>(*callback.user_arg), code.zero);
+        code.add_imm(code.a0, code.zero, reinterpret_cast<u64>(*callback.user_arg), Xscratch0);
+//        code.add_d(code.a0, reinterpret_cast<u64>(*callback.user_arg), code.zero);
     }
 
-    code.add_d(Xscratch0, reinterpret_cast<u64>(callback.function), code.zero);
+    code.add_imm(Xscratch0, code.zero, reinterpret_cast<u64>(callback.function), Xscratch1);
     code.jirl(code.ra, Xscratch0, 0);
 
     if (inst) {
@@ -97,7 +98,7 @@ void EmitIR<IR::Opcode::A32CoprocSendOneWord>(Xbyak_loongarch64::CodeGenerator& 
         auto Wvalue = ctx.reg_alloc.ReadW(args[1]);
         RegAlloc::Realize(Wvalue);
 
-        code.add_d(Xscratch0, reinterpret_cast<u64>(*destination_ptr), code.zero);
+        code.add_imm(Xscratch0, code.zero, reinterpret_cast<u64>(*destination_ptr), Xscratch1);
         code.stx_d(Wvalue, Xscratch0, code.zero);
 
         return;
@@ -139,8 +140,8 @@ void EmitIR<IR::Opcode::A32CoprocSendTwoWords>(Xbyak_loongarch64::CodeGenerator&
         auto Wvalue2 = ctx.reg_alloc.ReadW(args[2]);
         RegAlloc::Realize(Wvalue1, Wvalue2);
 
-        code.add_d(Xscratch0, reinterpret_cast<u64>((*destination_ptrs)[0]), code.zero);
-        code.add_d(Xscratch1, reinterpret_cast<u64>((*destination_ptrs)[1]), code.zero);
+        code.add_imm(Xscratch0, code.zero, reinterpret_cast<u64>((*destination_ptrs)[0]), Xscratch1);
+        code.add_imm(Xscratch1, code.zero, reinterpret_cast<u64>((*destination_ptrs)[1]), Xscratch2);
         code.stx_d(Wvalue1, Xscratch0, code.zero);
         code.stx_d(Wvalue2, Xscratch1, code.zero);
 
@@ -183,7 +184,7 @@ void EmitIR<IR::Opcode::A32CoprocGetOneWord>(Xbyak_loongarch64::CodeGenerator& c
         auto Wvalue = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wvalue);
 
-        code.add_d(Xscratch0, reinterpret_cast<u64>(*source_ptr), code.zero);
+        code.add_imm(Xscratch0, code.zero, reinterpret_cast<u64>(*source_ptr), Xscratch1);
         code.ld_d(Wvalue, Xscratch0, 0);
 
         return;
@@ -222,11 +223,13 @@ void EmitIR<IR::Opcode::A32CoprocGetTwoWords>(Xbyak_loongarch64::CodeGenerator& 
         auto Xvalue = ctx.reg_alloc.WriteX(inst);
         RegAlloc::Realize(Xvalue);
 
-        code.add_d(Xscratch0, reinterpret_cast<u64>((*source_ptrs)[0]), code.zero);
-        code.add_d(Xscratch1, reinterpret_cast<u64>((*source_ptrs)[1]), code.zero);
+        code.add_imm(Xscratch0, code.zero, reinterpret_cast<u64>((*source_ptrs)[0]), Xscratch1);
+        code.add_imm(Xscratch1, code.zero, reinterpret_cast<u64>((*source_ptrs)[1]), Xscratch2);
         code.ld_d(Xvalue, Xscratch0, 0);
         code.ld_d(Wscratch1, Xscratch1, 0);
-        code.BFI(Xvalue, Xscratch1, 32, 32);
+        code.srli_d(Xscratch1, Xscratch1, 32);
+        // TODO check if  bstrins_d is used correct
+        code.bstrins_d(Xvalue, Xscratch1, 32, 32);
 
         return;
     }
