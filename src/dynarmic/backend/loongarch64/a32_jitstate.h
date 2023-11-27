@@ -54,8 +54,8 @@ struct A32JitState {
 
     u32 fpsr_exc = 0;
     u32 fpsr_qc = 0;
-    u32 fpsr_nzcv = 0;
     u32 fpsr = 0;
+    u32 fpsr_nzcv = 0;
     u32 Fpscr() const;
     void SetFpscr(u32 FPSCR);
 

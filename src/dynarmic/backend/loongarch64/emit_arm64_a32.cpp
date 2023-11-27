@@ -833,7 +833,9 @@ namespace Dynarmic::Backend::LoongArch64 {
         ctx.reg_alloc.PrepareForCall();
         EmitRelocation(code, ctx, LinkTarget::InstructionSynchronizationBarrierRaised);
     }
-
+    static u32 GetFpscrImpl(A32JitState* jit_state) {
+        return jit_state->Fpscr();
+    }
     template<>
     void EmitIR<IR::Opcode::A32GetFpscr>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
         auto Wfpscr = ctx.reg_alloc.WriteW(inst);
@@ -847,8 +849,12 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.andi(Wfpscr, Wfpscr, 0xffff'0000);
         code.or_(Wscratch0, Wscratch0, Wscratch1);
         code.or_(Wfpscr, Wfpscr, Wscratch0);
+        code.call(GetFpscrImpl);
+        // FIXME
     }
-
+    static void SetFpscrImpl(u32 value, A32JitState* jit_state) {
+        jit_state->SetFpscr(value);
+    }
     template<>
     void EmitIR<IR::Opcode::A32SetFpscr>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -869,6 +875,8 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.andi(Wscratch0, Wfpscr, Wscratch0);
         code.andi(Wscratch1, Wfpscr, 0xf000'0000);
         code.STP(Wscratch0, Wscratch1, Xstate, offsetof(A32JitState, fpsr));
+        code.call(SetFpscrImpl);
+        // FIXME
     }
 
     template<>
