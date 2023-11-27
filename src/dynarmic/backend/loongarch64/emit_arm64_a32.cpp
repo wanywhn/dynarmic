@@ -778,7 +778,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             EmitRelocation(code, ctx, LinkTarget::AddTicks);
         }
 
-        code.add_d(W1, args[0].GetImmediateU32(), code.zero);
+        code.add_imm(code.a1, code.zero, args[0].GetImmediateU32(), Wscratch0);
         EmitRelocation(code, ctx, LinkTarget::CallSVC);
 
         if (ctx.conf.enable_cycle_counting) {
@@ -786,6 +786,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             code.st_d(code.a0, code.sp, offsetof(StackLayout, cycles_to_run));
             code.add_d(Xticks, code.a0, code.zero);
         }
+        // todo A32EmitX64::EmitA32CallSupervisor call SwitchMxcsrOnExit?
     }
 
     template<>
@@ -800,8 +801,8 @@ namespace Dynarmic::Backend::LoongArch64 {
             EmitRelocation(code, ctx, LinkTarget::AddTicks);
         }
 
-        code.add_d(W1, args[0].GetImmediateU32(), code.zero);
-        code.add_d(W2, args[1].GetImmediateU32(), code.zero);
+        code.add_imm(code.a1, code.zero, args[0].GetImmediateU32(), Wscratch0);
+        code.add_imm(code.a2, code.zero, args[1].GetImmediateU32(), Wscratch0);
         EmitRelocation(code, ctx, LinkTarget::ExceptionRaised);
 
         if (ctx.conf.enable_cycle_counting) {
