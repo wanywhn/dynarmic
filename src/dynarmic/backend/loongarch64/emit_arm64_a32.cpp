@@ -730,6 +730,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             const u32 new_pc = args[0].GetImmediateU32();
             const u32 mask = mcl::bit::get_bit<0>(new_pc) ? 0xFFFFFFFE : 0xFFFFFFFC;
             const u32 new_upper = upper_without_t | (mcl::bit::get_bit<0>(new_pc) ? 1 : 0);
+            // TODO check if eq to stp
             code.add_imm(Xscratch0, code.zero, (u64{new_upper} << 32) | (new_pc & mask), Xscratch1);
             code.st_d(Xscratch0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
 //            code.STUR(Xscratch0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
@@ -738,13 +739,19 @@ namespace Dynarmic::Backend::LoongArch64 {
             RegAlloc::Realize(Wpc);
             ctx.reg_alloc.SpillFlags();
 
+            code.add_imm(Wscratch2,  code.zero, upper_without_t, Wscratch1);
             code.andi(Wscratch0, Wpc, 1);
-            code.add_d(Wscratch1, 3, code.zero);
-            code.CSEL(Wscratch1, Wscratch0, Wscratch1, NE);
-            code.BIC(Wscratch1, Wpc, Wscratch1);
-            code.add_d(Wscratch0, upper_without_t, code.zero);
-            code.CINC(Wscratch0, Wscratch0, NE);
-            code.STP(Wscratch1, Wscratch0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
+//            code.bstrpick_d(Wscratch1, Wscratch0, 0, 0);
+            code.or_(Wscratch2, Wscratch2, Wscratch0);
+            code.st_w(Wscratch2, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32) + sizeof(u32));
+
+            code.addi_w(Wscratch0, Wscratch0, 1);
+            code.andi(Wscratch0, Wscratch0, 0x1);
+            code.slli_w(Wscratch0, Wscratch0, 1);
+
+            code.bstrins_d(Wpc, code.zero, 0, 0);
+            code.orn(Wpc, Wpc, Wscratch0);
+            code.st_w(Wpc, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
         }
     }
 
