@@ -815,12 +815,12 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::A32DataSynchronizationBarrier>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &,
                                                            IR::Inst *) {
-        code.DSB(Xbyak_loongarch64::BarrierOp::SY);
+        code.dbar(0x0);
     }
 
     template<>
     void EmitIR<IR::Opcode::A32DataMemoryBarrier>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &, IR::Inst *) {
-        code.DMB(Xbyak_loongarch64::BarrierOp::SY);
+        code.dbar(0x700);
     }
 
     template<>
