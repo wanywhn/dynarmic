@@ -96,7 +96,7 @@ public:
     // operator T() const { return reg.value(); }
     operator Xbyak_loongarch64::XReg () const { return reg.value(); }
     operator Xbyak_loongarch64::WReg() const { return reg.value(); }
-
+    operator Xbyak_loongarch64::VReg() const { return reg.value(); }
     //    operator Xbyak_loongarch64::WRegWsp() const
     //    requires(std::is_same_v<T, Xbyak_loongarch64::WReg>)
     //    {

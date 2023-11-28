@@ -54,8 +54,8 @@ void EmitIR<IR::Opcode::Pack2x32To1x64>(Xbyak_loongarch64::CodeGenerator& code, 
     auto Xresult = ctx.reg_alloc.WriteX(inst);
     RegAlloc::Realize(Wlo, Whi, Xresult);
 
-    code.add_d(Xresult->toW(), Wlo, code.zero);  // TODO: Move eliminiation
-    code.BFI(Xresult, Whi->toX(), 32, 32);
+    code.add_d(Xresult, Wlo, code.zero);  // TODO: Move eliminiation
+    code.bstrins_d(Xresult, Whi, 63, 32);
 }
 
 template<>
@@ -68,32 +68,37 @@ void EmitIR<IR::Opcode::Pack2x64To1x128>(Xbyak_loongarch64::CodeGenerator& code,
         auto Qresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Xlo, Xhi, Qresult);
 
-        code.FMOV(Qresult->toD(), Xlo);
-        code.add_d(Xbyak_loongarch64::VRegSelector{Qresult->getIdx()}.D()[1], Xhi, code.zero);
+        code.vinsgr2vr_w(Qresult, Xlo, 0);
+        code.vinsgr2vr_w(Qresult, Xhi, 1);
     } else if (args[0].IsInGpr()) {
         auto Xlo = ctx.reg_alloc.ReadX(args[0]);
         auto Dhi = ctx.reg_alloc.ReadD(args[1]);
         auto Qresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Xlo, Dhi, Qresult);
 
-        code.FMOV(Qresult->toD(), Xlo);
-        code.add_d(Xbyak_loongarch64::VRegSelector{Qresult->getIdx()}.D()[1], Xbyak_loongarch64::VRegSelector{Dhi->getIdx()}.D()[0], code.zero);
-    } else if (args[1].IsInGpr()) {
+        code.vslli_d(Qresult, Dhi, 64);
+        code.vinsgr2vr_w(Qresult, Xlo, 0);
+   } else if (args[1].IsInGpr()) {
         auto Dlo = ctx.reg_alloc.ReadD(args[0]);
         auto Xhi = ctx.reg_alloc.ReadX(args[1]);
         auto Qresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Dlo, Xhi, Qresult);
 
-        code.FMOV(Qresult->toD(), Dlo);  // TODO: Move eliminiation
-        code.add_d(Xbyak_loongarch64::VRegSelector{Qresult->getIdx()))}.D()[1], Xhi, code.zero);
+        code.vinsgr2vr_d(Qresult, Xhi, 1);
+        code.vinsgr2vr_d(Qresult, code.zero, 0);
+        code.vadd_d(Qresult, Qresult, Dlo);
+//        code.FMOV(Qresult->toD(), Dlo);  // TODO: Move eliminiation
+//        code.add_d(Xbyak_loongarch64::VRegSelector{Qresult->getIdx()))}.D()[1], Xhi, code.zero);
     } else {
         auto Dlo = ctx.reg_alloc.ReadD(args[0]);
         auto Dhi = ctx.reg_alloc.ReadD(args[1]);
         auto Qresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Dlo, Dhi, Qresult);
-
-        code.FMOV(Qresult->toD(), Dlo);  // TODO: Move eliminiation
-        code.add_d(Xbyak_loongarch64::VRegSelector{Qresult->getIdx()}.D()[1], Xbyak_loongarch64::VRegSelector{Dhi->getIdx()}.D()[0], code.zero);
+        code.vslli_d(Qresult, Dhi, 64);
+        code.vadd_d(Qresult, Dlo, Qresult);
+        // TODO is this instrc ok?
+//        code.FMOV(Qresult->toD(), Dlo);  // TODO: Move eliminiation
+//        code.add_d(Xbyak_loongarch64::VRegSelector{Qresult->getIdx()}.D()[1], Xbyak_loongarch64::VRegSelector{Dhi->getIdx()}.D()[0], code.zero);
     }
 }
 
@@ -104,8 +109,9 @@ void EmitIR<IR::Opcode::LeastSignificantWord>(Xbyak_loongarch64::CodeGenerator& 
     auto Wresult = ctx.reg_alloc.WriteW(inst);
     auto Xoperand = ctx.reg_alloc.ReadX(args[0]);
     RegAlloc::Realize(Wresult, Xoperand);
+    code.add_w(Wresult, code.zero, Xoperand);
 
-    code.add_d(Wresult, Xoperand->toW(), code.zero);  // TODO: Zext elimination
+//    code.add_d(Wresult, Xoperand->toW(), code.zero);  // TODO: Zext elimination
 }
 
 template<>
@@ -115,8 +121,9 @@ void EmitIR<IR::Opcode::LeastSignificantHalf>(Xbyak_loongarch64::CodeGenerator& 
     auto Wresult = ctx.reg_alloc.WriteW(inst);
     auto Woperand = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wresult, Woperand);
+    code.bstrpick_w(Wresult, Woperand, 15, 0);
 
-    code.UXTH(Wresult, Woperand);  // TODO: Zext elimination
+//    code.UXTH(Wresult, Woperand);  // TODO: Zext elimination
 }
 
 template<>
@@ -126,8 +133,9 @@ void EmitIR<IR::Opcode::LeastSignificantByte>(Xbyak_loongarch64::CodeGenerator& 
     auto Wresult = ctx.reg_alloc.WriteW(inst);
     auto Woperand = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wresult, Woperand);
+    code.bstrpick_w(Wresult, Woperand, 7, 0);
 
-    code.UXTB(Wresult, Woperand);  // TODO: Zext elimination
+//    code.UXTB(Wresult, Woperand);  // TODO: Zext elimination
 }
 
 template<>
@@ -140,14 +148,16 @@ void EmitIR<IR::Opcode::MostSignificantWord>(Xbyak_loongarch64::CodeGenerator& c
     auto Xoperand = ctx.reg_alloc.ReadX(args[0]);
     RegAlloc::Realize(Wresult, Xoperand);
 
-    code.srli_w(Wresult->toX(), Xoperand, 32);
+    code.srli_d(Wresult, Xoperand, 32);
 
     if (carry_inst) {
         auto Wcarry = ctx.reg_alloc.WriteW(carry_inst);
         RegAlloc::Realize(Wcarry);
 
-        code.srli_w(Wcarry, Xoperand->toW(), 31 - 29);
-        code.andi(Wcarry, Wcarry, 1 << 29);
+        code.srli_w(Wcarry, Xoperand, 31 - 29);
+        code.add_imm(Wscratch0, code.zero , 1 << 29, Wscratch1);
+        // TODO what does this mean?
+        code.and_(Wcarry, Wcarry, Wscratch0);
     }
 }
 
@@ -170,9 +180,10 @@ void EmitIR<IR::Opcode::IsZero32>(Xbyak_loongarch64::CodeGenerator& code, EmitCo
     auto Woperand = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wresult, Woperand);
     ctx.reg_alloc.SpillFlags();
-
-    code.CMP(Woperand, 0);
-    code.CSET(Wresult, EQ);
+    code.sltui(Wresult, Woperand, 0x1);
+//    code.xori(Wresult, Woperand, 0x1);
+//    code.CMP(Woperand, 0);
+//    code.CSET(Wresult, EQ);
 }
 
 template<>
@@ -183,9 +194,9 @@ void EmitIR<IR::Opcode::IsZero64>(Xbyak_loongarch64::CodeGenerator& code, EmitCo
     auto Xoperand = ctx.reg_alloc.ReadX(args[0]);
     RegAlloc::Realize(Wresult, Xoperand);
     ctx.reg_alloc.SpillFlags();
-
-    code.CMP(Xoperand, 0);
-    code.CSET(Wresult, EQ);
+    code.sltui(Wresult, Xoperand, 0x1);
+//    code.CMP(Xoperand, 0);
+//    code.CSET(Wresult, EQ);
 }
 
 template<>
@@ -196,9 +207,79 @@ void EmitIR<IR::Opcode::TestBit>(Xbyak_loongarch64::CodeGenerator& code, EmitCon
     RegAlloc::Realize(Xresult, Xoperand);
     ASSERT(args[1].IsImmediate());
     ASSERT(args[1].GetImmediateU8() < 64);
+//    code.srli_d(Xresult, Xoperand, args[1].GetImmediateU8());
+//    code.andi(Xresult, Xresult, 0x1);
 
-    code.UBFX(Xresult, Xoperand, args[1].GetImmediateU8(), 1);
+    code.bstrpick_d(Xresult, Xoperand, args[1].GetImmediateU8(), args[1].GetImmediateU8());
 }
+template< size_t bitsize>
+    static void EmitConditionalSelect(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        const IR::Cond cond = args[0].GetImmediateCond();
+        auto Xresult = ctx.reg_alloc.WriteX(inst);
+        auto Xthen = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
+        auto Xelse = ctx.reg_alloc.ReadReg<bitsize>(args[2]);
+        RegAlloc::Realize(Xresult, Xthen, Xelse);
+
+        const Xbyak::Reg32 nzcv = ctx.reg_alloc.ScratchGpr(HostLoc::RAX).cvt32();
+
+        code.mov(nzcv, dword[r15 + code.GetJitStateInfo().offsetof_cpsr_nzcv]);
+
+        code.LoadRequiredFlagsForCondFromRax(args[0].GetImmediateCond());
+
+        switch (args[0].GetImmediateCond()) {
+            case IR::Cond::EQ:
+                code.cmovz(else_, then_);
+                break;
+            case IR::Cond::NE:
+                code.cmovnz(else_, then_);
+                break;
+            case IR::Cond::CS:
+                code.cmovc(else_, then_);
+                break;
+            case IR::Cond::CC:
+                code.cmovnc(else_, then_);
+                break;
+            case IR::Cond::MI:
+                code.cmovs(else_, then_);
+                break;
+            case IR::Cond::PL:
+                code.cmovns(else_, then_);
+                break;
+            case IR::Cond::VS:
+                code.cmovo(else_, then_);
+                break;
+            case IR::Cond::VC:
+                code.cmovno(else_, then_);
+                break;
+            case IR::Cond::HI:
+                code.cmova(else_, then_);
+                break;
+            case IR::Cond::LS:
+                code.cmovna(else_, then_);
+                break;
+            case IR::Cond::GE:
+                code.cmovge(else_, then_);
+                break;
+            case IR::Cond::LT:
+                code.cmovl(else_, then_);
+                break;
+            case IR::Cond::GT:
+                code.cmovg(else_, then_);
+                break;
+            case IR::Cond::LE:
+                code.cmovle(else_, then_);
+                break;
+            case IR::Cond::AL:
+            case IR::Cond::NV:
+                code.mov(else_, then_);
+                break;
+            default:
+                ASSERT_MSG(false, "Invalid cond {}", static_cast<size_t>(args[0].GetImmediateCond()));
+        }
+
+        ctx.reg_alloc.DefineValue(inst, else_);
+    }
 
 template<>
 void EmitIR<IR::Opcode::ConditionalSelect32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
@@ -215,6 +296,7 @@ void EmitIR<IR::Opcode::ConditionalSelect32>(Xbyak_loongarch64::CodeGenerator& c
     code.ld_d(Wscratch0, Xstate, ctx.conf.state_nzcv_offset);
     code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
     code.CSEL(Wresult, Wthen, Welse, static_cast<Xbyak_loongarch64::Cond>(cond));
+    EmitConditionalSelect<32>(code, ctx, inst);
 }
 
 template<>
@@ -232,6 +314,7 @@ void EmitIR<IR::Opcode::ConditionalSelect64>(Xbyak_loongarch64::CodeGenerator& c
     code.ld_d(Wscratch0, Xstate, ctx.conf.state_nzcv_offset);
     code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
     code.CSEL(Xresult, Xthen, Xelse, static_cast<Xbyak_loongarch64::Cond>(cond));
+    EmitConditionalSelect<64>(code, ctx, inst);
 }
 
 template<>
