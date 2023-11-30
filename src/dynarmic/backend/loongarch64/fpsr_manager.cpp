@@ -32,7 +32,7 @@ void FpsrManager::Load() {
     if (fpsr_loaded)
         return;
 
-    code.MSR(Xbyak_loongarch64::SystemReg::FPSR, XZR);
+    code.MSR(Xbyak_loongarch64::SystemReg::FPSR, code.zero);
 
     fpsr_loaded = true;
 }

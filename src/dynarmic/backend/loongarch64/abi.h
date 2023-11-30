@@ -26,6 +26,7 @@ constexpr Xbyak_loongarch64::XReg Xpagetable{27};
 constexpr Xbyak_loongarch64::XReg Xscratch0{18}, Xscratch1{19}, Xscratch2{20};
 constexpr Xbyak_loongarch64::WReg Wscratch0{18}, Wscratch1{19}, Wscratch2{20};
 
+// TODO no need in LoongArch ,LoongArch use instruction to distinguish
 template<size_t bitsize>
 constexpr auto Rscratch0() {
     if constexpr (bitsize == 32) {

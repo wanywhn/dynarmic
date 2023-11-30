@@ -32,7 +32,7 @@ void EmitIR<IR::Opcode::SignedSaturatedAddWithFlag32>(Xbyak_loongarch64::CodeGen
     ctx.reg_alloc.SpillFlags();
 
     code.ADDS(Wresult, *Wa, Wb);
-    code.ASR(Wscratch0, Wresult, 31);
+    code.srai_w(Wscratch0, Wresult, 31);
     code.EOR(Wscratch0, Wscratch0, 0x8000'0000);
     code.CSEL(Wresult, Wresult, Wscratch0, VC);
     code.CSET(Woverflow, VS);
@@ -52,7 +52,7 @@ void EmitIR<IR::Opcode::SignedSaturatedSubWithFlag32>(Xbyak_loongarch64::CodeGen
     ctx.reg_alloc.SpillFlags();
 
     code.SUBS(Wresult, *Wa, Wb);
-    code.ASR(Wscratch0, Wresult, 31);
+    code.srai_w(Wscratch0, Wresult, 31);
     code.EOR(Wscratch0, Wscratch0, 0x8000'0000);
     code.CSEL(Wresult, Wresult, Wscratch0, VC);
     code.CSET(Woverflow, VS);

@@ -258,7 +258,7 @@ std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg> InlinePageTableEmitV
     EmitDetectMisalignedVAddr<bitsize>(code, ctx, Xaddr, fallback);
 
     if (ctx.conf.silently_mirror_page_table || unused_top_bits == 0) {
-        code.UBFX(Xscratch0, Xaddr, page_bits, valid_page_index_bits);
+        code.bstrpick_w(Xscratch0, Xaddr, page_bits + valid_page_index_bits -1, page_bits);
     } else {
         code.srli_d(Xscratch0, Xaddr, page_bits);
         code.addi_d(Xscratch1, code.zero, u64(~u64(0)) << valid_page_index_bits);
@@ -512,7 +512,7 @@ std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg> FastmemEmitVAddrLook
     }
 
     if (ctx.conf.silently_mirror_fastmem) {
-        code.UBFX(Xscratch0, Xaddr, 0, ctx.conf.fastmem_address_space_bits);
+        code.bstrpick_w(Xscratch0, Xaddr, ctx.conf.fastmem_address_space_bits - 1, 0);
         return std::make_pair(Xfastmem, Xscratch0);
     }
 

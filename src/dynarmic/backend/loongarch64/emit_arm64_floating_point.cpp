@@ -84,7 +84,7 @@ static void EmitToFixed(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx
         if constexpr (is_signed) {
             if constexpr (bitsize_to == 16) {
                 code.FCVTZS(Rto, Vfrom, fbits + 16);
-                code.ASR(Wscratch0, Rto, 31);
+                code.srai_w(Wscratch0, Rto, 31);
                 code.ADD(Rto, Rto, Wscratch0, LSR, 16);  // Round towards zero when truncating
                 code.srli_w(Rto, Rto, 16);
             } else if (fbits) {
