@@ -207,7 +207,7 @@ void RegAlloc::DefineAsRegister(IR::Inst* inst, Xbyak_loongarch64::Reg reg) {
     defined_insts.emplace(inst);
 
     ASSERT(!ValueLocation(inst));
-    auto& info = reg.is_vector() ? fprs[reg.getIdx()] : gprs[reg.getIdx()];
+    auto& info = reg.isVReg() ? fprs[reg.getIdx()] : gprs[reg.getIdx()];
     ASSERT(info.IsCompletelyEmpty());
     info.values.emplace_back(inst);
     info.expected_uses += inst->UseCount();
