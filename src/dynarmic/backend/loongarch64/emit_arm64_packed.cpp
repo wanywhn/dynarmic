@@ -54,12 +54,13 @@ void EmitIR<IR::Opcode::PackedAddU8>(Xbyak_loongarch64::CodeGenerator& code, Emi
     auto Vb = ctx.reg_alloc.ReadD(args[1]);
     RegAlloc::Realize(Vresult, Va, Vb);
 
-    code.ADD(Vresult->B8(), Va->B8(), Vb->B8());
+    code.vadd_b(Vresult, Va, Vb);
+//    code.ADD(Vresult->B8(), Va->B8(), Vb->B8());
 
     if (ge_inst) {
         auto Vge = ctx.reg_alloc.WriteD(ge_inst);
         RegAlloc::Realize(Vge);
-
+        // TODO how?
         code.CMHI(Vge->B8(), Va->B8(), Vresult->B8());
     }
 }
@@ -74,7 +75,9 @@ void EmitIR<IR::Opcode::PackedAddS8>(Xbyak_loongarch64::CodeGenerator& code, Emi
     auto Vb = ctx.reg_alloc.ReadD(args[1]);
     RegAlloc::Realize(Vresult, Va, Vb);
 
-    code.ADD(Vresult->B8(), Va->B8(), Vb->B8());
+    code.vadd_b(Vresult, Va, Vb);
+
+//    code.ADD(Vresult->B8(), Va->B8(), Vb->B8());
 
     if (ge_inst) {
         auto Vge = ctx.reg_alloc.WriteD(ge_inst);

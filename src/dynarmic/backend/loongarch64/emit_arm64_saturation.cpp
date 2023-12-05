@@ -31,11 +31,23 @@ void EmitIR<IR::Opcode::SignedSaturatedAddWithFlag32>(Xbyak_loongarch64::CodeGen
     RegAlloc::Realize(Wresult, Wa, Wb, Woverflow);
     ctx.reg_alloc.SpillFlags();
 
-    code.ADDS(Wresult, *Wa, Wb);
+
+    Xbyak_loongarch64::Label overflowLable;
+    code.add_w(Wresult, *Wa, Wb);
+    code.xor_(Wscratch1, Wresult, Wa);
+    code.xor_(Wscratch2, Wresult, Wb);
+    code.and_(Wscratch0, Wscratch1, Wscratch2);
+
+    code.slt(Wscratch2, Wscratch0,code.zero);
+    code.maskeqz(Woverflow, Wscratch2, Wscratch2);
+
     code.srai_w(Wscratch0, Wresult, 31);
-    code.EOR(Wscratch0, Wscratch0, 0x8000'0000);
-    code.CSEL(Wresult, Wresult, Wscratch0, VC);
-    code.CSET(Woverflow, VS);
+    code.add_imm(Wscratch1, code.zero, 0x8000'0000, Wscratch2);
+    code.xor_(Wscratch0, Wscratch0, Wscratch1);
+    code.slt(Wscratch2, Wscratch0, code.zero);
+    code.maskeqz(Wscratch1, Wscratch0, Wscratch2);
+    code.masknez(Wresult, Wresult, Wscratch2);
+    code.add_d(Wresult, Wresult, Wscratch1);
 }
 
 template<>
@@ -51,11 +63,21 @@ void EmitIR<IR::Opcode::SignedSaturatedSubWithFlag32>(Xbyak_loongarch64::CodeGen
     RegAlloc::Realize(Wresult, Wa, Wb, Woverflow);
     ctx.reg_alloc.SpillFlags();
 
-    code.SUBS(Wresult, *Wa, Wb);
+    code.sub_d(Wresult, *Wa, Wb);
+    code.xor_(Wscratch1, Wresult, Wa);
+    code.xor_(Wscratch2, Wresult, Wb);
+    code.and_(Wscratch0, Wscratch1, Wscratch2);
+
+    code.slt(Wscratch2, Wa,Wb);
+    code.maskeqz(Woverflow, Wscratch2, Wscratch2);
+
     code.srai_w(Wscratch0, Wresult, 31);
-    code.EOR(Wscratch0, Wscratch0, 0x8000'0000);
-    code.CSEL(Wresult, Wresult, Wscratch0, VC);
-    code.CSET(Woverflow, VS);
+    code.add_imm(Wscratch1, code.zero, 0x8000'0000, Wscratch2);
+    code.xor_(Wscratch0, Wscratch0, Wscratch1);
+    code.slt(Wscratch2, Wscratch0, code.zero);
+    code.maskeqz(Wscratch1, Wscratch0, Wscratch2);
+    code.masknez(Wresult, Wresult, Wscratch2);
+    code.add_d(Wresult, Wresult, Wscratch1);
 }
 
 template<>
@@ -84,18 +106,29 @@ void EmitIR<IR::Opcode::SignedSaturation>(Xbyak_loongarch64::CodeGenerator& code
     RegAlloc::Realize(Woperand, Wresult);
     ctx.reg_alloc.SpillFlags();
 
-    code.add_d(Wscratch0, negative_saturated_value, code.zero);
-    code.add_d(Wscratch1, positive_saturated_value, code.zero);
-    code.CMP(*Woperand, Wscratch0);
-    code.CSEL(Wresult, Woperand, Wscratch0, GT);
-    code.CMP(*Woperand, Wscratch1);
-    code.CSEL(Wresult, Wresult, Wscratch1, LT);
+    code.add_imm(Wscratch0, code.zero, negative_saturated_value, Wscratch2);
+    code.slt(Wscratch2, Wscratch0, Woperand);
+    code.maskeqz(Wscratch0, Woperand, Wscratch2);
+    code.masknez(Wscratch1, Wscratch0,Wscratch2);
+    code.add_d(Wresult, Wscratch0, Wscratch1);
+//    code.CMP(*Woperand, Wscratch0);
+//    code.CSEL(Wresult, Woperand, Wscratch0, GT);
+
+    code.add_imm(Wscratch1, code.zero, positive_saturated_value, Wscratch2);
+    code.slt(Wscratch2, *Woperand, Wscratch1);
+    code.maskeqz(Wscratch0, Wresult, Wscratch2);
+    code.masknez(Wscratch1, Wscratch0,Wscratch2);
+    code.add_d(Wresult, Wscratch0, Wscratch1);
+//    code.CMP(*Woperand, Wscratch1);
+//    code.CSEL(Wresult, Wresult, Wscratch1, LT);
 
     if (overflow_inst) {
         auto Woverflow = ctx.reg_alloc.WriteW(overflow_inst);
         RegAlloc::Realize(Woverflow);
-        code.CMP(*Wresult, Woperand);
-        code.CSET(Woverflow, NE);
+        code.sub_d(Wscratch1,Wresult, Woperand);
+        code.sltu(Woverflow, code.zero, Wscratch1);
+//        code.CMP(*Wresult, Woperand);
+//        code.CSET(Woverflow, NE);
     }
 }
 
@@ -113,17 +146,25 @@ void EmitIR<IR::Opcode::UnsignedSaturation>(Xbyak_loongarch64::CodeGenerator& co
     ASSERT(N <= 31);
     const u32 saturated_value = (1u << N) - 1;
 
-    code.add_d(Wscratch0, saturated_value, code.zero);
-    code.CMP(*Woperand, 0);
-    code.CSEL(Wresult, Woperand, code.zero, GT);
-    code.CMP(*Woperand, Wscratch0);
-    code.CSEL(Wresult, Wresult, Wscratch0, LT);
-
+    code.slt(Wscratch2, code.zero, Woperand);
+    code.maskeqz(Wresult,Woperand, Wscratch2);
+//    code.CMP(*Woperand, 0);
+//    code.CSEL(Wresult, Woperand, code.zero, GT);
+    code.add_imm(Wscratch0, code.zero, saturated_value, Wscratch2);
+    code.slt(Wresult, Woperand, Wscratch0);
     if (overflow_inst) {
         auto Woverflow = ctx.reg_alloc.WriteW(overflow_inst);
         RegAlloc::Realize(Woverflow);
-        code.CSET(Woverflow, HI);
+        code.sltu(Woverflow,Wscratch0, Woperand);
+//        code.CSET(Woverflow, HI);
     }
+    code.maskeqz(Wscratch1, Wresult, Wresult);
+    code.masknez(Wscratch2, Wscratch0, Wresult);
+    code.add_d(Wresult,Wscratch1, Wscratch2);
+//    code.CMP(*Woperand, Wscratch0);
+//    code.CSEL(Wresult, Wresult, Wscratch0, LT);
+
+
 }
 
 template<>

@@ -211,6 +211,33 @@ void EmitIR<IR::Opcode::FPAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitCon
     EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FADD(Dresult, Da, Db); });
 }
 
+    static Xbyak::Reg64 SetFpscrNzcvFromFlags(BlockOfCode& code, EmitContext& ctx) {
+        ctx.reg_alloc.ScratchGpr(HostLoc::RCX);  // shifting requires use of cl
+        const Xbyak::Reg64 nzcv = ctx.reg_alloc.ScratchGpr();
+
+        //               x64 flags    ARM flags
+        //               ZF  PF  CF     NZCV
+        // Unordered      1   1   1     0011
+        // Greater than   0   0   0     0010
+        // Less than      0   0   1     1000
+        // Equal          1   0   0     0110
+        //
+        // Thus we can take use ZF:CF as an index into an array like so:
+        //  x64      ARM      ARM as x64
+        // ZF:CF     NZCV     NZ-----C-------V
+        //   0       0010     0000000100000000 = 0x0100
+        //   1       1000     1000000000000000 = 0x8000
+        //   2       0110     0100000100000000 = 0x4100
+        //   3       0011     0000000100000001 = 0x0101
+
+        code.mov(nzcv, 0x0101'4100'8000'0100);
+        code.sete(cl);
+        code.rcl(cl, 5);  // cl = ZF:CF:0000
+        code.shr(nzcv, cl);
+
+        return nzcv;
+    }
+
 template<size_t size>
 void EmitCompare(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);

@@ -316,6 +316,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         RegAlloc::Realize(Sresult);
 
         // TODO: Detect if Gpr vs Fpr is more appropriate
+        // FIXME: this assume fp is in vr
         code.ld_w(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
         code.vinsgr2vr_w(Sresult, Xscratch0, 0);
 //        code.ld_d(Sresult, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
@@ -368,6 +369,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Wvalue = ctx.reg_alloc.ReadW(args[1]);
         RegAlloc::Realize(Wvalue);
 
+        // FIXME: if this should detect args[1] is imm
         // TODO: Detect if Gpr vs Fpr is more appropriate
 //        if (args[1].IsImmediate()) {
 //            code.
@@ -559,6 +561,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wnzcv);
         // u32 ToLoongArch64(u32 nzcv)
+        // TODO if Wnzcv is imm
 //        code.addi_w(Wscratch0, code.zero, 28);
         code.srli_w(Wnzcv, Wnzcv, NZCV::arm_nzcv_shift);
 

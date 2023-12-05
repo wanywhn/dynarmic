@@ -164,6 +164,7 @@ void RegAlloc::PrepareForCall(std::optional<Argument::copyable_reference> arg0, 
 
     const std::array<std::optional<Argument::copyable_reference>, 4> args{arg0, arg1, arg2, arg3};
 
+    // FIXME is this is args reg, should change to a0?
     // AAPCS64 Next General-purpose Register Number
     int ngrn = 0;
     // AAPCS64 Next SIMD and Floating-point Register Number
