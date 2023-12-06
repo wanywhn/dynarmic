@@ -133,7 +133,7 @@ void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd64>(Xbyak_loongarch64::CodeGen
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
-        // FIXME use which sch reg?
+        // FIXME use which scr reg?
         code.vxor_v(code.vr6, code.vr6, code.vr6);
         code.vorn_v(Vb, Vb, code.vr6);
         code.addi_w(Wscratch0, code.zero, 1);

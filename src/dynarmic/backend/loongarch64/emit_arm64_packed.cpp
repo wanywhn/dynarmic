@@ -218,51 +218,75 @@ static void EmitPackedAddSub(Xbyak_loongarch64::CodeGenerator& code, EmitContext
     const auto ge_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetGEFromOp);
 
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Vresult = ctx.reg_alloc.WriteD(inst);
-    auto Va = ctx.reg_alloc.ReadD(args[0]);
-    auto Vb = ctx.reg_alloc.ReadD(args[1]);
-    RegAlloc::Realize(Vresult, Va, Vb);
+    auto Vresult = ctx.reg_alloc.WriteX(inst);
+    auto reg_a_hi = ctx.reg_alloc.ReadX(args[0]);
+    auto reg_b_hi = ctx.reg_alloc.ReadX(args[1]);
+    RegAlloc::Realize(Vresult, reg_a_hi, reg_b_hi);
+    auto reg_a_lo = Wscratch0;
+    auto reg_b_lo = Wscratch1;
+    auto reg_diff = reg_a_lo;
+    auto reg_sum = reg_a_lo;
+
 
     if (is_signed) {
-        code.SXTL(V0.S4(), Va->H4());
-        code.SXTL(V1.S4(), Vb->H4());
+        code.ext_w_h(reg_a_lo, reg_a_hi);
+        code.ext_w_h(reg_b_lo, reg_b_hi);
+        code.srai_w(reg_a_hi, reg_a_hi, 16);
+        code.srai_w(reg_b_hi, reg_b_hi, 16);
+//        code.SXTL(V0.S4(), Va->H4());
+//        code.SXTL(V1.S4(), Vb->H4());
     } else {
-        code.UXTL(V0.S4(), Va->H4());
-        code.UXTL(V1.S4(), Vb->H4());
-    }
-    code.EXT(V1.B8(), V1.B8(), V1.B8(), 4);
-
-    code.MOVI(D2, Xbyak_loongarch64::RepImm{add_is_hi ? 0b11110000 : 0b00001111});
-
-    code.EOR(V1.B8(), V1.B8(), V2.B8());
-    code.sub_imm(V1.S2(), V1.S2(), V2.S2(), code.t0);
-    code.sub_imm(Vresult->S2(), V0.S2(), V1.S2(), code.t0);
-
-    if (is_halving) {
-        if (is_signed) {
-            code.SSHR(Vresult->S2(), Vresult->S2(), 1);
-        } else {
-            code.USHR(Vresult->S2(), Vresult->S2(), 1);
-        }
+        code.bstrins_w(reg_a_lo, reg_a_hi, 15, 0);
+        code.bstrins_w(reg_b_lo, reg_b_hi, 15, 0);
+        code.srli_d(reg_a_hi, reg_a_hi, 16);
+        code.srli_d(reg_b_hi, reg_b_hi, 16);
+//        code.UXTL(V0.S4(), Va->H4());
+//        code.UXTL(V1.S4(), Vb->H4());
     }
 
-    if (ge_inst) {
-        ASSERT(!is_halving);
+    if (add_is_hi) {
+        code.sub_w(reg_a_lo, reg_a_lo, reg_b_hi);
+        code.add_w(reg_a_hi, reg_a_hi, reg_b_lo);
+        reg_diff = reg_a_lo;
+        reg_sum = reg_a_hi;
+    } else {
+        code.add_w(reg_a_lo, reg_a_lo, reg_b_hi);
+        code.sub_w(reg_a_hi, reg_a_hi, reg_b_lo);
+        reg_diff = reg_a_hi;
+        reg_sum = reg_a_lo;
+    }
 
-        auto Vge = ctx.reg_alloc.WriteD(ge_inst);
+    if (ge_inst){
+        auto Vge = ctx.reg_alloc.WriteW(ge_inst);
         RegAlloc::Realize(Vge);
+        Xbyak_loongarch64::XReg ge_sum = reg_b_hi;
+        auto ge_diff = reg_b_lo;
+        code.add_w(ge_sum, code.zero, reg_sum);
+        code.add_w(ge_diff, code.zero, reg_diff);
 
-        if (is_signed) {
-            code.CMGE(Vge->S2(), Vresult->S2(), 0);
-            code.XTN(Vge->H4(), Vge->toQ().S4());
+        if(!is_signed){
+            code.slli_w(ge_sum, ge_sum, 15);
+            code.srai_w(ge_sum, ge_sum, 31);
         } else {
-            code.CMEQ(Vge->H4(), Vresult->H4(), 0);
-            code.EOR(Vge->B8(), Vge->B8(), V2.B8());
-            code.SHRN(Vge->H4(), Vge->toQ().S4(), 16);
+            code.nor(ge_sum, ge_sum, code.zero);
+            code.srai_w(ge_sum, ge_sum, 31);
         }
+        code.nor(ge_diff, ge_diff, code.zero);
+        code.srai_w(ge_diff, ge_diff, 31);
+
+        code.add_imm(Vresult, code.zero, add_is_hi? 0xFFFF0000:0x0000FFFF,Wscratch2);
+        code.and_(ge_sum, ge_sum, Vresult);
+        code.add_imm(Vresult, code.zero, add_is_hi? 0x0000FFFF:0xFFFF0000,Wscratch2);
+        code.and_(ge_diff, ge_diff, Vresult);
+        code.or_(Vge, ge_sum, ge_diff);
     }
 
-    code.XTN(Vresult->H4(), Vresult->toQ().S4());
+    code.bstrins_w(reg_a_hi, reg_a_lo, 15, 0);
+    if(is_halving) {
+        code.srli_w(Vresult, reg_a_hi, 1);
+    } else {
+        code.add_w(Vresult, code.zero, reg_a_hi);
+    }
 }
 
 template<>
