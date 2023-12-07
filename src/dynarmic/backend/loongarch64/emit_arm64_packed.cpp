@@ -311,42 +311,71 @@ void EmitIR<IR::Opcode::PackedSubAddS16>(Xbyak_loongarch64::CodeGenerator& code,
 
 template<>
 void EmitIR<IR::Opcode::PackedHalvingAddU8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.UHADD(Vresult->B8(), Va->B8(), Vb->B8()); });
+    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        // TODO diff bettwen avgr?
+        code.xvavg_bu(Vresult, Va, Vb);
+//        code.UHADD(Vresult->B8(), Va->B8(), Vb->B8());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedHalvingAddS8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.SHADD(Vresult->B8(), Va->B8(), Vb->B8()); });
+    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvavg_b(Vresult, Va, Vb);
+//        code.SHADD(Vresult->B8(), Va->B8(), Vb->B8());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedHalvingSubU8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.UHSUB(Vresult->B8(), Va->B8(), Vb->B8()); });
+    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvavg_bu(Vresult, Va, Vb);
+        code.xvsub_b(Vresult, Vresult, Vb);
+//        code.UHSUB(Vresult->B8(), Va->B8(), Vb->B8());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedHalvingSubS8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.SHSUB(Vresult->B8(), Va->B8(), Vb->B8()); });
+    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvavg_b(Vresult, Va, Vb);
+        code.xvsub_b(Vresult, Vresult, Vb);
+//        code.SHSUB(Vresult->B8(), Va->B8(), Vb->B8());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedHalvingAddU16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.UHADD(Vresult->H4(), Va->H4(), Vb->H4()); });
+    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvavg_hu(Vresult, Va, Vb);
+//        code.UHADD(Vresult->H4(), Va->H4(), Vb->H4());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedHalvingAddS16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.SHADD(Vresult->H4(), Va->H4(), Vb->H4()); });
+    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvavg_h(Vresult, Va, Vb);
+//        code.SHADD(Vresult->H4(), Va->H4(), Vb->H4());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedHalvingSubU16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.UHSUB(Vresult->H4(), Va->H4(), Vb->H4()); });
+    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvavg_hu(Vresult, Va, Vb);
+        code.xvsub_h(Vresult, Vresult, Vb);
+//        code.UHSUB(Vresult->H4(), Va->H4(), Vb->H4());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedHalvingSubS16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.SHSUB(Vresult->H4(), Va->H4(), Vb->H4()); });
+    EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvavg_hu(Vresult, Va, Vb);
+        code.xvsub_h(Vresult, Vresult, Vb);
+//        code.SHSUB(Vresult->H4(), Va->H4(), Vb->H4());
+    });
 }
 
 template<>
@@ -371,51 +400,81 @@ void EmitIR<IR::Opcode::PackedHalvingSubAddS16>(Xbyak_loongarch64::CodeGenerator
 
 template<>
 void EmitIR<IR::Opcode::PackedSaturatedAddU8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.UQADD(Vresult->B8(), Va->B8(), Vb->B8()); });
+    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        // FIXME Saturated
+        code.xvadd_b(Vresult, Va, Vb);
+//        code.UQADD(Vresult->B8(), Va->B8(), Vb->B8());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedSaturatedAddS8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.SQADD(Vresult->B8(), Va->B8(), Vb->B8()); });
+    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.vadd_b(Vresult, Va, Vb);
+//        code.SQADD(Vresult->B8(), Va->B8(), Vb->B8());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedSaturatedSubU8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.UQSUB(Vresult->B8(), Va->B8(), Vb->B8()); });
+    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvsub_b(Vresult, Va, Vb);
+//        code.UQSUB(Vresult->B8(), Va->B8(), Vb->B8());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedSaturatedSubS8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.SQSUB(Vresult->B8(), Va->B8(), Vb->B8()); });
+    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvsub_b(Vresult, Va, Vb);
+//        code.SQSUB(Vresult->B8(), Va->B8(), Vb->B8());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedSaturatedAddU16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.UQADD(Vresult->H4(), Va->H4(), Vb->H4()); });
+    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvadd_h(Vresult, Va, Vb);
+//        code.UQADD(Vresult->H4(), Va->H4(), Vb->H4());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedSaturatedAddS16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.SQADD(Vresult->H4(), Va->H4(), Vb->H4()); });
+    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvadd_h(Vresult, Va, Vb);
+//        code.SQADD(Vresult->H4(), Va->H4(), Vb->H4());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedSaturatedSubU16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.UQSUB(Vresult->H4(), Va->H4(), Vb->H4()); });
+    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvsub_h(Vresult, Va, Vb);
+//        code.UQSUB(Vresult->H4(), Va->H4(), Vb->H4());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedSaturatedSubS16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) { code.SQSUB(Vresult->H4(), Va->H4(), Vb->H4()); });
+    EmitSaturatedPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
+        code.xvsub_h(Vresult, Va, Vb);
+//        code.SQSUB(Vresult->H4(), Va->H4(), Vb->H4());
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedAbsDiffSumU8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
-        code.MOVI(D2, Xbyak_loongarch64::RepImm{0b00001111});
-        code.UABD(Vresult->B8(), Va->B8(), Vb->B8());
-        code.andi(Vresult->B8(), Vresult->B8(), V2.B8());  // TODO: Zext tracking
-        code.UADDLV(Vresult->toH(), Vresult->B8());
+        code.xvabsd_bu(Vresult, Va, Vb);
+        // FIXME add into xybak
+        code.vhaddw_h_b(Vresult, Vresult, Vresult);
+        code.vhaddw_w_h(Vresult, Vresult, Vresult);
+
+//        code.MOVI(D2, Xbyak_loongarch64::RepImm{0b00001111});
+//        code.UABD(Vresult->B8(), Va->B8(), Vb->B8());
+//        code.andi(Vresult->B8(), Vresult->B8(), V2.B8());  // TODO: Zext tracking
+//        code.UADDLV(Vresult->toH(), Vresult->B8());
     });
 }
 
@@ -424,13 +483,16 @@ void EmitIR<IR::Opcode::PackedSelect>(Xbyak_loongarch64::CodeGenerator& code, Em
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
     auto Vresult = ctx.reg_alloc.WriteD(inst);
-    auto Vge = ctx.reg_alloc.ReadD(args[0]);
-    auto Va = ctx.reg_alloc.ReadD(args[1]);
-    auto Vb = ctx.reg_alloc.ReadD(args[2]);
+    auto Vge = ctx.reg_alloc.ReadX(args[0]);
+    auto Va = ctx.reg_alloc.ReadX(args[1]);
+    auto Vb = ctx.reg_alloc.ReadX(args[2]);
     RegAlloc::Realize(Vresult, Vge, Va, Vb);
 
-    code.FMOV(Vresult, Vge);  // TODO: Move elimination
-    code.BSL(Vresult->B8(), Vb->B8(), Va->B8());
+    code.and_(Vb, Vb, Vge);
+    code.andn(Va, Vge, Va);
+    code.or_(Vb, Vb, Va);
+//    code.FMOV(Vresult, Vge);  // TODO: Move elimination
+//    code.BSL(Vresult->B8(), Vb->B8(), Va->B8());
 }
 
 }  // namespace Dynarmic::Backend::LoongArch64
