@@ -36,35 +36,36 @@ static void Emit(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::I
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedAdd8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vadd_b(Vresult, Va, Vb); });
+    Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_b(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedAdd16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vadd_h(Vresult, Va, Vb); });
+    Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_h(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedAdd32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vadd_w(Vresult, Va, Vb); });
+    Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_w(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vadd_w(Vresult, Va, Vb); });
+    Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_d(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedSub8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
-        code.vxor_v(code.vr6, code.vr6, code.vr6);
-        code.vorn_v(Vb, Vb, code.vr6);
-        code.addi_w(Wscratch0, code.zero, 1);
-        code.vreplgr2vr_b(code.vr6, Wscratch0);
-        code.vadd_b(Vb, Vb,code.vr6);
-        code.vadd_b(Vresult, Va, Vb);
+//        code.vxor_v(code.vr6, code.vr6, code.vr6);
+//        code.vorn_v(Vb, Vb, code.vr6);
+//        code.addi_w(Wscratch0, code.zero, 1);
+//        code.vreplgr2vr_b(code.vr6, Wscratch0);
+//        code.vadd_b(Vb, Vb,code.vr6);
+//        code.vadd_b(Vresult, Va, Vb);
 //        code.SQSUB(Vresult, Va, Vb);
+        code.vssub_b(Vresult, Va, Vb);
         });
 }
 
@@ -72,13 +73,15 @@ template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedSub16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
-        code.vxor_v(code.vr6, code.vr6, code.vr6);
-        code.vorn_v(Vb, Vb, code.vr6);
-        code.addi_w(Wscratch0, code.zero, 1);
-        code.vreplgr2vr_b(code.vr6, Wscratch0);
-        code.vadd_h(Vb, Vb,code.vr6);
-        code.vadd_h(Vresult, Va, Vb);
+//        code.vxor_v(code.vr6, code.vr6, code.vr6);
+//        code.vorn_v(Vb, Vb, code.vr6);
+//        code.addi_w(Wscratch0, code.zero, 1);
+//        code.vreplgr2vr_b(code.vr6, Wscratch0);
+//        code.vadd_h(Vb, Vb,code.vr6);
+//        code.vadd_h(Vresult, Va, Vb);
 //        code.SQSUB(Vresult, Va, Vb);
+        code.vssub_h(Vresult, Va, Vb);
+
     });
 }
 
@@ -86,13 +89,15 @@ template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedSub32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
-        code.vxor_v(code.vr6, code.vr6, code.vr6);
-        code.vorn_v(Vb, Vb, code.vr6);
-        code.addi_w(Wscratch0, code.zero, 1);
-        code.vreplgr2vr_b(code.vr6, Wscratch0);
-        code.vadd_w(Vb, Vb,code.vr6);
-        code.vadd_w(Vresult, Va, Vb);
+//        code.vxor_v(code.vr6, code.vr6, code.vr6);
+//        code.vorn_v(Vb, Vb, code.vr6);
+//        code.addi_w(Wscratch0, code.zero, 1);
+//        code.vreplgr2vr_b(code.vr6, Wscratch0);
+//        code.vadd_w(Vb, Vb,code.vr6);
+//        code.vadd_w(Vresult, Va, Vb);
 //        code.SQSUB(Vresult, Va, Vb);
+        code.vssub_w(Vresult, Va, Vb);
+
     });
 }
 
@@ -100,47 +105,50 @@ template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedSub64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
-        code.vxor_v(code.vr6, code.vr6, code.vr6);
-        code.vorn_v(Vb, Vb, code.vr6);
-        code.addi_w(Wscratch0, code.zero, 1);
-        code.vreplgr2vr_b(code.vr6, Wscratch0);
-        code.vadd_d(Vb, Vb,code.vr6);
-        code.vadd_d(Vresult, Va, Vb);
+//        code.vxor_v(code.vr6, code.vr6, code.vr6);
+//        code.vorn_v(Vb, Vb, code.vr6);
+//        code.addi_w(Wscratch0, code.zero, 1);
+//        code.vreplgr2vr_b(code.vr6, Wscratch0);
+//        code.vadd_d(Vb, Vb,code.vr6);
+//        code.vadd_d(Vresult, Va, Vb);
 //        code.SQSUB(Vresult, Va, Vb);
+        code.vssub_d(Vresult, Va, Vb);
+
     });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vadd_b(Vresult, Va, Vb); });
+    Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_bu(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vadd_h(Vresult, Va, Vb); });
+    Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_hu(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vadd_w(Vresult, Va, Vb); });
+    Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_wu(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vadd_d(Vresult, Va, Vb); });
+    Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_du(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which scr reg?
-        code.vxor_v(code.vr6, code.vr6, code.vr6);
-        code.vorn_v(Vb, Vb, code.vr6);
-        code.addi_w(Wscratch0, code.zero, 1);
-        code.vreplgr2vr_b(code.vr6, Wscratch0);
-        code.vadd_b(Vb, Vb,code.vr6);
-        code.vadd_b(Vresult, Va, Vb);
+//        code.vxor_v(code.vr6, code.vr6, code.vr6);
+//        code.vorn_v(Vb, Vb, code.vr6);
+//        code.addi_w(Wscratch0, code.zero, 1);
+//        code.vreplgr2vr_b(code.vr6, Wscratch0);
+//        code.vadd_b(Vb, Vb,code.vr6);
+//        code.vadd_b(Vresult, Va, Vb);
 //        code.UQSUB(Vresult, Va, Vb);
+        code.vssub_bu(Vresult, Va, Vb);
     });
 }
 
@@ -148,13 +156,15 @@ template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
-        code.vxor_v(code.vr6, code.vr6, code.vr6);
-        code.vorn_v(Vb, Vb, code.vr6);
-        code.addi_w(Wscratch0, code.zero, 1);
-        code.vreplgr2vr_b(code.vr6, Wscratch0);
-        code.vadd_h(Vb, Vb,code.vr6);
-        code.vadd_h(Vresult, Va, Vb);
+//        code.vxor_v(code.vr6, code.vr6, code.vr6);
+//        code.vorn_v(Vb, Vb, code.vr6);
+//        code.addi_w(Wscratch0, code.zero, 1);
+//        code.vreplgr2vr_b(code.vr6, Wscratch0);
+//        code.vadd_h(Vb, Vb,code.vr6);
+//        code.vadd_h(Vresult, Va, Vb);
 //        code.UQSUB(Vresult, Va, Vb);
+        code.vssub_hu(Vresult, Va, Vb);
+
     });
 }
 
@@ -162,13 +172,15 @@ template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
-        code.vxor_v(code.vr6, code.vr6, code.vr6);
-        code.vorn_v(Vb, Vb, code.vr6);
-        code.addi_w(Wscratch0, code.zero, 1);
-        code.vreplgr2vr_b(code.vr6, Wscratch0);
-        code.vadd_w(Vb, Vb,code.vr6);
-        code.vadd_w(Vresult, Va, Vb);
+//        code.vxor_v(code.vr6, code.vr6, code.vr6);
+//        code.vorn_v(Vb, Vb, code.vr6);
+//        code.addi_w(Wscratch0, code.zero, 1);
+//        code.vreplgr2vr_b(code.vr6, Wscratch0);
+//        code.vadd_w(Vb, Vb,code.vr6);
+//        code.vadd_w(Vresult, Va, Vb);
 //        code.UQSUB(Vresult, Va, Vb);
+        code.vssub_wu(Vresult, Va, Vb);
+
     });
 }
 
@@ -176,13 +188,15 @@ template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
-        code.vxor_v(code.vr6, code.vr6, code.vr6);
-        code.vorn_v(Vb, Vb, code.vr6);
-        code.addi_w(Wscratch0, code.zero, 1);
-        code.vreplgr2vr_b(code.vr6, Wscratch0);
-        code.vadd_d(Vb, Vb,code.vr6);
-        code.vadd_d(Vresult, Va, Vb);
+//        code.vxor_v(code.vr6, code.vr6, code.vr6);
+//        code.vorn_v(Vb, Vb, code.vr6);
+//        code.addi_w(Wscratch0, code.zero, 1);
+//        code.vreplgr2vr_b(code.vr6, Wscratch0);
+//        code.vadd_d(Vb, Vb,code.vr6);
+//        code.vadd_d(Vresult, Va, Vb);
 //        code.UQSUB(Vresult, Va, Vb);
+        code.vssub_du(Vresult, Va, Vb);
+
     });
 }
 
