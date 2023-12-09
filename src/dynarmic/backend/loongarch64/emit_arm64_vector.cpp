@@ -16,6 +16,7 @@
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
 #include "xbyak_loongarch64.h"
+#include "mcl/type_traits/function_info.hpp"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -1230,12 +1231,16 @@ void EmitIR<IR::Opcode::VectorPolynomialMultiplyLong64>(Xbyak_loongarch64::CodeG
 
 template<>
 void EmitIR<IR::Opcode::VectorPopulationCount>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.CNT(Vresult, Voperand); });
+    EmitTwoOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.vpcnt_b(Vresult, Voperand); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorReverseBits>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.RBIT(Vresult, Voperand); });
+    EmitTwoOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) {
+        code.addi_d(Xscratch0, code.zero, 0xFF);
+        code.vreplgr2vr_b(code.vr0, Xscratch0);
+        code.vbitrevi_b(Vresult, Voperand, code.vr0);
+    });
 }
 
 template<>
@@ -1270,22 +1275,22 @@ void EmitIR<IR::Opcode::VectorReverseElementsInLongGroups32>(Xbyak_loongarch64::
 
 template<>
 void EmitIR<IR::Opcode::VectorReduceAdd8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitReduce<8>(code, ctx, inst, [&](auto& Bresult, auto Voperand) { code.ADDV(Bresult, Voperand); });
+    EmitReduce<8>(code, ctx, inst, [&](auto& Bresult, auto Voperand) { code.vhaddw_h_b(Bresult, Voperand, Voperand); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorReduceAdd16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitReduce<16>(code, ctx, inst, [&](auto& Hresult, auto Voperand) { code.ADDV(Hresult, Voperand); });
+    EmitReduce<16>(code, ctx, inst, [&](auto& Hresult, auto Voperand) { code.vhaddw_w_h(Hresult, Voperand, Voperand); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorReduceAdd32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitReduce<32>(code, ctx, inst, [&](auto& Sresult, auto Voperand) { code.ADDV(Sresult, Voperand); });
+    EmitReduce<32>(code, ctx, inst, [&](auto& Sresult, auto Voperand) { code.vhaddw_d_w(Sresult, Voperand, Voperand); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorReduceAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitReduce<64>(code, ctx, inst, [&](auto& Dresult, auto Voperand) { code.ADDP(Dresult, Voperand); });
+    EmitReduce<64>(code, ctx, inst, [&](auto& Dresult, auto Voperand) { code.vhaddw_q_d(Dresult, Voperand, Voperand); });
 }
 
 template<>
@@ -1293,38 +1298,38 @@ void EmitIR<IR::Opcode::VectorRotateWholeVectorRight>(Xbyak_loongarch64::CodeGen
     EmitImmShift<8>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
         ASSERT(shift_amount % 8 == 0);
         const u8 ext_imm = (shift_amount % 128) / 8;
-        code.EXT(Vresult, Voperand, Voperand, ext_imm);
+        code.vrotri_b(Vresult, Voperand, ext_imm);
     });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorRoundingHalvingAddS8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SRHADD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vavgr_b(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorRoundingHalvingAddS16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SRHADD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vavgr_h(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorRoundingHalvingAddS32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SRHADD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vavgr_w(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorRoundingHalvingAddU8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.URHADD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vavgr_bu(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorRoundingHalvingAddU16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.URHADD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vavgr_hu(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorRoundingHalvingAddU32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.URHADD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vavgr_wu(Vresult, Va, Vb); });
 }
 
 template<>
@@ -1392,17 +1397,17 @@ void EmitIR<IR::Opcode::VectorSignExtend64>(Xbyak_loongarch64::CodeGenerator& co
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedAbsoluteDifference8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SABD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vabsd_b(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedAbsoluteDifference16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SABD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vabsd_h(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedAbsoluteDifference32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SABD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vabsd_w(Vresult, Va, Vb); });
 }
 
 template<>
@@ -1541,68 +1546,192 @@ void EmitIR<IR::Opcode::VectorSignedSaturatedNeg64>(Xbyak_loongarch64::CodeGener
     EmitTwoOpArrangedSaturated<64>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.SQNEG(Vresult, Voperand); });
 }
 
+template<typename Lambda>
+static void EmitTwoArgumentFallbackWithSaturation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, Lambda lambda) {
+    const auto fn = static_cast<mcl::equivalent_function_type<Lambda>*>(lambda);
+    constexpr u32 stack_space = 3 * 16;
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+    const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+    const Xbyak::Xmm arg2 = ctx.reg_alloc.UseXmm(args[1]);
+    const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+    ctx.reg_alloc.EndOfAllocScope();
+
+    ctx.reg_alloc.HostCall(nullptr);
+    ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+    code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+    code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+    code.lea(code.ABI_PARAM3, ptr[rsp + ABI_SHADOW_SPACE + 2 * 16]);
+
+    code.movaps(xword[code.ABI_PARAM2], arg1);
+    code.movaps(xword[code.ABI_PARAM3], arg2);
+    code.CallFunction(fn);
+    code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+    ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+    code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
+
+    ctx.reg_alloc.DefineValue(inst, result);
+}
+
+template<typename T, typename U = std::make_unsigned_t<T>>
+static bool VectorSignedSaturatedShiftLeft(VectorArray<T>& dst, const VectorArray<T>& data, const VectorArray<T>& shift_values) {
+    static_assert(std::is_signed_v<T>, "T must be signed.");
+
+    bool qc_flag = false;
+
+    constexpr size_t bit_size_minus_one = mcl::bitsizeof<T> - 1;
+
+    const auto saturate = [bit_size_minus_one](T value) {
+        return static_cast<T>((static_cast<U>(value) >> bit_size_minus_one) + (U{1} << bit_size_minus_one) - 1);
+    };
+
+    for (size_t i = 0; i < dst.size(); i++) {
+        const T element = data[i];
+        const T shift = std::clamp<T>(static_cast<T>(mcl::bit::sign_extend<8>(static_cast<U>(shift_values[i] & 0xFF))),
+                                      -static_cast<T>(bit_size_minus_one), std::numeric_limits<T>::max());
+
+        if (element == 0) {
+            dst[i] = 0;
+        } else if (shift < 0) {
+            dst[i] = static_cast<T>(element >> -shift);
+        } else if (static_cast<U>(shift) > bit_size_minus_one) {
+            dst[i] = saturate(element);
+            qc_flag = true;
+        } else {
+            const T shifted = T(U(element) << shift);
+
+            if ((shifted >> shift) != element) {
+                dst[i] = saturate(element);
+                qc_flag = true;
+            } else {
+                dst[i] = shifted;
+            }
+        }
+    }
+
+    return qc_flag;
+}
+
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArrangedSaturated<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SQSHL(Vresult, Va, Vb); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorSignedSaturatedShiftLeft<s8>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArrangedSaturated<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SQSHL(Vresult, Va, Vb); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorSignedSaturatedShiftLeft<s16>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArrangedSaturated<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SQSHL(Vresult, Va, Vb); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorSignedSaturatedShiftLeft<s32>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArrangedSaturated<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SQSHL(Vresult, Va, Vb); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorSignedSaturatedShiftLeft<s64>);
+}
+
+template<typename T, typename U = std::make_unsigned_t<T>>
+static bool VectorSignedSaturatedShiftLeftUnsigned(VectorArray<T>& dst, const VectorArray<T>& data, u8 shift_amount) {
+    static_assert(std::is_signed_v<T>, "T must be signed.");
+
+    bool qc_flag = false;
+    for (size_t i = 0; i < dst.size(); i++) {
+        const T element = data[i];
+        const T shift = static_cast<T>(shift_amount);
+
+        if (element == 0) {
+            dst[i] = 0;
+        } else if (element < 0) {
+            dst[i] = 0;
+            qc_flag = true;
+        } else {
+            const U shifted = static_cast<U>(element) << static_cast<U>(shift);
+            const U shifted_test = shifted >> static_cast<U>(shift);
+
+            if (shifted_test != static_cast<U>(element)) {
+                dst[i] = static_cast<T>(std::numeric_limits<U>::max());
+                qc_flag = true;
+            } else {
+                dst[i] = shifted;
+            }
+        }
+    }
+
+    return qc_flag;
+}
+
+template<typename Lambda>
+static void EmitTwoArgumentFallbackWithSaturationAndImmediate(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, Lambda lambda) {
+    const auto fn = static_cast<mcl::equivalent_function_type<Lambda>*>(lambda);
+    constexpr u32 stack_space = 2 * 16;
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+    const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+    const u8 arg2 = args[1].GetImmediateU8();
+    const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+    ctx.reg_alloc.EndOfAllocScope();
+
+    ctx.reg_alloc.HostCall(nullptr);
+    ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+    code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+    code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+
+    code.movaps(xword[code.ABI_PARAM2], arg1);
+    code.mov(code.ABI_PARAM3, arg2);
+    code.CallFunction(fn);
+    code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+    ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+    code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
+
+    ctx.reg_alloc.DefineValue(inst, result);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeftUnsigned8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitImmShiftSaturated<8>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) { code.SQSHLU(Vresult, Voperand, shift_amount); });
+    EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst, VectorSignedSaturatedShiftLeftUnsigned<s8>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeftUnsigned16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitImmShiftSaturated<16>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) { code.SQSHLU(Vresult, Voperand, shift_amount); });
+    EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst, VectorSignedSaturatedShiftLeftUnsigned<s16>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeftUnsigned32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitImmShiftSaturated<32>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) { code.SQSHLU(Vresult, Voperand, shift_amount); });
+    EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst, VectorSignedSaturatedShiftLeftUnsigned<s32>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeftUnsigned64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitImmShiftSaturated<64>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) { code.SQSHLU(Vresult, Voperand, shift_amount); });
+    EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst, VectorSignedSaturatedShiftLeftUnsigned<s64>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSub8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitThreeOpArranged<8>(
-        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.sub_imm(Vresult, Va, Vb); }, code.t0);
+        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsub_b(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSub16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitThreeOpArranged<16>(
-        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.sub_imm(Vresult, Va, Vb); }, code.t0);
+        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsub_h(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSub32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitThreeOpArranged<32>(
-        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.sub_imm(Vresult, Va, Vb); }, code.t0);
+        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsub_w(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorSub64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     EmitThreeOpArranged<64>(
-        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.sub_imm(Vresult, Va, Vb); }, code.t0);
+        code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsub_d(Vresult, Va, Vb); });
 }
 
 template<>
@@ -1688,97 +1817,138 @@ void EmitIR<IR::Opcode::VectorTableLookup128>(Xbyak_loongarch64::CodeGenerator& 
     const size_t table_size = std::count_if(table.begin(), table.end(), [](const auto& elem) { return !elem.IsVoid(); });
     const bool is_defaults_zero = inst->GetArg(0).IsZero();
 
-    auto Qresult = is_defaults_zero ? ctx.reg_alloc.WriteQ(inst) : ctx.reg_alloc.ReadWriteQ(args[0], inst);
-    auto Qindices = ctx.reg_alloc.ReadQ(args[2]);
+    auto result = is_defaults_zero ? ctx.reg_alloc.WriteQ(inst) : ctx.reg_alloc.ReadWriteQ(args[0], inst);
+    auto indicies = ctx.reg_alloc.ReadQ(args[2]);
     std::vector<RAReg<Xbyak_loongarch64::VReg>> Qtable;
     for (size_t i = 0; i < table_size; i++) {
         Qtable.emplace_back(ctx.reg_alloc.ReadQ(table[i]));
     }
-    RegAlloc::Realize(Qresult, Qindices);
+    RegAlloc::Realize(result, indicies);
     for (size_t i = 0; i < table_size; i++) {
         RegAlloc::Realize(Qtable[i]);
     }
 
-    switch (table_size) {
-    case 1:
-        if (is_defaults_zero) {
-            code.TBL(Qresult->B16(), Xbyak_loongarch64::List{Qtable[0]->B16()}, Qindices->B16());
-        } else {
-            code.TBX(Qresult->B16(), Xbyak_loongarch64::List{Qtable[0]->B16()}, Qindices->B16());
-        }
-        break;
-    case 2:
-        code.add_d(V0.B16(), Qtable[0]->B16(), code.zero);
-        code.add_d(V1.B16(), Qtable[1]->B16(), code.zero);
-        if (is_defaults_zero) {
-            code.TBL(Qresult->B16(), Xbyak_loongarch64::List{V0.B16(), V1.B16()}, Qindices->B16());
-        } else {
-            code.TBX(Qresult->B16(), Xbyak_loongarch64::List{V0.B16(), V1.B16()}, Qindices->B16());
-        }
-        break;
-    case 3:
-        code.add_d(V0.B16(), Qtable[0]->B16(), code.zero);
-        code.add_d(V1.B16(), Qtable[1]->B16(), code.zero);
-        code.add_d(V2.B16(), Qtable[2]->B16(), code.zero);
-        if (is_defaults_zero) {
-            code.TBL(Qresult->B16(), Xbyak_loongarch64::List{V0.B16(), V1.B16(), V2.B16()}, Qindices->B16());
-        } else {
-            code.TBX(Qresult->B16(), Xbyak_loongarch64::List{V0.B16(), V1.B16(), V2.B16()}, Qindices->B16());
-        }
-        break;
-    case 4:
-        code.add_d(V0.B16(), Qtable[0]->B16(), code.zero);
-        code.add_d(V1.B16(), Qtable[1]->B16(), code.zero);
-        code.add_d(V2.B16(), Qtable[2]->B16(), code.zero);
-        code.add_d(V3.B16(), Qtable[3]->B16(), code.zero);
-        if (is_defaults_zero) {
-            code.TBL(Qresult->B16(), Xbyak_loongarch64::List{V0.B16(), V1.B16(), V2.B16(), V3.B16()}, Qindices->B16());
-        } else {
-            code.TBX(Qresult->B16(), Xbyak_loongarch64::List{V0.B16(), V1.B16(), V2.B16(), V3.B16()}, Qindices->B16());
-        }
-        break;
-    default:
-        ASSERT_FALSE("Unsupported table_size");
+    if (table_size == 1) {
+//        const Xbyak::Xmm indicies = ctx.reg_alloc.UseXmm(args[2]);
+        const Xbyak::Xmm defaults = result;//ctx.reg_alloc.UseXmm(args[0]);
+        const Xbyak::Xmm xmm_table0 = Qtable[0];
+
+        code.addi_d(Xscratch0, code.zero, 0x70);
+        code.vreplgr2vr_b(xmm1, Xscratch0);
+        code.vsadd_b(xmm0, xmm1, indicies);
+
+        code.vshuf_b(xmm_table0, xmm_table0, indicies);
+        code.vbitsel_v(xmm_table0, xmm0, xmm_table0, defaults);
+//        code.pshufb(xmm_table0, indicies);
+//        code.pblendvb(xmm_table0, defaults);
+
+//        ctx.reg_alloc.DefineValue(inst, xmm_table0);
+        return;
     }
+
+    if (is_defaults_zero && table_size == 2) {
+//        const Xbyak::Xmm indicies = ctx.reg_alloc.UseScratchXmm(args[2]);
+        const Xbyak::Xmm xmm_table0 = Qtable[0];
+        const Xbyak::Xmm xmm_table1 = Qtable[1];
+
+
+//            code.movaps(xmm0, indicies);
+//            code.paddusb(xmm0, code.MConst(xword, 0x7070707070707070, 0x7070707070707070));
+        code.addi_d(Xscratch0, code.zero, 0x70);
+        code.vreplgr2vr_b(xmm1, Xscratch0);
+        code.vsadd_b(xmm0, xmm1, indicies);
+
+        code.addi_d(Xscratch0, code.zero, 0x60);
+        code.vreplgr2vr_b(xmm1, Xscratch0);
+        code.vsadd_b(indicies, xmm1, indicies);
+
+//        code.paddusb(indicies, code.MConst(xword, 0x6060606060606060, 0x6060606060606060));
+//        code.pshufb(xmm_table0, xmm0);
+        code.vshuf_b(xmm_table0, xmm_table0,xmm0);
+        code.vshuf_b(xmm_table1, xmm_table1, indicies);
+//        code.pshufb(xmm_table1, indicies);
+        code.vbitsel_v(xmm_table0, xmm0, xmm_table0, xmm_table1);
+//        code.pblendvb(xmm_table0, xmm_table1);
+
+//        ctx.reg_alloc.DefineValue(inst, xmm_table0);
+        return;
+    }
+//    const Xbyak::Xmm indicies = ctx.reg_alloc.UseXmm(args[2]);
+//    const Xbyak::Xmm result = ctx.reg_alloc.UseScratchXmm(args[0]);
+    const Xbyak::Xmm masked = ctx.reg_alloc.ScratchXmm();
+
+    code.addi_d(Xscratch0, code.zero, 0xF0);
+    code.vreplgr2vr_b(masked, Xscratch0);
+    code.vand_v(masked, masked, indicies);
+//    code.movaps(masked, code.MConst(xword, 0xF0F0F0F0F0F0F0F0, 0xF0F0F0F0F0F0F0F0));
+//    code.pand(masked, indicies);
+
+    for (size_t i = 0; i < table_size; ++i) {
+        const auto xmm_table = Qtable[i];
+
+        const u64 table_index = mcl::bit::replicate_element<u8, u64>(i * 16);
+
+        if (table_index == 0) {
+            code.vxor_v(code.vr0, code.vr0, code.vr0);
+            code.vseq_b(code.vr0, masked, code.vr0);
+        } else {
+            code.add_imm(Xscratch0, code.zero,  i * 16, Xscratch1);
+            code.vreplgr2vr_b(masked, Xscratch0);
+            code.vseq_b(code.vr0, masked, code.vr0);
+//            code.movaps(xmm0, code.MConst(xword, table_index, table_index));
+//            code.pcmpeqb(xmm0, masked);
+        }
+        code.vshuf_b(xmm_table, xmm_table, indicies);
+        code.vbitsel_v(result, code.vr0, result, xmm_table);
+//        code.pblendvb(result, xmm_table);
+
+//        ctx.reg_alloc.Release(xmm_table);
+    }
+
+//    ctx.reg_alloc.DefineValue(inst, result);
+    return;
+
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorTranspose8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     const bool part = inst->GetArg(2).GetU1();
-    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { !part ? code.TRN1(Vresult, Va, Vb) : code.TRN2(Vresult, Va, Vb); });
+    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { !part ? code.vpackev_b(Vresult,Vb, Va) : code.vpackod_b(Vresult, Vb, Va); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorTranspose16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     const bool part = inst->GetArg(2).GetU1();
-    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { !part ? code.TRN1(Vresult, Va, Vb) : code.TRN2(Vresult, Va, Vb); });
+    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { !part ? code.vpackev_h(Vresult, Vb, Va) : code.vpackod_h(Vresult, Vb, Va); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorTranspose32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     const bool part = inst->GetArg(2).GetU1();
-    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { !part ? code.TRN1(Vresult, Va, Vb) : code.TRN2(Vresult, Va, Vb); });
+    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { !part ? code.vpackev_w(Vresult,Vb, Va) : code.vpackod_w(Vresult,Vb, Va); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorTranspose64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     const bool part = inst->GetArg(2).GetU1();
-    EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { !part ? code.TRN1(Vresult, Va, Vb) : code.TRN2(Vresult, Va, Vb); });
+    EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { !part ? code.vpackev_d(Vresult,Vb, Va) : code.vpackod_d(Vresult,Vb, Va); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedAbsoluteDifference8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UABD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vabsd_b(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedAbsoluteDifference16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UABD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vabsd_h(Vresult, Va, Vb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedAbsoluteDifference32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UABD(Vresult, Va, Vb); });
+    EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+        code.vabsd_w(Vresult, Va, Vb);
+    });
 }
 
 template<>
@@ -1797,101 +1967,337 @@ void EmitIR<IR::Opcode::VectorUnsignedMultiply32>(Xbyak_loongarch64::CodeGenerat
     ASSERT_FALSE("Unimplemented");
 }
 
-template<>
-void EmitIR<IR::Opcode::VectorUnsignedRecipEstimate>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.URECPE(Vresult, Voperand); });
+template<typename Lambda>
+static void EmitOneArgumentFallback(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, Lambda lambda) {
+    const auto fn = static_cast<mcl::equivalent_function_type<Lambda>*>(lambda);
+    constexpr u32 stack_space = 2 * 16;
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+    const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+    const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+    ctx.reg_alloc.EndOfAllocScope();
+
+    ctx.reg_alloc.HostCall(nullptr);
+    ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+    code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+    code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+
+    code.movaps(xword[code.ABI_PARAM2], arg1);
+    code.CallFunction(fn);
+    code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+    ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+    ctx.reg_alloc.DefineValue(inst, result);
 }
 
 template<>
+void EmitIR<IR::Opcode::VectorUnsignedRecipEstimate>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitOneArgumentFallback(code, ctx, inst, [](VectorArray<u32>& result, const VectorArray<u32>& a) {
+        for (size_t i = 0; i < result.size(); i++) {
+            if ((a[i] & 0x80000000) == 0) {
+                result[i] = 0xFFFFFFFF;
+                continue;
+            }
+
+            const u32 input = mcl::bit::get_bits<23, 31>(a[i]);
+            const u32 estimate = Common::RecipEstimate(input);
+
+            result[i] = (0b100000000 | estimate) << 23;
+        }
+    });}
+
+template<>
 void EmitIR<IR::Opcode::VectorUnsignedRecipSqrtEstimate>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.URSQRTE(Vresult, Voperand); });
+    EmitOneArgumentFallback(code, ctx, inst, [](VectorArray<u32>& result, const VectorArray<u32>& a) {
+        for (size_t i = 0; i < result.size(); i++) {
+            if ((a[i] & 0xC0000000) == 0) {
+                result[i] = 0xFFFFFFFF;
+                continue;
+            }
+
+            const u32 input = mcl::bit::get_bits<23, 31>(a[i]);
+            const u32 estimate = Common::RecipSqrtEstimate(input);
+
+            result[i] = (0b100000000 | estimate) << 23;
+        }
+    });}
+
+
+
+// Simple generic case for 8, 16, and 32-bit values. 64-bit values
+// will need to be special-cased as we can't simply use a larger integral size.
+template<typename T, typename U = std::make_unsigned_t<T>>
+static bool EmitVectorUnsignedSaturatedAccumulateSigned(VectorArray<U>& result, const VectorArray<T>& lhs, const VectorArray<T>& rhs) {
+    static_assert(std::is_signed_v<T>, "T must be signed.");
+    static_assert(mcl::bitsizeof<T> < 64, "T must be less than 64 bits in size.");
+
+    bool qc_flag = false;
+
+    for (size_t i = 0; i < result.size(); i++) {
+        // We treat rhs' members as unsigned, so cast to unsigned before signed to inhibit sign-extension.
+        // We use the unsigned equivalent of T, as we want zero-extension to occur, rather than a plain move.
+        const s64 x = s64{lhs[i]};
+        const s64 y = static_cast<s64>(static_cast<std::make_unsigned_t<U>>(rhs[i]));
+        const s64 sum = x + y;
+
+        if (sum > std::numeric_limits<U>::max()) {
+            result[i] = std::numeric_limits<U>::max();
+            qc_flag = true;
+        } else if (sum < 0) {
+            result[i] = std::numeric_limits<U>::min();
+            qc_flag = true;
+        } else {
+            result[i] = static_cast<U>(sum);
+        }
+    }
+
+    return qc_flag;
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedAccumulateSigned8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedAccumulate<8>(code, ctx, inst, [&](auto Vaccumulator, auto Voperand) { code.USQADD(Vaccumulator, Voperand); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, EmitVectorUnsignedSaturatedAccumulateSigned<s8>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedAccumulateSigned16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedAccumulate<16>(code, ctx, inst, [&](auto Vaccumulator, auto Voperand) { code.USQADD(Vaccumulator, Voperand); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, EmitVectorUnsignedSaturatedAccumulateSigned<s16>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedAccumulateSigned32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedAccumulate<32>(code, ctx, inst, [&](auto Vaccumulator, auto Voperand) { code.USQADD(Vaccumulator, Voperand); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, EmitVectorUnsignedSaturatedAccumulateSigned<s32>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedAccumulateSigned64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitSaturatedAccumulate<64>(code, ctx, inst, [&](auto Vaccumulator, auto Voperand) { code.USQADD(Vaccumulator, Voperand); });
+    // TODO use vsadd?
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, [](VectorArray<u64>& result, const VectorArray<u64>& lhs, const VectorArray<u64>& rhs) {
+        bool qc_flag = false;
+
+        for (size_t i = 0; i < result.size(); i++) {
+            const u64 x = lhs[i];
+            const u64 y = rhs[i];
+            const u64 res = x + y;
+
+            // Check sign bits to determine if an overflow occurred.
+            if ((~x & y & ~res) & 0x8000000000000000) {
+                result[i] = UINT64_MAX;
+                qc_flag = true;
+            } else if ((x & ~y & res) & 0x8000000000000000) {
+                result[i] = 0;
+                qc_flag = true;
+            } else {
+                result[i] = res;
+            }
+        }
+
+        return qc_flag;
+    });}
+
+template<typename Lambda>
+static void EmitOneArgumentFallbackWithSaturation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, Lambda lambda) {
+    const auto fn = static_cast<mcl::equivalent_function_type<Lambda>*>(lambda);
+    constexpr u32 stack_space = 2 * 16;
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+    const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+    const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+    ctx.reg_alloc.EndOfAllocScope();
+
+    ctx.reg_alloc.HostCall(nullptr);
+    ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+    code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+    code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+
+    code.movaps(xword[code.ABI_PARAM2], arg1);
+    code.CallFunction(fn);
+    code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+    ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+    code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
+
+    ctx.reg_alloc.DefineValue(inst, result);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedNarrow16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArrangedSaturatedNarrow<16>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.UQXTN(Vresult, Voperand); });
-}
+    EmitOneArgumentFallbackWithSaturation(code, ctx, inst, [](VectorArray<u8>& result, const VectorArray<u16>& a) {
+        result = {};
+        bool qc_flag = false;
+        for (size_t i = 0; i < a.size(); ++i) {
+            const u16 saturated = std::clamp<u16>(a[i], 0, 0xFF);
+            result[i] = static_cast<u8>(saturated);
+            qc_flag |= saturated != a[i];
+        }
+        return qc_flag;
+    });}
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedNarrow32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArrangedSaturatedNarrow<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.UQXTN(Vresult, Voperand); });
-}
+    EmitOneArgumentFallbackWithSaturation(code, ctx, inst, [](VectorArray<u16>& result, const VectorArray<u32>& a) {
+        result = {};
+        bool qc_flag = false;
+        for (size_t i = 0; i < a.size(); ++i) {
+            const u32 saturated = std::clamp<u32>(a[i], 0, 0xFFFF);
+            result[i] = static_cast<u16>(saturated);
+            qc_flag |= saturated != a[i];
+        }
+        return qc_flag;
+    });}
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedNarrow64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArrangedSaturatedNarrow<64>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.UQXTN(Vresult, Voperand); });
+    EmitOneArgumentFallbackWithSaturation(code, ctx, inst, [](VectorArray<u32>& result, const VectorArray<u64>& a) {
+        result = {};
+        bool qc_flag = false;
+        for (size_t i = 0; i < a.size(); ++i) {
+            const u64 saturated = std::clamp<u64>(a[i], 0, 0xFFFFFFFF);
+            result[i] = static_cast<u32>(saturated);
+            qc_flag |= saturated != a[i];
+        }
+        return qc_flag;
+    });}
+
+using A64FullVectorWidth = std::integral_constant<size_t, 128>;
+// Array alias that always sizes itself according to the given type T
+// relative to the size of a vector register. e.g. T = u32 would result
+// in a std::array<u32, 4>.
+template<typename T>
+using VectorArray = std::array<T, A64FullVectorWidth::value / mcl::bitsizeof<T>>;
+
+template<typename T, typename S = std::make_signed_t<T>>
+static bool VectorUnsignedSaturatedShiftLeft(VectorArray<T>& dst, const VectorArray<T>& data, const VectorArray<T>& shift_values) {
+    static_assert(std::is_unsigned_v<T>, "T must be an unsigned type.");
+
+    bool qc_flag = false;
+
+    constexpr size_t bit_size = mcl::bitsizeof<T>;
+    constexpr S negative_bit_size = -static_cast<S>(bit_size);
+
+    for (size_t i = 0; i < dst.size(); i++) {
+        const T element = data[i];
+        const S shift = std::clamp(static_cast<S>(mcl::bit::sign_extend<8>(static_cast<T>(shift_values[i] & 0xFF))),
+                                   negative_bit_size, std::numeric_limits<S>::max());
+
+        if (element == 0 || shift <= negative_bit_size) {
+            dst[i] = 0;
+        } else if (shift < 0) {
+            dst[i] = static_cast<T>(element >> -shift);
+        } else if (shift >= static_cast<S>(bit_size)) {
+            dst[i] = std::numeric_limits<T>::max();
+            qc_flag = true;
+        } else {
+            const T shifted = element << shift;
+
+            if ((shifted >> shift) != element) {
+                dst[i] = std::numeric_limits<T>::max();
+                qc_flag = true;
+            } else {
+                dst[i] = shifted;
+            }
+        }
+    }
+
+    return qc_flag;
+}
+
+template<typename Lambda>
+static void EmitTwoArgumentFallbackWithSaturation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, Lambda lambda) {
+    const auto fn = static_cast<mcl::equivalent_function_type<Lambda>*>(lambda);
+    constexpr u32 stack_space = 3 * 16;
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+    const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+    const Xbyak::Xmm arg2 = ctx.reg_alloc.UseXmm(args[1]);
+    const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+    ctx.reg_alloc.EndOfAllocScope();
+
+    ctx.reg_alloc.HostCall(nullptr);
+    ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+    code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+    code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+    code.lea(code.ABI_PARAM3, ptr[rsp + ABI_SHADOW_SPACE + 2 * 16]);
+
+    code.movaps(xword[code.ABI_PARAM2], arg1);
+    code.movaps(xword[code.ABI_PARAM3], arg2);
+    code.CallFunction(fn);
+    code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+    ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+    code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
+
+    ctx.reg_alloc.DefineValue(inst, result);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedShiftLeft8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArrangedSaturated<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UQSHL(Vresult, Va, Vb); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorUnsignedSaturatedShiftLeft<u8>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedShiftLeft16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArrangedSaturated<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UQSHL(Vresult, Va, Vb); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorUnsignedSaturatedShiftLeft<u16>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedShiftLeft32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArrangedSaturated<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UQSHL(Vresult, Va, Vb); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorUnsignedSaturatedShiftLeft<u32>);
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorUnsignedSaturatedShiftLeft64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOpArrangedSaturated<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UQSHL(Vresult, Va, Vb); });
+//    EmitThreeOpArrangedSaturated<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UQSHL(Vresult, Va, Vb); });
+    EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorUnsignedSaturatedShiftLeft<u64>);
+
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorZeroExtend8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArrangedWiden<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.UXTL(Vresult, Voperand); });
+    EmitTwoOpArrangedWiden<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) {
+        code.vxor_v(Vresult, Vresult, Vresult);
+        code.vilvl_b(Vresult, Vresult,Voperand);
+//        code.UXTL(Vresult, Voperand);
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorZeroExtend16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArrangedWiden<16>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.UXTL(Vresult, Voperand); });
+    EmitTwoOpArrangedWiden<16>(code, ctx, inst, [&](auto Vresult, auto Voperand) {
+        code.vxor_v(Vresult, Vresult, Vresult);
+        code.vilvl_h(Vresult, Vresult,Voperand);
+//        code.UXTL(Vresult, Voperand);
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorZeroExtend32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOpArrangedWiden<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.UXTL(Vresult, Voperand); });
+    EmitTwoOpArrangedWiden<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) {
+        code.vxor_v(Vresult, Vresult, Vresult);
+        code.vilvl_w(Vresult, Vresult,Voperand);
+        // FIXME use which?
+//        code.vsllwil_hu_bu(Vresult, Voperand, 0);?
+//        code.UXTL(Vresult, Voperand);
+    });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorZeroExtend64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp(code, ctx, inst, [&](auto& Qresult, auto& Qoperand) { code.FMOV(Qresult->toD(), Qoperand->toD()); });
+    EmitTwoOp(code, ctx, inst, [&](auto& Qresult, auto& Qoperand) {
+        code.vor_v(Qresult, Qoperand, Qoperand);
+//        code.FMOV(Qresult->toD(), Qoperand->toD()); });
 }
 
 template<>
 void EmitIR<IR::Opcode::VectorZeroUpper>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp(code, ctx, inst, [&](auto& Qresult, auto& Qoperand) { code.FMOV(Qresult->toD(), Qoperand->toD()); });
+    EmitTwoOp(code, ctx, inst, [&](auto& Qresult, auto& Qoperand) { code.vsubi_du(Qresult, Qoperand, 0); });
 }
 
 template<>
 void EmitIR<IR::Opcode::ZeroVector>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
     auto Qresult = ctx.reg_alloc.WriteQ(inst);
     RegAlloc::Realize(Qresult);
-    code.MOVI(Qresult->toD(), Xbyak_loongarch64::RepImm{0});
+    code.vreplgr2vr_d(Qresult, code.zero);
 }
 
 }  // namespace Dynarmic::Backend::LoongArch64
