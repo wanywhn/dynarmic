@@ -202,14 +202,6 @@ namespace Dynarmic::Backend::LoongArch64 {
         emit(Qresult, Qoperand);
     }
 
-    template<typename EmitFn>
-    static void
-    EmitTwoOpArranged(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst, EmitFn emit) {
-        EmitTwoOp(code, ctx, inst, [&](auto &Qresult, auto &Qoperand) {
-            emit(Qresult, Qoperand);
-        });
-    }
-
     template<size_t size, typename EmitFn>
     static void
     EmitTwoOpArrangedSaturated(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst, EmitFn emit) {
