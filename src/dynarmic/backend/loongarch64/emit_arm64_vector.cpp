@@ -17,14 +17,188 @@
 #include "dynarmic/ir/opcodes.h"
 #include "xbyak_loongarch64.h"
 #include "mcl/type_traits/function_info.hpp"
+#include "dynarmic/common/math_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
     using namespace Xbyak_loongarch64::util;
 
+
     template<typename Lambda>
-    static void EmitTwoArgumentFallback(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, Lambda lambda) {
-        const auto fn = static_cast<mcl::equivalent_function_type<Lambda>*>(lambda);
+    static void
+    EmitTwoArgumentFallbackWithSaturation(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst,
+                                          Lambda lambda) {
+        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
+        constexpr u32 stack_space = 3 * 16;
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+        const Xbyak::Xmm arg2 = ctx.reg_alloc.UseXmm(args[1]);
+        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+        ctx.reg_alloc.EndOfAllocScope();
+
+        ctx.reg_alloc.HostCall(nullptr);
+        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+        code.lea(code.ABI_PARAM3, ptr[rsp + ABI_SHADOW_SPACE + 2 * 16]);
+
+        code.movaps(xword[code.ABI_PARAM2], arg1);
+        code.movaps(xword[code.ABI_PARAM3], arg2);
+        code.CallFunction(fn);
+        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+        code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
+
+        ctx.reg_alloc.DefineValue(inst, result);
+    }
+
+
+    template<typename Lambda>
+    static void
+    EmitTwoArgumentFallbackWithSaturationAndImmediate(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                      IR::Inst *inst, Lambda lambda) {
+        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
+        constexpr u32 stack_space = 2 * 16;
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+        const u8 arg2 = args[1].GetImmediateU8();
+        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+        ctx.reg_alloc.EndOfAllocScope();
+
+        ctx.reg_alloc.HostCall(nullptr);
+        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+
+        code.movaps(xword[code.ABI_PARAM2], arg1);
+        code.mov(code.ABI_PARAM3, arg2);
+        code.CallFunction(fn);
+        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+        code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
+
+        ctx.reg_alloc.DefineValue(inst, result);
+    }
+
+
+    template<typename Lambda>
+    static void
+    EmitOneArgumentFallback(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst, Lambda lambda) {
+        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
+        constexpr u32 stack_space = 2 * 16;
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+        ctx.reg_alloc.EndOfAllocScope();
+
+        ctx.reg_alloc.HostCall(nullptr);
+        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+
+        code.movaps(xword[code.ABI_PARAM2], arg1);
+        code.CallFunction(fn);
+        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+        ctx.reg_alloc.DefineValue(inst, result);
+    }
+
+
+    template<typename Lambda>
+    static void
+    EmitOneArgumentFallbackWithSaturation(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst,
+                                          Lambda lambda) {
+        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
+        constexpr u32 stack_space = 2 * 16;
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+        ctx.reg_alloc.EndOfAllocScope();
+
+        ctx.reg_alloc.HostCall(nullptr);
+        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+
+        code.movaps(xword[code.ABI_PARAM2], arg1);
+        code.CallFunction(fn);
+        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+        code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
+
+        ctx.reg_alloc.DefineValue(inst, result);
+    }
+
+    template<typename Lambda>
+    static void
+    EmitTwoArgumentFallbackWithSaturation(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst,
+                                          Lambda lambda) {
+        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
+        constexpr u32 stack_space = 3 * 16;
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
+        const Xbyak::Xmm arg2 = ctx.reg_alloc.UseXmm(args[1]);
+        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+        ctx.reg_alloc.EndOfAllocScope();
+
+        ctx.reg_alloc.HostCall(nullptr);
+        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
+        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
+        code.lea(code.ABI_PARAM3, ptr[rsp + ABI_SHADOW_SPACE + 2 * 16]);
+
+        code.movaps(xword[code.ABI_PARAM2], arg1);
+        code.movaps(xword[code.ABI_PARAM3], arg2);
+        code.CallFunction(fn);
+        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
+
+        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
+
+        code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
+
+        ctx.reg_alloc.DefineValue(inst, result);
+    }
+
+    template<typename T>
+    static constexpr T VShift(T x, T y) {
+        const s8 shift_amount = static_cast<s8>(static_cast<u8>(y));
+        const s64 bit_size = static_cast<s64>(mcl::bitsizeof<T>);
+
+        if constexpr (std::is_signed_v<T>) {
+            if (shift_amount >= bit_size) {
+                return 0;
+            }
+
+            if (shift_amount <= -bit_size) {
+                // Parentheses necessary, as MSVC doesn't appear to consider cast parentheses
+                // as a grouping in terms of precedence, causing warning C4554 to fire. See:
+                // https://developercommunity.visualstudio.com/content/problem/144783/msvc-2017-does-not-understand-that-static-cast-cou.html
+                return x >> (T(bit_size - 1));
+            }
+        } else if (shift_amount <= -bit_size || shift_amount >= bit_size) {
+            return 0;
+        }
+
+        if (shift_amount < 0) {
+            return x >> T(-shift_amount);
+        }
+
+        using unsigned_type = std::make_unsigned_t<T>;
+        return static_cast<T>(static_cast<unsigned_type>(x) << static_cast<unsigned_type>(shift_amount));
+    }
+
+    template<typename Lambda>
+    static void
+    EmitTwoArgumentFallback(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst, Lambda lambda) {
+        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
         constexpr u32 stack_space = 3 * 16;
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
@@ -516,30 +690,38 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorArithmeticVShift8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<s8>& result, const VectorArray<s8>& a, const VectorArray<s8>& b) {
-            std::transform(a.begin(), a.end(), b.begin(), result.begin(), VShift<s8>);
-        });    }
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s8> &result, const VectorArray<s8> &a, const VectorArray<s8> &b) {
+                                    std::transform(a.begin(), a.end(), b.begin(), result.begin(), VShift<s8>);
+                                });
+    }
 
     template<>
     void EmitIR<IR::Opcode::VectorArithmeticVShift16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
-        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<s16>& result, const VectorArray<s16>& a, const VectorArray<s16>& b) {
-            std::transform(a.begin(), a.end(), b.begin(), result.begin(), VShift<s16>);
-        });    }
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s16> &result, const VectorArray<s16> &a, const VectorArray<s16> &b) {
+                                    std::transform(a.begin(), a.end(), b.begin(), result.begin(), VShift<s16>);
+                                });
+    }
 
     template<>
     void EmitIR<IR::Opcode::VectorArithmeticVShift32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
-        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<s32>& result, const VectorArray<s32>& a, const VectorArray<s32>& b) {
-            std::transform(a.begin(), a.end(), b.begin(), result.begin(), VShift<s32>);
-        });    }
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s32> &result, const VectorArray<s32> &a, const VectorArray<s32> &b) {
+                                    std::transform(a.begin(), a.end(), b.begin(), result.begin(), VShift<s32>);
+                                });
+    }
 
     template<>
     void EmitIR<IR::Opcode::VectorArithmeticVShift64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
-        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<s64>& result, const VectorArray<s64>& a, const VectorArray<s64>& b) {
-            std::transform(a.begin(), a.end(), b.begin(), result.begin(), VShift<s64>);
-        });    }
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s64> &result, const VectorArray<s64> &a, const VectorArray<s64> &b) {
+                                    std::transform(a.begin(), a.end(), b.begin(), result.begin(), VShift<s64>);
+                                });
+    }
 
     template<size_t size, typename EmitFn>
     static void EmitBroadcast(Xbyak_loongarch64::CodeGenerator &, EmitContext &ctx, IR::Inst *inst, EmitFn emit) {
@@ -556,43 +738,58 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorBroadcastLower8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                    IR::Inst *inst) {
-        EmitBroadcast<8>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) { code.DUP(Qvector->toD().B8(), Wvalue); });
+        EmitBroadcast<8>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) {
+            code.vxor_v(code.vr8, code.vr8, code.vr8);
+            code.vreplgr2vr_b(Qvector, Wvalue);
+            code.vpickev_b(Qvector, code.vr8, Qvector);
+            code.vpickod_b(Qvector, code.vr8, Qvector);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorBroadcastLower16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
-        EmitBroadcast<16>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) { code.DUP(Qvector->toD().H4(), Wvalue); });
+        EmitBroadcast<16>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) {
+            code.vxor_v(code.vr8, code.vr8, code.vr8);
+            code.vreplgr2vr_h(Qvector, Wvalue);
+            code.vpickev_b(Qvector, code.vr8, Qvector);
+            code.vpickod_b(Qvector, code.vr8, Qvector);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorBroadcastLower32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
-        EmitBroadcast<32>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) { code.DUP(Qvector->toD().S2(), Wvalue); });
+        EmitBroadcast<32>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) {
+            code.vxor_v(code.vr8, code.vr8, code.vr8);
+            code.vreplgr2vr_w(Qvector, Wvalue);
+            code.vpickev_b(Qvector, code.vr8, Qvector);
+            code.vpickod_b(Qvector, code.vr8, Qvector);
+        });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorBroadcast8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitBroadcast<8>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) { code.DUP(Qvector->B16(), Wvalue); });
+        EmitBroadcast<8>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) { code.vreplgr2vr_b(Qvector, Wvalue); });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorBroadcast16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitBroadcast<16>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) { code.DUP(Qvector->H8(), Wvalue); });
+        EmitBroadcast<16>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) { code.vreplgr2vr_h(Qvector, Wvalue); });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorBroadcast32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitBroadcast<32>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) { code.DUP(Qvector->S4(), Wvalue); });
+        EmitBroadcast<32>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) { code.vreplgr2vr_w(Qvector, Wvalue); });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorBroadcast64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitBroadcast<64>(code, ctx, inst, [&](auto &Qvector, auto &Xvalue) { code.DUP(Qvector->D2(), Xvalue); });
+        EmitBroadcast<64>(code, ctx, inst, [&](auto &Qvector, auto &Xvalue) { code.vreplgr2vr_d(Qvector, Wvalue); });
     }
 
     template<size_t size, typename EmitFn>
@@ -978,7 +1175,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorLogicalShiftLeft8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
         EmitImmShift<8>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.SHL(Vresult, Voperand, shift_amount);
+            code.vslli_b(Vresult, Voperand, shift_amount);
         });
     }
 
@@ -986,7 +1183,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorLogicalShiftLeft16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
         EmitImmShift<16>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.SHL(Vresult, Voperand, shift_amount);
+            code.vslli_h(Vresult, Voperand, shift_amount);
         });
     }
 
@@ -994,7 +1191,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorLogicalShiftLeft32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
         EmitImmShift<32>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.SHL(Vresult, Voperand, shift_amount);
+            code.vslli_w(Vresult, Voperand, shift_amount);
         });
     }
 
@@ -1002,7 +1199,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorLogicalShiftLeft64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
         EmitImmShift<64>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.SHL(Vresult, Voperand, shift_amount);
+            code.vslli_d(Vresult, Voperand, shift_amount);
         });
     }
 
@@ -1010,7 +1207,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorLogicalShiftRight8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
         EmitImmShift<8>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.USHR(Vresult, Voperand, shift_amount);
+            code.vsrli_b(Vresult, Voperand, shift_amount);
         });
     }
 
@@ -1018,7 +1215,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorLogicalShiftRight16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
         EmitImmShift<16>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.USHR(Vresult, Voperand, shift_amount);
+            code.vsrli_h(Vresult, Voperand, shift_amount);
         });
     }
 
@@ -1026,7 +1223,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorLogicalShiftRight32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
         EmitImmShift<32>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.USHR(Vresult, Voperand, shift_amount);
+            code.vsrli_w(Vresult, Voperand, shift_amount);
         });
     }
 
@@ -1034,51 +1231,53 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorLogicalShiftRight64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
         EmitImmShift<64>(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.USHR(Vresult, Voperand, shift_amount);
+            code.vsrli_d(Vresult, Voperand, shift_amount);
         });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorLogicalVShift8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.USHL(Vresult, Va, Vb); });
+        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsll_b(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorLogicalVShift16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                    IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.USHL(Vresult, Va, Vb); });
+        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsll_h(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorLogicalVShift32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                    IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.USHL(Vresult, Va, Vb); });
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsll_w(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorLogicalVShift64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                    IR::Inst *inst) {
-        EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.USHL(Vresult, Va, Vb); });
+        EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsll_d(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMaxS8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMAX(Vresult, Va, Vb); });
+        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmax_b(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMaxS16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMAX(Vresult, Va, Vb); });
+        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmax_h(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMaxS32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMAX(Vresult, Va, Vb); });
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmax_w(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMaxS64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmax_d(Vresult, Va, Vb); });
+
         (void) code;
         (void) ctx;
         (void) inst;
@@ -1087,21 +1286,23 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::VectorMaxU8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMAX(Vresult, Va, Vb); });
+        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmax_bu(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMaxU16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMAX(Vresult, Va, Vb); });
+        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmax_hu(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMaxU32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMAX(Vresult, Va, Vb); });
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmax_wu(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMaxU64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmax_du(Vresult, Va, Vb); });
+
         (void) code;
         (void) ctx;
         (void) inst;
@@ -1110,21 +1311,22 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::VectorMinS8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMIN(Vresult, Va, Vb); });
+        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmin_b(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMinS16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMIN(Vresult, Va, Vb); });
+        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmin_h(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMinS32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMIN(Vresult, Va, Vb); });
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmin_w(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMinS64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmin_d(Vresult, Va, Vb); });
         (void) code;
         (void) ctx;
         (void) inst;
@@ -1133,21 +1335,22 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::VectorMinU8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMIN(Vresult, Va, Vb); });
+        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmin_bu(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMinU16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMIN(Vresult, Va, Vb); });
+        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmin_hu(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMinU32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMIN(Vresult, Va, Vb); });
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmin_wu(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMinU64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmin_du(Vresult, Va, Vb); });
         (void) code;
         (void) ctx;
         (void) inst;
@@ -1156,77 +1359,87 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiply8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.MUL(Vresult, Va, Vb); });
+        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmul_b(Vresult, Va, Vb); });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorMultiply16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.MUL(Vresult, Va, Vb); });
+        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmul_h(Vresult, Va, Vb); });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorMultiply32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.MUL(Vresult, Va, Vb); });
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmul_w(Vresult, Va, Vb); });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorMultiply64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        ASSERT_MSG(ctx.conf.very_verbose_debugging_output, "VectorMultiply64 is for debugging only");
-        EmitThreeOp(code, ctx, inst, [&](auto &Qresult, auto &Qa, auto &Qb) {
-            code.FMOV(Xscratch0, Qa->toD());
-            code.FMOV(Xscratch1, Qb->toD());
-            code.mul_d(Xscratch0, Xscratch0, Xscratch1);
-            code.FMOV(Qresult->toD(), Xscratch0);
-            code.FMOV(Xscratch0, Qa->Delem()[1]);
-            code.FMOV(Xscratch1, Qb->Delem()[1]);
-            code.mul_d(Xscratch0, Xscratch0, Xscratch1);
-            code.FMOV(Qresult->Delem()[1], Xscratch0);
+        EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmul_d(Vresult, Va, Vb); });
+
+//        ASSERT_MSG(ctx.conf.very_verbose_debugging_output, "VectorMultiply64 is for debugging only");
+//        EmitThreeOp(code, ctx, inst, [&](auto &Qresult, auto &Qa, auto &Qb) {
+//            code.FMOV(Xscratch0, Qa->toD());
+//            code.FMOV(Xscratch1, Qb->toD());
+//            code.mul_d(Xscratch0, Xscratch0, Xscratch1);
+//            code.FMOV(Qresult->toD(), Xscratch0);
+//            code.FMOV(Xscratch0, Qa->Delem()[1]);
+//            code.FMOV(Xscratch1, Qb->Delem()[1]);
+//            code.mul_d(Xscratch0, Xscratch0, Xscratch1);
+//            code.FMOV(Qresult->Delem()[1], Xscratch0);
         });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplySignedWiden8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                         IR::Inst *inst) {
-        EmitThreeOpArrangedWiden<8>(code, ctx, inst,
-                                    [&](auto Vresult, auto Va, auto Vb) { code.SMULL(Vresult, Va, Vb); });
+        ASSERT_FALSE("Unexpected VectorMultiplySignedWiden8");
+
+//        EmitThreeOpArrangedWiden<8>(code, ctx, inst,
+//                                    [&](auto Vresult, auto Va, auto Vb) { code.SMULL(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplySignedWiden16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                          IR::Inst *inst) {
-        EmitThreeOpArrangedWiden<16>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.SMULL(Vresult, Va, Vb); });
+        ASSERT_FALSE("Unexpected VectorMultiplySignedWiden16");
+//        EmitThreeOpArrangedWiden<16>(code, ctx, inst,
+//                                     [&](auto Vresult, auto Va, auto Vb) { code.SMULL(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplySignedWiden32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                          IR::Inst *inst) {
-        EmitThreeOpArrangedWiden<32>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.SMULL(Vresult, Va, Vb); });
+        ASSERT_FALSE("Unexpected VectorMultiplySignedWiden32");
+
+//        EmitThreeOpArrangedWiden<32>(code, ctx, inst,
+//                                     [&](auto Vresult, auto Va, auto Vb) { code.SMULL(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplyUnsignedWiden8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                           IR::Inst *inst) {
-        EmitThreeOpArrangedWiden<8>(code, ctx, inst,
-                                    [&](auto Vresult, auto Va, auto Vb) { code.UMULL(Vresult, Va, Vb); });
+        ASSERT_FALSE("Unexpected VectorMultiplyUnsignedWiden8");
+//        EmitThreeOpArrangedWiden<8>(code, ctx, inst,
+//                                    [&](auto Vresult, auto Va, auto Vb) { code.UMULL(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplyUnsignedWiden16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                            IR::Inst *inst) {
-        EmitThreeOpArrangedWiden<16>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.UMULL(Vresult, Va, Vb); });
+        ASSERT_FALSE("Unexpected VectorMultiplyUnsignedWiden16");
+//        EmitThreeOpArrangedWiden<16>(code, ctx, inst,
+//                                     [&](auto Vresult, auto Va, auto Vb) { code.UMULL(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplyUnsignedWiden32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                            IR::Inst *inst) {
-        EmitThreeOpArrangedWiden<32>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.UMULL(Vresult, Va, Vb); });
+        ASSERT_FALSE("Unexpected VectorMultiplyUnsignedWiden32");
+//        EmitThreeOpArrangedWiden<32>(code, ctx, inst,
+//                                     [&](auto Vresult, auto Va, auto Vb) { code.UMULL(Vresult, Va, Vb); });
     }
 
     template<>
@@ -1246,12 +1459,64 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::VectorNot>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.NOT(Vresult, Voperand); });
+        EmitTwoOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) {
+            code.vorn_v(code.vr8, code.vr8, code.vr8);
+            code.vxor_v(Vresult, Voperand, code.vr8);
+//            code.NOT(Vresult, Voperand);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorOr>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.ORR(Vresult, Va, Vb); });
+        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vor_v(Vresult, Va, Vb); });
+    }
+
+
+    template<typename T, typename Function>
+    static void PairedOperation(VectorArray<T> &result, const VectorArray<T> &x, const VectorArray<T> &y, Function fn) {
+        const size_t range = x.size() / 2;
+
+        for (size_t i = 0; i < range; i++) {
+            result[i] = fn(x[2 * i], x[2 * i + 1]);
+        }
+
+        for (size_t i = 0; i < range; i++) {
+            result[range + i] = fn(y[2 * i], y[2 * i + 1]);
+        }
+    }
+
+    template<typename T, typename Function>
+    static void
+    LowerPairedOperation(VectorArray<T> &result, const VectorArray<T> &x, const VectorArray<T> &y, Function fn) {
+        const size_t range = x.size() / 4;
+
+        for (size_t i = 0; i < range; i++) {
+            result[i] = fn(x[2 * i], x[2 * i + 1]);
+        }
+
+        for (size_t i = 0; i < range; i++) {
+            result[range + i] = fn(y[2 * i], y[2 * i + 1]);
+        }
+    }
+
+    template<typename T>
+    static void PairedMax(VectorArray<T> &result, const VectorArray<T> &x, const VectorArray<T> &y) {
+        PairedOperation(result, x, y, [](auto a, auto b) { return std::max(a, b); });
+    }
+
+    template<typename T>
+    static void PairedMin(VectorArray<T> &result, const VectorArray<T> &x, const VectorArray<T> &y) {
+        PairedOperation(result, x, y, [](auto a, auto b) { return std::min(a, b); });
+    }
+
+    template<typename T>
+    static void LowerPairedMax(VectorArray<T> &result, const VectorArray<T> &x, const VectorArray<T> &y) {
+        LowerPairedOperation(result, x, y, [](auto a, auto b) { return std::max(a, b); });
+    }
+
+    template<typename T>
+    static void LowerPairedMin(VectorArray<T> &result, const VectorArray<T> &x, const VectorArray<T> &y) {
+        LowerPairedOperation(result, x, y, [](auto a, auto b) { return std::min(a, b); });
     }
 
     template<>
@@ -1344,170 +1609,225 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMaxS8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMAXP(Vresult, Va, Vb); });
-    }
+        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<s8>& result, const VectorArray<s8>& a, const VectorArray<s8>& b) {
+            PairedMax(result, a, b);
+        });    }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMaxS16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMAXP(Vresult, Va, Vb); });
-    }
+        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<s16>& result, const VectorArray<s16>& a, const VectorArray<s16>& b) {
+            PairedMax(result, a, b);
+        });    }
 
+        // TODO is this right
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMaxS32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMAXP(Vresult, Va, Vb); });
-    }
+        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<s32>& result, const VectorArray<s32>& a, const VectorArray<s32>& b) {
+            PairedMax(result, a, b);
+        });    }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMaxU8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMAXP(Vresult, Va, Vb); });
-    }
+        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<u8>& result, const VectorArray<u8>& a, const VectorArray<u8>& b) {
+            PairedMax(result, a, b);
+        });    }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMaxU16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMAXP(Vresult, Va, Vb); });
-    }
+        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<u16>& result, const VectorArray<u16>& a, const VectorArray<u16>& b) {
+            PairedMax(result, a, b);
+        });    }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMaxU32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMAXP(Vresult, Va, Vb); });
-    }
+        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<u32>& result, const VectorArray<u32>& a, const VectorArray<u32>& b) {
+            PairedMax(result, a, b);
+        });    }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMinS8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s8> &result, const VectorArray<s8> &a, const VectorArray<s8> &b) {
+                                    PairedMin(result, a, b);
+                                });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMinS16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s16> &result, const VectorArray<s16> &a, const VectorArray<s16> &b) {
+                                    PairedMin(result, a, b);
+                                });
     }
 
+    // TODO is this right
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMinS32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u32> &result, const VectorArray<u32> &a, const VectorArray<u32> &b) {
+                                    PairedMin(result, a, b);
+                                });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMinU8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u8> &result, const VectorArray<u8> &a, const VectorArray<u8> &b) {
+                                    PairedMin(result, a, b);
+                                });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMinU16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u16> &result, const VectorArray<u16> &a, const VectorArray<u16> &b) {
+                                    PairedMin(result, a, b);
+                                });
     }
 
+    // TODO is this right
     template<>
     void
     EmitIR<IR::Opcode::VectorPairedMinU32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.UMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u32> &result, const VectorArray<u32> &a, const VectorArray<u32> &b) {
+                                    PairedMin(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMaxLowerS8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
-        EmitThreeOpArrangedLower<8>(code, ctx, inst,
-                                    [&](auto Vresult, auto Va, auto Vb) { code.SMAXP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s8> &result, const VectorArray<s8> &a, const VectorArray<s8> &b) {
+                                    LowerPairedMax(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMaxLowerS16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitThreeOpArrangedLower<16>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.SMAXP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s16> &result, const VectorArray<s16> &a, const VectorArray<s16> &b) {
+                                    LowerPairedMax(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMaxLowerS32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitThreeOpArrangedLower<32>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.SMAXP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s32> &result, const VectorArray<s32> &a, const VectorArray<s32> &b) {
+                                    LowerPairedMax(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMaxLowerU8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
-        EmitThreeOpArrangedLower<8>(code, ctx, inst,
-                                    [&](auto Vresult, auto Va, auto Vb) { code.UMAXP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u8> &result, const VectorArray<u8> &a, const VectorArray<u8> &b) {
+                                    LowerPairedMax(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMaxLowerU16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitThreeOpArrangedLower<16>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.UMAXP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u16> &result, const VectorArray<u16> &a, const VectorArray<u16> &b) {
+                                    LowerPairedMax(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMaxLowerU32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitThreeOpArrangedLower<32>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.UMAXP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u32> &result, const VectorArray<u32> &a, const VectorArray<u32> &b) {
+                                    LowerPairedMax(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMinLowerS8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
-        EmitThreeOpArrangedLower<8>(code, ctx, inst,
-                                    [&](auto Vresult, auto Va, auto Vb) { code.SMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s8> &result, const VectorArray<s8> &a, const VectorArray<s8> &b) {
+                                    LowerPairedMin(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMinLowerS16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitThreeOpArrangedLower<16>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.SMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s16> &result, const VectorArray<s16> &a, const VectorArray<s16> &b) {
+                                    LowerPairedMin(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMinLowerS32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitThreeOpArrangedLower<32>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.SMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s32> &result, const VectorArray<s32> &a, const VectorArray<s32> &b) {
+                                    LowerPairedMin(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMinLowerU8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
-        EmitThreeOpArrangedLower<8>(code, ctx, inst,
-                                    [&](auto Vresult, auto Va, auto Vb) { code.UMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u8> &result, const VectorArray<u8> &a, const VectorArray<u8> &b) {
+                                    LowerPairedMin(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMinLowerU16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitThreeOpArrangedLower<16>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.UMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u16> &result, const VectorArray<u16> &a, const VectorArray<u16> &b) {
+                                    LowerPairedMin(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedMinLowerU32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitThreeOpArrangedLower<32>(code, ctx, inst,
-                                     [&](auto Vresult, auto Va, auto Vb) { code.UMINP(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u32> &result, const VectorArray<u32> &a, const VectorArray<u32> &b) {
+                                    LowerPairedMin(result, a, b);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPolynomialMultiply8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.PMUL(Vresult, Va, Vb); });
+        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmul_b(Vresult, Va, Vb); });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPolynomialMultiplyLong8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                            IR::Inst *inst) {
         EmitThreeOpArrangedWiden<8>(code, ctx, inst,
-                                    [&](auto Vresult, auto Va, auto Vb) { code.PMULL(Vresult, Va, Vb); });
+                                    [&](auto Vresult, auto Va, auto Vb) {
+                                        code.vmulwev_h_b(Vresult, Va, Vb);
+                                        code.vmulwod_h_b(Vresult, Va, Vb);
+//            code.PMULL(Vresult, Va, Vb);
+                                    });
     }
 
     template<>
@@ -1654,75 +1974,142 @@ namespace Dynarmic::Backend::LoongArch64 {
                                 [&](auto Vresult, auto Va, auto Vb) { code.vavgr_wu(Vresult, Va, Vb); });
     }
 
+
+    template<typename T, typename U>
+    static void RoundingShiftLeft(VectorArray<T> &out, const VectorArray<T> &lhs, const VectorArray<U> &rhs) {
+        using signed_type = std::make_signed_t<T>;
+        using unsigned_type = std::make_unsigned_t<T>;
+
+        constexpr auto bit_size = static_cast<s64>(mcl::bitsizeof<T>);
+
+        for (size_t i = 0; i < out.size(); i++) {
+            const s64 extended_shift = static_cast<s64>(mcl::bit::sign_extend<8, u64>(rhs[i] & 0xFF));
+
+            if (extended_shift >= 0) {
+                if (extended_shift >= bit_size) {
+                    out[i] = 0;
+                } else {
+                    out[i] = static_cast<T>(static_cast<unsigned_type>(lhs[i]) << extended_shift);
+                }
+            } else {
+                if ((std::is_unsigned_v<T> && extended_shift < -bit_size) ||
+                    (std::is_signed_v<T> && extended_shift <= -bit_size)) {
+                    out[i] = 0;
+                } else {
+                    const s64 shift_value = -extended_shift - 1;
+                    const T shifted = (lhs[i] & (static_cast<signed_type>(1) << shift_value)) >> shift_value;
+
+                    if (extended_shift == -bit_size) {
+                        out[i] = shifted;
+                    } else {
+                        out[i] = (lhs[i] >> -extended_shift) + shifted;
+                    }
+                }
+            }
+        }
+    }
+
+
     template<>
     void EmitIR<IR::Opcode::VectorRoundingShiftLeftS8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SRSHL(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s8> &result, const VectorArray<s8> &lhs, const VectorArray<s8> &rhs) {
+                                    RoundingShiftLeft(result, lhs, rhs);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorRoundingShiftLeftS16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                         IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SRSHL(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s16> &result, const VectorArray<s16> &lhs, const VectorArray<s16> &rhs) {
+                                    RoundingShiftLeft(result, lhs, rhs);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorRoundingShiftLeftS32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                         IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SRSHL(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s32> &result, const VectorArray<s32> &lhs, const VectorArray<s32> &rhs) {
+                                    RoundingShiftLeft(result, lhs, rhs);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorRoundingShiftLeftS64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                         IR::Inst *inst) {
-        EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.SRSHL(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<s64> &result, const VectorArray<s64> &lhs, const VectorArray<s64> &rhs) {
+                                    RoundingShiftLeft(result, lhs, rhs);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorRoundingShiftLeftU8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.URSHL(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u8> &result, const VectorArray<u8> &lhs, const VectorArray<s8> &rhs) {
+                                    RoundingShiftLeft(result, lhs, rhs);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorRoundingShiftLeftU16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                         IR::Inst *inst) {
-        EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.URSHL(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst,
+                                [](VectorArray<u16> &result, const VectorArray<u16> &lhs, const VectorArray<s16> &rhs) {
+                                    RoundingShiftLeft(result, lhs, rhs);
+                                });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorRoundingShiftLeftU32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                         IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.URSHL(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<u32> &result, const VectorArray<u32> &lhs,
+                                                    const VectorArray<s32> &rhs) {
+            RoundingShiftLeft(result, lhs, rhs);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorRoundingShiftLeftU64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                         IR::Inst *inst) {
-        EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.URSHL(Vresult, Va, Vb); });
+        EmitTwoArgumentFallback(code, ctx, inst, [](VectorArray<u64> &result, const VectorArray<u64> &lhs,
+                                                    const VectorArray<s64> &rhs) {
+            RoundingShiftLeft(result, lhs, rhs);
+        });
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorSignExtend8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoOpArrangedWiden<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.SXTL(Vresult, Voperand); });
+    EmitIR<IR::Opcode::VectorSignExtend8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                          IR::Inst *inst) {
+        EmitTwoOpArrangedWiden<8>(code, ctx, inst,
+                                  [&](auto Vresult, auto Voperand) { code.SXTL(Vresult, Voperand); });
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorSignExtend16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoOpArrangedWiden<16>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.SXTL(Vresult, Voperand); });
+    EmitIR<IR::Opcode::VectorSignExtend16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                           IR::Inst *inst) {
+        EmitTwoOpArrangedWiden<16>(code, ctx, inst,
+                                   [&](auto Vresult, auto Voperand) { code.SXTL(Vresult, Voperand); });
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorSignExtend32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoOpArrangedWiden<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.SXTL(Vresult, Voperand); });
+    EmitIR<IR::Opcode::VectorSignExtend32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                           IR::Inst *inst) {
+        EmitTwoOpArrangedWiden<32>(code, ctx, inst,
+                                   [&](auto Vresult, auto Voperand) { code.SXTL(Vresult, Voperand); });
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorSignExtend64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorSignExtend64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                           IR::Inst *inst) {
         (void) code;
         (void) ctx;
         (void) inst;
@@ -1730,21 +2117,25 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorSignedAbsoluteDifference8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                             IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vabsd_b(Vresult, Va, Vb); });
+    void
+    EmitIR<IR::Opcode::VectorSignedAbsoluteDifference8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                        IR::Inst *inst) {
+        EmitThreeOpArranged<8>(code, ctx, inst,
+                               [&](auto Vresult, auto Va, auto Vb) { code.vabsd_b(Vresult, Va, Vb); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorSignedAbsoluteDifference16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                              IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorSignedAbsoluteDifference16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                         IR::Inst *inst) {
         EmitThreeOpArranged<16>(code, ctx, inst,
                                 [&](auto Vresult, auto Va, auto Vb) { code.vabsd_h(Vresult, Va, Vb); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorSignedAbsoluteDifference32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                              IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorSignedAbsoluteDifference32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                         IR::Inst *inst) {
         EmitThreeOpArranged<32>(code, ctx, inst,
                                 [&](auto Vresult, auto Va, auto Vb) { code.vabsd_w(Vresult, Va, Vb); });
     }
@@ -1838,15 +2229,17 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyHighRounding16>(Xbyak_loongarch64::CodeGenerator &code,
-                                                                                 EmitContext &ctx, IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyHighRounding16>(Xbyak_loongarch64::CodeGenerator &code,
+                                                                            EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOpArrangedSaturated<16>(code, ctx, inst,
                                          [&](auto Vresult, auto Va, auto Vb) { code.SQRDMULH(Vresult, Va, Vb); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyHighRounding32>(Xbyak_loongarch64::CodeGenerator &code,
-                                                                                 EmitContext &ctx, IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyHighRounding32>(Xbyak_loongarch64::CodeGenerator &code,
+                                                                            EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOpArrangedSaturated<32>(code, ctx, inst,
                                          [&](auto Vresult, auto Va, auto Vb) { code.SQRDMULH(Vresult, Va, Vb); });
     }
@@ -1855,19 +2248,24 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyLong16>(Xbyak_loongarch64::CodeGenerator &code,
                                                                          EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOpArrangedSaturatedWiden<16>(code, ctx, inst,
-                                              [&](auto Vresult, auto Va, auto Vb) { code.SQDMULL(Vresult, Va, Vb); });
+                                              [&](auto Vresult, auto Va, auto Vb) {
+                                                  code.SQDMULL(Vresult, Va, Vb);
+                                              });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyLong32>(Xbyak_loongarch64::CodeGenerator &code,
                                                                          EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOpArrangedSaturatedWiden<32>(code, ctx, inst,
-                                              [&](auto Vresult, auto Va, auto Vb) { code.SQDMULL(Vresult, Va, Vb); });
+                                              [&](auto Vresult, auto Va, auto Vb) {
+                                                  code.SQDMULL(Vresult, Va, Vb);
+                                              });
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorSignedSaturatedNarrowToSigned16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+    EmitIR<IR::Opcode::VectorSignedSaturatedNarrowToSigned16>(Xbyak_loongarch64::CodeGenerator &code,
+                                                              EmitContext &ctx,
                                                               IR::Inst *inst) {
         EmitTwoOpArrangedSaturatedNarrow<16>(code, ctx, inst,
                                              [&](auto Vresult, auto Voperand) { code.SQXTN(Vresult, Voperand); });
@@ -1875,7 +2273,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorSignedSaturatedNarrowToSigned32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+    EmitIR<IR::Opcode::VectorSignedSaturatedNarrowToSigned32>(Xbyak_loongarch64::CodeGenerator &code,
+                                                              EmitContext &ctx,
                                                               IR::Inst *inst) {
         EmitTwoOpArrangedSaturatedNarrow<32>(code, ctx, inst,
                                              [&](auto Vresult, auto Voperand) { code.SQXTN(Vresult, Voperand); });
@@ -1883,10 +2282,21 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorSignedSaturatedNarrowToSigned64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+    EmitIR<IR::Opcode::VectorSignedSaturatedNarrowToSigned64>(Xbyak_loongarch64::CodeGenerator &code,
+                                                              EmitContext &ctx,
                                                               IR::Inst *inst) {
-        EmitTwoOpArrangedSaturatedNarrow<64>(code, ctx, inst,
-                                             [&](auto Vresult, auto Voperand) { code.SQXTN(Vresult, Voperand); });
+        EmitOneArgumentFallbackWithSaturation(code, ctx, inst,
+                                              [](VectorArray<s32> &result, const VectorArray<s64> &a) {
+                                                  result = {};
+                                                  bool qc_flag = false;
+                                                  for (size_t i = 0; i < a.size(); ++i) {
+                                                      const s64 saturated = std::clamp<s64>(a[i], -s64(0x80000000),
+                                                                                            s64(0x7FFFFFFF));
+                                                      result[i] = static_cast<s32>(saturated);
+                                                      qc_flag |= saturated != a[i];
+                                                  }
+                                                  return qc_flag;
+                                              });
     }
 
     template<>
@@ -1899,15 +2309,33 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedNarrowToUnsigned32>(Xbyak_loongarch64::CodeGenerator &code,
                                                                      EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoOpArrangedSaturatedNarrow<32>(code, ctx, inst,
-                                             [&](auto Vresult, auto Voperand) { code.SQXTUN(Vresult, Voperand); });
+        EmitOneArgumentFallbackWithSaturation(code, ctx, inst,
+                                              [](VectorArray<u16> &result, const VectorArray<s32> &a) {
+                                                  result = {};
+                                                  bool qc_flag = false;
+                                                  for (size_t i = 0; i < a.size(); ++i) {
+                                                      const s32 saturated = std::clamp<s32>(a[i], 0, 0xFFFF);
+                                                      result[i] = static_cast<u16>(saturated);
+                                                      qc_flag |= saturated != a[i];
+                                                  }
+                                                  return qc_flag;
+                                              });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedNarrowToUnsigned64>(Xbyak_loongarch64::CodeGenerator &code,
                                                                      EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoOpArrangedSaturatedNarrow<64>(code, ctx, inst,
-                                             [&](auto Vresult, auto Voperand) { code.SQXTUN(Vresult, Voperand); });
+        EmitOneArgumentFallbackWithSaturation(code, ctx, inst,
+                                              [](VectorArray<u32> &result, const VectorArray<s64> &a) {
+                                                  result = {};
+                                                  bool qc_flag = false;
+                                                  for (size_t i = 0; i < a.size(); ++i) {
+                                                      const s64 saturated = std::clamp<s64>(a[i], 0, 0xFFFFFFFF);
+                                                      result[i] = static_cast<u32>(saturated);
+                                                      qc_flag |= saturated != a[i];
+                                                  }
+                                                  return qc_flag;
+                                              });
     }
 
     template<>
@@ -1934,43 +2362,26 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedNeg64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                         IR::Inst *inst) {
-        EmitTwoOpArrangedSaturated<64>(code, ctx, inst,
-                                       [&](auto Vresult, auto Voperand) { code.SQNEG(Vresult, Voperand); });
-    }
+        EmitOneArgumentFallbackWithSaturation(code, ctx, inst,
+                                              [](VectorArray<s64> &result, const VectorArray<s64> &data) {
+                                                  bool qc_flag = false;
 
-    template<typename Lambda>
-    static void
-    EmitTwoArgumentFallbackWithSaturation(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst,
-                                          Lambda lambda) {
-        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
-        constexpr u32 stack_space = 3 * 16;
-        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
-        const Xbyak::Xmm arg2 = ctx.reg_alloc.UseXmm(args[1]);
-        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
-        ctx.reg_alloc.EndOfAllocScope();
+                                                  for (size_t i = 0; i < result.size(); i++) {
+                                                      if (static_cast<u64>(data[i]) == 0x8000000000000000) {
+                                                          result[i] = 0x7FFFFFFFFFFFFFFF;
+                                                          qc_flag = true;
+                                                      } else {
+                                                          result[i] = -data[i];
+                                                      }
+                                                  }
 
-        ctx.reg_alloc.HostCall(nullptr);
-        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
-        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
-        code.lea(code.ABI_PARAM3, ptr[rsp + ABI_SHADOW_SPACE + 2 * 16]);
-
-        code.movaps(xword[code.ABI_PARAM2], arg1);
-        code.movaps(xword[code.ABI_PARAM3], arg2);
-        code.CallFunction(fn);
-        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-
-        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
-
-        code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
-
-        ctx.reg_alloc.DefineValue(inst, result);
+                                                  return qc_flag;
+                                              });
     }
 
     template<typename T, typename U = std::make_unsigned_t<T>>
-    static bool VectorSignedSaturatedShiftLeft(VectorArray <T> &dst, const VectorArray <T> &data,
-                                               const VectorArray <T> &shift_values) {
+    static bool VectorSignedSaturatedShiftLeft(VectorArray<T> &dst, const VectorArray<T> &data,
+                                               const VectorArray<T> &shift_values) {
         static_assert(std::is_signed_v<T>, "T must be signed.");
 
         bool qc_flag = false;
@@ -2010,32 +2421,36 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                             IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                        IR::Inst *inst) {
         EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorSignedSaturatedShiftLeft<s8>);
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                              IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                         IR::Inst *inst) {
         EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorSignedSaturatedShiftLeft<s16>);
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                              IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                         IR::Inst *inst) {
         EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorSignedSaturatedShiftLeft<s32>);
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                              IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeft64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                         IR::Inst *inst) {
         EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorSignedSaturatedShiftLeft<s64>);
     }
 
     template<typename T, typename U = std::make_unsigned_t<T>>
     static bool
-    VectorSignedSaturatedShiftLeftUnsigned(VectorArray <T> &dst, const VectorArray <T> &data, u8 shift_amount) {
+    VectorSignedSaturatedShiftLeftUnsigned(VectorArray<T> &dst, const VectorArray<T> &data, u8 shift_amount) {
         static_assert(std::is_signed_v<T>, "T must be signed.");
 
         bool qc_flag = false;
@@ -2064,57 +2479,32 @@ namespace Dynarmic::Backend::LoongArch64 {
         return qc_flag;
     }
 
-    template<typename Lambda>
-    static void
-    EmitTwoArgumentFallbackWithSaturationAndImmediate(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                      IR::Inst *inst, Lambda lambda) {
-        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
-        constexpr u32 stack_space = 2 * 16;
-        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
-        const u8 arg2 = args[1].GetImmediateU8();
-        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
-        ctx.reg_alloc.EndOfAllocScope();
-
-        ctx.reg_alloc.HostCall(nullptr);
-        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
-        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
-
-        code.movaps(xword[code.ABI_PARAM2], arg1);
-        code.mov(code.ABI_PARAM3, arg2);
-        code.CallFunction(fn);
-        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-
-        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
-
-        code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
-
-        ctx.reg_alloc.DefineValue(inst, result);
-    }
-
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeftUnsigned8>(Xbyak_loongarch64::CodeGenerator &code,
                                                                      EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst, VectorSignedSaturatedShiftLeftUnsigned<s8>);
+        EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst,
+                                                          VectorSignedSaturatedShiftLeftUnsigned<s8>);
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeftUnsigned16>(Xbyak_loongarch64::CodeGenerator &code,
                                                                       EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst, VectorSignedSaturatedShiftLeftUnsigned<s16>);
+        EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst,
+                                                          VectorSignedSaturatedShiftLeftUnsigned<s16>);
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeftUnsigned32>(Xbyak_loongarch64::CodeGenerator &code,
                                                                       EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst, VectorSignedSaturatedShiftLeftUnsigned<s32>);
+        EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst,
+                                                          VectorSignedSaturatedShiftLeftUnsigned<s32>);
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedShiftLeftUnsigned64>(Xbyak_loongarch64::CodeGenerator &code,
                                                                       EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst, VectorSignedSaturatedShiftLeftUnsigned<s64>);
+        EmitTwoArgumentFallbackWithSaturationAndImmediate(code, ctx, inst,
+                                                          VectorSignedSaturatedShiftLeftUnsigned<s64>);
     }
 
     template<>
@@ -2149,7 +2539,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorTableLookup64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorTableLookup64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                            IR::Inst *inst) {
         ASSERT(inst->GetArg(1).GetInst()->GetOpcode() == IR::Opcode::VectorTable);
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -2161,7 +2552,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         auto Dresult = is_defaults_zero ? ctx.reg_alloc.WriteD(inst) : ctx.reg_alloc.ReadWriteD(args[0], inst);
         auto Dindices = ctx.reg_alloc.ReadD(args[2]);
-        std::vector<RAReg<Xbyak_loongarch64::DReg>> Dtable;
+        std::vector<RAReg<Xbyak_loongarch64::DReg>>
+                Dtable;
         for (size_t i = 0; i < table_size; i++) {
             Dtable.emplace_back(ctx.reg_alloc.ReadD(table[i]));
         }
@@ -2218,7 +2610,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorTableLookup128>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorTableLookup128>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                             IR::Inst *inst) {
         ASSERT(inst->GetArg(1).GetInst()->GetOpcode() == IR::Opcode::VectorTable);
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -2230,7 +2623,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         auto result = is_defaults_zero ? ctx.reg_alloc.WriteQ(inst) : ctx.reg_alloc.ReadWriteQ(args[0], inst);
         auto indicies = ctx.reg_alloc.ReadQ(args[2]);
-        std::vector<RAReg<Xbyak_loongarch64::VReg>> Qtable;
+        std::vector<RAReg<Xbyak_loongarch64::VReg>>
+                Qtable;
         for (size_t i = 0; i < table_size; i++) {
             Qtable.emplace_back(ctx.reg_alloc.ReadQ(table[i]));
         }
@@ -2286,6 +2680,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 //    const Xbyak::Xmm indicies = ctx.reg_alloc.UseXmm(args[2]);
 //    const Xbyak::Xmm result = ctx.reg_alloc.UseScratchXmm(args[0]);
+        // TODO how scratch vr?
         const Xbyak::Xmm masked = ctx.reg_alloc.ScratchXmm();
 
         code.addi_d(Xscratch0, code.zero, 0xF0);
@@ -2332,7 +2727,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorTranspose16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorTranspose16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                          IR::Inst *inst) {
         const bool part = inst->GetArg(2).GetU1();
         EmitThreeOpArranged<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             !part ? code.vpackev_h(Vresult, Vb, Va) : code.vpackod_h(Vresult, Vb, Va);
@@ -2341,7 +2737,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorTranspose32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorTranspose32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                          IR::Inst *inst) {
         const bool part = inst->GetArg(2).GetU1();
         EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             !part ? code.vpackev_w(Vresult, Vb, Va) : code.vpackod_w(Vresult, Vb, Va);
@@ -2350,7 +2747,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorTranspose64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorTranspose64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                          IR::Inst *inst) {
         const bool part = inst->GetArg(2).GetU1();
         EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             !part ? code.vpackev_d(Vresult, Vb, Va) : code.vpackod_d(Vresult, Vb, Va);
@@ -2358,9 +2756,11 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorUnsignedAbsoluteDifference8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                               IR::Inst *inst) {
-        EmitThreeOpArranged<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vabsd_b(Vresult, Va, Vb); });
+    void
+    EmitIR<IR::Opcode::VectorUnsignedAbsoluteDifference8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                          IR::Inst *inst) {
+        EmitThreeOpArranged<8>(code, ctx, inst,
+                               [&](auto Vresult, auto Va, auto Vb) { code.vabsd_b(Vresult, Va, Vb); });
     }
 
     template<>
@@ -2398,34 +2798,10 @@ namespace Dynarmic::Backend::LoongArch64 {
         ASSERT_FALSE("Unimplemented");
     }
 
-    template<typename Lambda>
-    static void
-    EmitOneArgumentFallback(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst, Lambda lambda) {
-        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
-        constexpr u32 stack_space = 2 * 16;
-        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
-        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
-        ctx.reg_alloc.EndOfAllocScope();
-
-        ctx.reg_alloc.HostCall(nullptr);
-        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
-        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
-
-        code.movaps(xword[code.ABI_PARAM2], arg1);
-        code.CallFunction(fn);
-        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-
-        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
-
-        ctx.reg_alloc.DefineValue(inst, result);
-    }
-
     template<>
     void EmitIR<IR::Opcode::VectorUnsignedRecipEstimate>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                          IR::Inst *inst) {
-        EmitOneArgumentFallback(code, ctx, inst, [](VectorArray <u32> &result, const VectorArray <u32> &a) {
+        EmitOneArgumentFallback(code, ctx, inst, [](VectorArray<u32> &result, const VectorArray<u32> &a) {
             for (size_t i = 0; i < result.size(); i++) {
                 if ((a[i] & 0x80000000) == 0) {
                     result[i] = 0xFFFFFFFF;
@@ -2441,9 +2817,10 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorUnsignedRecipSqrtEstimate>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                             IR::Inst *inst) {
-        EmitOneArgumentFallback(code, ctx, inst, [](VectorArray <u32> &result, const VectorArray <u32> &a) {
+    void
+    EmitIR<IR::Opcode::VectorUnsignedRecipSqrtEstimate>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                        IR::Inst *inst) {
+        EmitOneArgumentFallback(code, ctx, inst, [](VectorArray<u32> &result, const VectorArray<u32> &a) {
             for (size_t i = 0; i < result.size(); i++) {
                 if ((a[i] & 0xC0000000) == 0) {
                     result[i] = 0xFFFFFFFF;
@@ -2462,8 +2839,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 // Simple generic case for 8, 16, and 32-bit values. 64-bit values
 // will need to be special-cased as we can't simply use a larger integral size.
     template<typename T, typename U = std::make_unsigned_t<T>>
-    static bool EmitVectorUnsignedSaturatedAccumulateSigned(VectorArray <U> &result, const VectorArray <T> &lhs,
-                                                            const VectorArray <T> &rhs) {
+    static bool EmitVectorUnsignedSaturatedAccumulateSigned(VectorArray<U> &result, const VectorArray<T> &lhs,
+                                                            const VectorArray<T> &rhs) {
         static_assert(std::is_signed_v<T>, "T must be signed.");
         static_assert(mcl::bitsizeof<T> < 64, "T must be less than 64 bits in size.");
 
@@ -2499,13 +2876,15 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorUnsignedSaturatedAccumulateSigned16>(Xbyak_loongarch64::CodeGenerator &code,
                                                                        EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, EmitVectorUnsignedSaturatedAccumulateSigned<s16>);
+        EmitTwoArgumentFallbackWithSaturation(code, ctx, inst,
+                                              EmitVectorUnsignedSaturatedAccumulateSigned<s16>);
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorUnsignedSaturatedAccumulateSigned32>(Xbyak_loongarch64::CodeGenerator &code,
                                                                        EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, EmitVectorUnsignedSaturatedAccumulateSigned<s32>);
+        EmitTwoArgumentFallbackWithSaturation(code, ctx, inst,
+                                              EmitVectorUnsignedSaturatedAccumulateSigned<s32>);
     }
 
     template<>
@@ -2513,8 +2892,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                                        EmitContext &ctx, IR::Inst *inst) {
         // TODO use vsadd?
         EmitTwoArgumentFallbackWithSaturation(code, ctx, inst,
-                                              [](VectorArray <u64> &result, const VectorArray <u64> &lhs,
-                                                 const VectorArray <u64> &rhs) {
+                                              [](VectorArray<u64> &result, const VectorArray<u64> &lhs,
+                                                 const VectorArray<u64> &rhs) {
                                                   bool qc_flag = false;
 
                                                   for (size_t i = 0; i < result.size(); i++) {
@@ -2538,38 +2917,12 @@ namespace Dynarmic::Backend::LoongArch64 {
                                               });
     }
 
-    template<typename Lambda>
-    static void
-    EmitOneArgumentFallbackWithSaturation(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst,
-                                          Lambda lambda) {
-        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
-        constexpr u32 stack_space = 2 * 16;
-        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
-        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
-        ctx.reg_alloc.EndOfAllocScope();
-
-        ctx.reg_alloc.HostCall(nullptr);
-        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
-        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
-
-        code.movaps(xword[code.ABI_PARAM2], arg1);
-        code.CallFunction(fn);
-        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-
-        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
-
-        code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
-
-        ctx.reg_alloc.DefineValue(inst, result);
-    }
-
     template<>
-    void EmitIR<IR::Opcode::VectorUnsignedSaturatedNarrow16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                             IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorUnsignedSaturatedNarrow16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                        IR::Inst *inst) {
         EmitOneArgumentFallbackWithSaturation(code, ctx, inst,
-                                              [](VectorArray <u8> &result, const VectorArray <u16> &a) {
+                                              [](VectorArray<u8> &result, const VectorArray<u16> &a) {
                                                   result = {};
                                                   bool qc_flag = false;
                                                   for (size_t i = 0; i < a.size(); ++i) {
@@ -2582,10 +2935,11 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorUnsignedSaturatedNarrow32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                             IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorUnsignedSaturatedNarrow32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                        IR::Inst *inst) {
         EmitOneArgumentFallbackWithSaturation(code, ctx, inst,
-                                              [](VectorArray <u16> &result, const VectorArray <u32> &a) {
+                                              [](VectorArray<u16> &result, const VectorArray<u32> &a) {
                                                   result = {};
                                                   bool qc_flag = false;
                                                   for (size_t i = 0; i < a.size(); ++i) {
@@ -2598,10 +2952,11 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::VectorUnsignedSaturatedNarrow64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                             IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorUnsignedSaturatedNarrow64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                        IR::Inst *inst) {
         EmitOneArgumentFallbackWithSaturation(code, ctx, inst,
-                                              [](VectorArray <u32> &result, const VectorArray <u64> &a) {
+                                              [](VectorArray<u32> &result, const VectorArray<u64> &a) {
                                                   result = {};
                                                   bool qc_flag = false;
                                                   for (size_t i = 0; i < a.size(); ++i) {
@@ -2612,13 +2967,6 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                   return qc_flag;
                                               });
     }
-
-    using A64FullVectorWidth = std::integral_constant<size_t, 128>;
-// Array alias that always sizes itself according to the given type T
-// relative to the size of a vector register. e.g. T = u32 would result
-// in a std::array<u32, 4>.
-    template<typename T>
-    using VectorArray = std::array<T, A64FullVectorWidth::value / mcl::bitsizeof<T>>;
 
     template<typename T, typename S = std::make_signed_t<T>>
     static bool VectorUnsignedSaturatedShiftLeft(VectorArray<T> &dst, const VectorArray<T> &data,
@@ -2632,8 +2980,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         for (size_t i = 0; i < dst.size(); i++) {
             const T element = data[i];
-            const S shift = std::clamp(static_cast<S>(mcl::bit::sign_extend<8>(static_cast<T>(shift_values[i] & 0xFF))),
-                                       negative_bit_size, std::numeric_limits<S>::max());
+            const S shift = std::clamp(
+                    static_cast<S>(mcl::bit::sign_extend<8>(static_cast<T>(shift_values[i] & 0xFF))),
+                    negative_bit_size, std::numeric_limits<S>::max());
 
             if (element == 0 || shift <= negative_bit_size) {
                 dst[i] = 0;
@@ -2657,39 +3006,11 @@ namespace Dynarmic::Backend::LoongArch64 {
         return qc_flag;
     }
 
-    template<typename Lambda>
-    static void
-    EmitTwoArgumentFallbackWithSaturation(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst,
-                                          Lambda lambda) {
-        const auto fn = static_cast<mcl::equivalent_function_type<Lambda> *>(lambda);
-        constexpr u32 stack_space = 3 * 16;
-        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        const Xbyak::Xmm arg1 = ctx.reg_alloc.UseXmm(args[0]);
-        const Xbyak::Xmm arg2 = ctx.reg_alloc.UseXmm(args[1]);
-        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
-        ctx.reg_alloc.EndOfAllocScope();
-
-        ctx.reg_alloc.HostCall(nullptr);
-        ctx.reg_alloc.AllocStackSpace(stack_space + ABI_SHADOW_SPACE);
-        code.lea(code.ABI_PARAM1, ptr[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-        code.lea(code.ABI_PARAM2, ptr[rsp + ABI_SHADOW_SPACE + 1 * 16]);
-        code.lea(code.ABI_PARAM3, ptr[rsp + ABI_SHADOW_SPACE + 2 * 16]);
-
-        code.movaps(xword[code.ABI_PARAM2], arg1);
-        code.movaps(xword[code.ABI_PARAM3], arg2);
-        code.CallFunction(fn);
-        code.movaps(result, xword[rsp + ABI_SHADOW_SPACE + 0 * 16]);
-
-        ctx.reg_alloc.ReleaseStackSpace(stack_space + ABI_SHADOW_SPACE);
-
-        code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], code.ABI_RETURN.cvt8());
-
-        ctx.reg_alloc.DefineValue(inst, result);
-    }
 
     template<>
-    void EmitIR<IR::Opcode::VectorUnsignedSaturatedShiftLeft8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
-                                                               IR::Inst *inst) {
+    void
+    EmitIR<IR::Opcode::VectorUnsignedSaturatedShiftLeft8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                                          IR::Inst *inst) {
         EmitTwoArgumentFallbackWithSaturation(code, ctx, inst, VectorUnsignedSaturatedShiftLeft<u8>);
     }
 
@@ -2718,7 +3039,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorZeroExtend8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorZeroExtend8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                          IR::Inst *inst) {
         EmitTwoOpArrangedWiden<8>(code, ctx, inst, [&](auto Vresult, auto Voperand) {
             code.vxor_v(Vresult, Vresult, Vresult);
             code.vilvl_b(Vresult, Vresult, Voperand);
@@ -2728,7 +3050,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorZeroExtend16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorZeroExtend16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                           IR::Inst *inst) {
         EmitTwoOpArrangedWiden<16>(code, ctx, inst, [&](auto Vresult, auto Voperand) {
             code.vxor_v(Vresult, Vresult, Vresult);
             code.vilvl_h(Vresult, Vresult, Voperand);
@@ -2738,7 +3061,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorZeroExtend32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorZeroExtend32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                           IR::Inst *inst) {
         EmitTwoOpArrangedWiden<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) {
             code.vxor_v(Vresult, Vresult, Vresult);
             code.vilvl_w(Vresult, Vresult, Voperand);
@@ -2750,23 +3074,25 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::VectorZeroExtend64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::VectorZeroExtend64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+                                           IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst, [&](auto &Qresult, auto &Qoperand) {
             code.vor_v(Qresult, Qoperand, Qoperand);
 //        code.FMOV(Qresult->toD(), Qoperand->toD()); });
-        }
+        });
+    }
 
-        template<>
-        void
-        EmitIR<IR::Opcode::VectorZeroUpper>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-            EmitTwoOp(code, ctx, inst, [&](auto &Qresult, auto &Qoperand) { code.vsubi_du(Qresult, Qoperand, 0); });
-        }
+    template<>
+    void
+    EmitIR<IR::Opcode::VectorZeroUpper>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        EmitTwoOp(code, ctx, inst, [&](auto &Qresult, auto &Qoperand) { code.vsubi_du(Qresult, Qoperand, 0); });
+    }
 
-        template<>
-        void EmitIR<IR::Opcode::ZeroVector>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-            auto Qresult = ctx.reg_alloc.WriteQ(inst);
-            RegAlloc::Realize(Qresult);
-            code.vreplgr2vr_d(Qresult, code.zero);
-        }
+    template<>
+    void EmitIR<IR::Opcode::ZeroVector>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        auto Qresult = ctx.reg_alloc.WriteQ(inst);
+        RegAlloc::Realize(Qresult);
+        code.vreplgr2vr_d(Qresult, code.zero);
+    }
 
-    }  // namespace Dynarmic::Backend::LoongArch64
+}  // namespace Dynarmic::Backend::LoongArch64

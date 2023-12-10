@@ -38,7 +38,15 @@ enum class Cond;
 enum class Opcode;
 }  // namespace Dynarmic::IR
 
+
 namespace Dynarmic::Backend::LoongArch64 {
+using A64FullVectorWidth = std::integral_constant<size_t, 128>;
+
+    // Array alias that always sizes itself according to the given type T
+// relative to the size of a vector register. e.g. T = u32 would result
+// in a std::array<u32, 4>.
+template<typename T>
+using VectorArray = std::array<T, A64FullVectorWidth::value / mcl::bitsizeof<T>>;
 
 struct EmitContext;
 
