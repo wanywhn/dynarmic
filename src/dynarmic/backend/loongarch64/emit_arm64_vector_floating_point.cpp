@@ -51,7 +51,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     static void MaybeStandardFPSCRValue(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, bool fpcr_controlled,
                                         EmitFn emit) {
         if (ctx.FPCR(fpcr_controlled) != ctx.FPCR()) {
-            code.add_d(Wscratch0, ctx.FPCR(fpcr_controlled).Value(), code.zero);
+            code.add_imm(Wscratch0, code.zero, ctx.FPCR(fpcr_controlled).Value(), Wscratch1);
             code.MSR(Xbyak_loongarch64::SystemReg::FPCR, Xscratch0);
             emit();
             code.add_d(Wscratch0, ctx.FPCR().Value(), code.zero);
@@ -536,50 +536,79 @@ namespace Dynarmic::Backend::LoongArch64 {
         EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.FMULX(Vresult, Va, Vb); });
     }
 
+    template<size_t fsize>
+    void FPVectorNeg(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        auto Qa = ctx.reg_alloc.ReadWriteQ(args[0], inst);
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+        constexpr FPT sign_mask = FP::FPInfo<FPT>::sign_mask;
+        constexpr u64 sign_mask64 = mcl::bit::replicate_element<fsize, u64>(sign_mask);
+
+        if constexpr (fsize == 64) {
+            code.add_imm(Xscratch0, code.zero, sign_mask64, Xscratch1);
+            code.vinsgr2vr_d(code.vr0, Xscratch0 ,0);
+            code.vxor_v(Qa, Qa, code.vr0);
+        } else if constexpr (fsize == 32) {
+            code.add_imm(Xscratch0, code.zero, sign_mask64, Xscratch1);
+            code.vinsgr2vr_w(code.vr0, Xscratch0 ,0);
+            code.vxor_v(Qa, Qa, code.vr0);
+        } else if constexpr (fsize == 16) {
+            code.add_imm(Xscratch0, code.zero, sign_mask64, Xscratch1);
+            code.vinsgr2vr_h(code.vr0, Xscratch0 ,0);
+            code.vxor_v(Qa, Qa, code.vr0);
+        }
+
+
+//        ctx.reg_alloc.DefineValue(inst, a);
+    }
+
     template<>
     void EmitIR<IR::Opcode::FPVectorNeg16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        FPVectorNeg<16>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorNeg32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va) {
-            code.vffint_s_w(Vresult, code.zero);
-            code.vfsub_s(Vresult, Vresult, Va);
-//        code.FNEG(Vresult, Va);
-        });
+        FPVectorNeg<32>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorNeg64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitTwoOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va) {
-            code.vffint_d_l(Vresult, code.zero);
-            code.vfsub_d(Vresult, Vresult, Va);
-        });
+        FPVectorNeg<64>(code, ctx, inst);
     }
 
     template<>
     void
     EmitIR<IR::Opcode::FPVectorPairedAdd32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.FADDP(Vresult, Va, Vb); });
+        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vpickev_w(Vresult, Vb, Va);
+            code.vpickod_w(Vc, Vb, Va);
+            code.vfadd_w(Vresult, Vresult, Vc);
+//            code.vinsgr2vr_d(Vresult, code.zero , 1);
+        });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::FPVectorPairedAdd64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.FADDP(Vresult, Va, Vb); });
+        EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vpickev_d(Vresult, Vb, Va);
+            code.vpickod_d(Vc, Vb, Va);
+            code.vfadd_d(Vresult, Vresult, Vc);
+//            code.vinsgr2vr_d(Vresult, code.zero , 1);
+//            code.FADDP(Vresult, Va, Vb);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorPairedAddLower32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto &Qresult, auto &Qa, auto &Qb) {
-            code.ZIP1(V0.D2(), Qa->D2(), Qb->D2());
-            code.MOVI(D1, Xbyak_loongarch64::RepImm{0});
-            code.FADDP(Qresult->S4(), V0.S4(), V1.S4());
+            code.vfadd_s(Qresult, Qa, Qb);
+            code.vinsgr2vr_d(Qresult, code.zero ,1);
+//            code.ZIP1(V0.D2(), Qa->D2(), Qb->D2());
+//            code.MOVI(D1, Xbyak_loongarch64::RepImm{0});
+//            code.FADDP(Qresult->S4(), V0.S4(), V1.S4());
         });
     }
 
@@ -587,58 +616,197 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::FPVectorPairedAddLower64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto &Qresult, auto &Qa, auto &Qb) {
-            code.ZIP1(V0.D2(), Qa->D2(), Qb->D2());
-            code.FADDP(Qresult->toD(), V0.D2());
+            code.vfadd_d(Qresult, Qa, Qb);
+            code.vinsgr2vr_d(Qresult, code.zero ,1);
+//            code.ZIP1(V0.D2(), Qa->D2(), Qb->D2());
+//            code.FADDP(Qresult->toD(), V0.D2());
+        });
+    }
+
+    template<size_t fsize>
+    static void EmitRecipEstimate(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+
+        if constexpr (fsize != 16) {
+            if (ctx.HasOptimization(OptimizationFlag::Unsafe_ReducedErrorFP)) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+                const Xbyak::Xmm operand = ctx.reg_alloc.UseXmm(args[0]);
+                const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+
+                if (code.HasHostFeature(HostFeature::AVX512_OrthoFloat)) {
+                    FCODE(vrcp14p)(result, operand);
+                } else {
+                    if constexpr (fsize == 32) {
+                        code.rcpps(result, operand);
+                    } else {
+                        code.cvtpd2ps(result, operand);
+                        code.rcpps(result, result);
+                        code.cvtps2pd(result, result);
+                    }
+                }
+
+                ctx.reg_alloc.DefineValue(inst, result);
+                return;
+            }
+        }
+
+        EmitTwoOpFallback(code, ctx, inst, [](VectorArray<FPT>& result, const VectorArray<FPT>& operand, FP::FPCR fpcr, FP::FPSR& fpsr) {
+            for (size_t i = 0; i < result.size(); i++) {
+                result[i] = FP::FPRecipEstimate<FPT>(operand[i], fpcr, fpsr);
+            }
         });
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRecipEstimate16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitRecipEstimate<16>(code, ctx, inst);
+
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRecipEstimate32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitTwoOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.FRECPE(Vresult, Voperand); });
+        EmitRecipEstimate<32>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRecipEstimate64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitTwoOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.FRECPE(Vresult, Voperand); });
+        EmitRecipEstimate<64>(code, ctx, inst);
+    }
+
+
+    template<size_t fsize>
+    static void EmitRecipStepFused(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+
+        const auto fallback_fn = [](VectorArray<FPT>& result, const VectorArray<FPT>& op1, const VectorArray<FPT>& op2, FP::FPCR fpcr, FP::FPSR& fpsr) {
+            for (size_t i = 0; i < result.size(); i++) {
+                result[i] = FP::FPRecipStepFused<FPT>(op1[i], op2[i], fpcr, fpsr);
+            }
+        };
+
+        if constexpr (fsize != 16) {
+            if (code.HasHostFeature(HostFeature::FMA | HostFeature::AVX) && ctx.HasOptimization(OptimizationFlag::Unsafe_InaccurateNaN)) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+                const bool fpcr_controlled = args[2].GetImmediateU1();
+
+                const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+                const Xbyak::Xmm operand1 = ctx.reg_alloc.UseXmm(args[0]);
+                const Xbyak::Xmm operand2 = ctx.reg_alloc.UseXmm(args[1]);
+
+                MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
+                    code.movaps(result, GetVectorOf<fsize, false, 0, 2>(code));
+                    FCODE(vfnmadd231p)(result, operand1, operand2);
+                });
+
+                ctx.reg_alloc.DefineValue(inst, result);
+                return;
+            }
+
+            if (code.HasHostFeature(HostFeature::FMA | HostFeature::AVX)) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+                const bool fpcr_controlled = args[2].GetImmediateU1();
+
+                const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+                const Xbyak::Xmm operand1 = ctx.reg_alloc.UseXmm(args[0]);
+                const Xbyak::Xmm operand2 = ctx.reg_alloc.UseXmm(args[1]);
+                const Xbyak::Xmm tmp = ctx.reg_alloc.ScratchXmm();
+
+                SharedLabel end = GenSharedLabel(), fallback = GenSharedLabel();
+
+                MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
+                    code.movaps(result, GetVectorOf<fsize, false, 0, 2>(code));
+                    FCODE(vfnmadd231p)(result, operand1, operand2);
+
+                    FCODE(vcmpunordp)(tmp, result, result);
+                    code.vptest(tmp, tmp);
+                    code.jnz(*fallback, code.T_NEAR);
+                    code.L(*end);
+                });
+
+                ctx.deferred_emits.emplace_back([=, &code, &ctx] {
+                    code.L(*fallback);
+                    code.sub(rsp, 8);
+                    ABI_PushCallerSaveRegistersAndAdjustStackExcept(code, HostLocXmmIdx(result.getIdx()));
+                    EmitThreeOpFallbackWithoutRegAlloc(code, ctx, result, operand1, operand2, fallback_fn, fpcr_controlled);
+                    ABI_PopCallerSaveRegistersAndAdjustStackExcept(code, HostLocXmmIdx(result.getIdx()));
+                    code.add(rsp, 8);
+                    code.jmp(*end, code.T_NEAR);
+                });
+
+                ctx.reg_alloc.DefineValue(inst, result);
+                return;
+            }
+
+            if (ctx.HasOptimization(OptimizationFlag::Unsafe_UnfuseFMA)) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+                const Xbyak::Xmm operand1 = ctx.reg_alloc.UseScratchXmm(args[0]);
+                const Xbyak::Xmm operand2 = ctx.reg_alloc.UseXmm(args[1]);
+                const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+
+                code.movaps(result, GetVectorOf<fsize, false, 0, 2>(code));
+                FCODE(mulp)(operand1, operand2);
+                FCODE(subp)(result, operand1);
+
+                ctx.reg_alloc.DefineValue(inst, result);
+                return;
+            }
+        }
+
+        EmitThreeOpFallback(code, ctx, inst, fallback_fn);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRecipStepFused16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitRecipStepFused<16>(code, ctx, inst);
+
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRecipStepFused32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.FRECPS(Vresult, Va, Vb); });
+        EmitRecipStepFused<32>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRecipStepFused64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
-        EmitThreeOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.FRECPS(Vresult, Va, Vb); });
+        EmitRecipStepFused<64>(code, ctx, inst);
     }
 
-    template<>
-    void
-    EmitIR<IR::Opcode::FPVectorRoundInt16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    template<size_t fsize>
+    void EmitFPVectorRoundInt(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
         const auto rounding = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
         const bool exact = inst->GetArg(2).GetU1();
+
+        if constexpr (fsize != 16) {
+            if (code.HasHostFeature(HostFeature::SSE41) && rounding != FP::RoundingMode::ToNearest_TieAwayFromZero && !exact) {
+                const u8 round_imm = [&]() -> u8 {
+                    switch (rounding) {
+                        case FP::RoundingMode::ToNearest_TieEven:
+                            return 0b00;
+                        case FP::RoundingMode::TowardsPlusInfinity:
+                            return 0b10;
+                        case FP::RoundingMode::TowardsMinusInfinity:
+                            return 0b01;
+                        case FP::RoundingMode::TowardsZero:
+                            return 0b11;
+                        default:
+                            UNREACHABLE();
+                    }
+                }();
+
+                EmitTwoOpVectorOperation<fsize, DefaultIndexer, 3>(code, ctx, inst, [&](const Xbyak::Xmm& result, const Xbyak::Xmm& xmm_a) {
+                    FCODE(roundp)(result, xmm_a, round_imm);
+                });
+
+                return;
+            }
+        }
 
         using rounding_list = mp::list<
                 mp::lift_value<FP::RoundingMode::ToNearest_TieEven>,
@@ -650,19 +818,16 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         static const auto lut = Common::GenerateLookupTableFromList(
                 []<typename I>(I) {
-                    using FPT = u16;
+                    using FPT = mcl::unsigned_integer_of_size<fsize>;  // WORKAROUND: For issue 678 on MSVC
                     return std::pair{
                             mp::lower_to_tuple_v<I>,
                             Common::FptrCast(
-                                    [](VectorArray<FPT> &output, const VectorArray<FPT> &input, FP::FPCR fpcr,
-                                       FP::FPSR &fpsr) {
+                                    [](VectorArray<FPT>& output, const VectorArray<FPT>& input, FP::FPCR fpcr, FP::FPSR& fpsr) {
                                         constexpr FP::RoundingMode rounding_mode = mp::get<0, I>::value;
                                         constexpr bool exact = mp::get<1, I>::value;
 
                                         for (size_t i = 0; i < output.size(); ++i) {
-                                            output[i] = static_cast<FPT>(FP::FPRoundInt<FPT>(input[i], fpcr,
-                                                                                             rounding_mode, exact,
-                                                                                             fpsr));
+                                            output[i] = static_cast<FPT>(FP::FPRoundInt<FPT>(input[i], fpcr, rounding_mode, exact, fpsr));
                                         }
                                     })};
                 },
@@ -673,128 +838,241 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
+    EmitIR<IR::Opcode::FPVectorRoundInt16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        EmitFPVectorRoundInt<16>(code, ctx, inst);
+
+    }
+
+    template<>
+    void
     EmitIR<IR::Opcode::FPVectorRoundInt32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
-        const bool exact = inst->GetArg(2).GetU1();
-        const bool fpcr_controlled = inst->GetArg(3).GetU1();
+        EmitFPVectorRoundInt<32>(code, ctx, inst);
 
-        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        auto Qresult = ctx.reg_alloc.WriteQ(inst);
-        auto Qoperand = ctx.reg_alloc.ReadQ(args[0]);
-        RegAlloc::Realize(Qresult, Qoperand);
-        ctx.fpsr.Load();
-
-        MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
-            if (exact) {
-                ASSERT(ctx.FPCR().RMode() == rounding_mode);
-                code.FRINTX(Qresult->S4(), Qoperand->S4());
-            } else {
-                switch (rounding_mode) {
-                    case FP::RoundingMode::ToNearest_TieEven:
-                        code.FRINTN(Qresult->S4(), Qoperand->S4());
-                        break;
-                    case FP::RoundingMode::TowardsPlusInfinity:
-                        code.FRINTP(Qresult->S4(), Qoperand->S4());
-                        break;
-                    case FP::RoundingMode::TowardsMinusInfinity:
-                        code.FRINTM(Qresult->S4(), Qoperand->S4());
-                        break;
-                    case FP::RoundingMode::TowardsZero:
-                        code.FRINTZ(Qresult->S4(), Qoperand->S4());
-                        break;
-                    case FP::RoundingMode::ToNearest_TieAwayFromZero:
-                        code.FRINTA(Qresult->S4(), Qoperand->S4());
-                        break;
-                    default:
-                        ASSERT_FALSE("Invalid RoundingMode");
-                }
-            }
-        });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::FPVectorRoundInt64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
-        const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
-        const bool exact = inst->GetArg(2).GetU1();
-        const bool fpcr_controlled = inst->GetArg(3).GetU1();
+//        const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
+//        const bool exact = inst->GetArg(2).GetU1();
+//        const bool fpcr_controlled = inst->GetArg(3).GetU1();
+//
+//        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+//        auto Qresult = ctx.reg_alloc.WriteQ(inst);
+//        auto Qoperand = ctx.reg_alloc.ReadQ(args[0]);
+//        RegAlloc::Realize(Qresult, Qoperand);
+//        ctx.fpsr.Load();
 
-        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        auto Qresult = ctx.reg_alloc.WriteQ(inst);
-        auto Qoperand = ctx.reg_alloc.ReadQ(args[0]);
-        RegAlloc::Realize(Qresult, Qoperand);
-        ctx.fpsr.Load();
+        EmitFPVectorRoundInt<64>(code, ctx, inst);
 
-        MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
-            if (exact) {
-                ASSERT(ctx.FPCR().RMode() == rounding_mode);
-                code.FRINTX(Qresult->D2(), Qoperand->D2());
-            } else {
-                switch (rounding_mode) {
-                    case FP::RoundingMode::ToNearest_TieEven:
-                        code.FRINTN(Qresult->D2(), Qoperand->D2());
-                        break;
-                    case FP::RoundingMode::TowardsPlusInfinity:
-                        code.FRINTP(Qresult->D2(), Qoperand->D2());
-                        break;
-                    case FP::RoundingMode::TowardsMinusInfinity:
-                        code.FRINTM(Qresult->D2(), Qoperand->D2());
-                        break;
-                    case FP::RoundingMode::TowardsZero:
-                        code.FRINTZ(Qresult->D2(), Qoperand->D2());
-                        break;
-                    case FP::RoundingMode::ToNearest_TieAwayFromZero:
-                        code.FRINTA(Qresult->D2(), Qoperand->D2());
-                        break;
-                    default:
-                        ASSERT_FALSE("Invalid RoundingMode");
-                }
+    }
+
+    template<size_t fsize>
+    static void EmitRSqrtEstimate(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+
+        const auto fallback_fn = [](VectorArray<FPT>& result, const VectorArray<FPT>& operand, FP::FPCR fpcr, FP::FPSR& fpsr) {
+            for (size_t i = 0; i < result.size(); i++) {
+                result[i] = FP::FPRSqrtEstimate<FPT>(operand[i], fpcr, fpsr);
             }
-        });
+        };
+
+        if constexpr (fsize != 16) {
+            if (ctx.HasOptimization(OptimizationFlag::Unsafe_ReducedErrorFP)) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+                const Xbyak::Xmm operand = ctx.reg_alloc.UseXmm(args[0]);
+                const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+
+                if (code.HasHostFeature(HostFeature::AVX512_OrthoFloat)) {
+                    FCODE(vrsqrt14p)(result, operand);
+                } else {
+                    if constexpr (fsize == 32) {
+                        code.rsqrtps(result, operand);
+                    } else {
+                        code.cvtpd2ps(result, operand);
+                        code.rsqrtps(result, result);
+                        code.cvtps2pd(result, result);
+                    }
+                }
+
+                ctx.reg_alloc.DefineValue(inst, result);
+                return;
+            }
+
+            if (code.HasHostFeature(HostFeature::AVX)) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+                const bool fpcr_controlled = args[1].GetImmediateU1();
+
+                const Xbyak::Xmm operand = ctx.reg_alloc.UseXmm(args[0]);
+                const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+                const Xbyak::Xmm value = ctx.reg_alloc.ScratchXmm();
+
+                SharedLabel bad_values = GenSharedLabel(), end = GenSharedLabel();
+
+                code.movaps(value, operand);
+
+                code.movaps(xmm0, GetVectorOf<fsize, (fsize == 32 ? 0xFFFF8000 : 0xFFFF'F000'0000'0000)>(code));
+                code.pand(value, xmm0);
+                code.por(value, GetVectorOf<fsize, (fsize == 32 ? 0x00008000 : 0x0000'1000'0000'0000)>(code));
+
+                // Detect NaNs, negatives, zeros, denormals and infinities
+                FCODE(vcmpnge_uqp)(result, value, GetVectorOf<fsize, (FPT(1) << FP::FPInfo<FPT>::explicit_mantissa_width)>(code));
+                code.vptest(result, result);
+                code.jnz(*bad_values, code.T_NEAR);
+
+                FCODE(sqrtp)(value, value);
+                code.vmovaps(result, GetVectorOf<fsize, FP::FPValue<FPT, false, 0, 1>()>(code));
+                FCODE(divp)(result, value);
+
+                ICODE(padd)(result, GetVectorOf<fsize, (fsize == 32 ? 0x00004000 : 0x0000'0800'0000'0000)>(code));
+                code.pand(result, xmm0);
+
+                code.L(*end);
+
+                ctx.deferred_emits.emplace_back([=, &code, &ctx] {
+                    code.L(*bad_values);
+                    code.sub(rsp, 8);
+                    ABI_PushCallerSaveRegistersAndAdjustStackExcept(code, HostLocXmmIdx(result.getIdx()));
+                    EmitTwoOpFallbackWithoutRegAlloc(code, ctx, result, operand, fallback_fn, fpcr_controlled);
+                    ABI_PopCallerSaveRegistersAndAdjustStackExcept(code, HostLocXmmIdx(result.getIdx()));
+                    code.add(rsp, 8);
+                    code.jmp(*end, code.T_NEAR);
+                });
+
+                ctx.reg_alloc.DefineValue(inst, result);
+                return;
+            }
+        }
+
+        EmitTwoOpFallback(code, ctx, inst, fallback_fn);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRSqrtEstimate16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitRSqrtEstimate<16>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRSqrtEstimate32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitTwoOpArranged<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.FRSQRTE(Vresult, Voperand); });
+        EmitRSqrtEstimate<32>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRSqrtEstimate64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitTwoOpArranged<64>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.FRSQRTE(Vresult, Voperand); });
+        EmitRSqrtEstimate<64>(code, ctx, inst);
+    }
+
+    template<size_t fsize>
+    static void EmitRSqrtStepFused(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+
+        const auto fallback_fn = [](VectorArray<FPT>& result, const VectorArray<FPT>& op1, const VectorArray<FPT>& op2, FP::FPCR fpcr, FP::FPSR& fpsr) {
+            for (size_t i = 0; i < result.size(); i++) {
+                result[i] = FP::FPRSqrtStepFused<FPT>(op1[i], op2[i], fpcr, fpsr);
+            }
+        };
+
+        if constexpr (fsize != 16) {
+            if (code.HasHostFeature(HostFeature::FMA | HostFeature::AVX) && ctx.HasOptimization(OptimizationFlag::Unsafe_InaccurateNaN)) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+                const bool fpcr_controlled = args[2].GetImmediateU1();
+
+                const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+                const Xbyak::Xmm operand1 = ctx.reg_alloc.UseXmm(args[0]);
+                const Xbyak::Xmm operand2 = ctx.reg_alloc.UseXmm(args[1]);
+
+                MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
+                    code.vmovaps(result, GetVectorOf<fsize, false, 0, 3>(code));
+                    FCODE(vfnmadd231p)(result, operand1, operand2);
+                    FCODE(vmulp)(result, result, GetVectorOf<fsize, false, -1, 1>(code));
+                });
+
+                ctx.reg_alloc.DefineValue(inst, result);
+                return;
+            }
+
+            if (code.HasHostFeature(HostFeature::FMA | HostFeature::AVX)) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+                const bool fpcr_controlled = args[2].GetImmediateU1();
+
+                const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+                const Xbyak::Xmm operand1 = ctx.reg_alloc.UseXmm(args[0]);
+                const Xbyak::Xmm operand2 = ctx.reg_alloc.UseXmm(args[1]);
+                const Xbyak::Xmm tmp = ctx.reg_alloc.ScratchXmm();
+                const Xbyak::Xmm mask = ctx.reg_alloc.ScratchXmm();
+
+                SharedLabel end = GenSharedLabel(), fallback = GenSharedLabel();
+
+                MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
+                    code.vmovaps(result, GetVectorOf<fsize, false, 0, 3>(code));
+                    FCODE(vfnmadd231p)(result, operand1, operand2);
+
+                    // An explanation for this is given in EmitFPRSqrtStepFused.
+                    code.vmovaps(mask, GetVectorOf<fsize, (fsize == 32 ? 0x7f000000 : 0x7fe0000000000000)>(code));
+                    FCODE(vandp)(tmp, result, mask);
+                    ICODE(vpcmpeq)(tmp, tmp, mask);
+                    code.ptest(tmp, tmp);
+                    code.jnz(*fallback, code.T_NEAR);
+
+                    FCODE(vmulp)(result, result, GetVectorOf<fsize, false, -1, 1>(code));
+                    code.L(*end);
+                });
+
+                ctx.deferred_emits.emplace_back([=, &code, &ctx] {
+                    code.L(*fallback);
+                    code.sub(rsp, 8);
+                    ABI_PushCallerSaveRegistersAndAdjustStackExcept(code, HostLocXmmIdx(result.getIdx()));
+                    EmitThreeOpFallbackWithoutRegAlloc(code, ctx, result, operand1, operand2, fallback_fn, fpcr_controlled);
+                    ABI_PopCallerSaveRegistersAndAdjustStackExcept(code, HostLocXmmIdx(result.getIdx()));
+                    code.add(rsp, 8);
+                    code.jmp(*end, code.T_NEAR);
+                });
+
+                ctx.reg_alloc.DefineValue(inst, result);
+                return;
+            }
+
+            if (ctx.HasOptimization(OptimizationFlag::Unsafe_UnfuseFMA)) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+                const Xbyak::Xmm operand1 = ctx.reg_alloc.UseScratchXmm(args[0]);
+                const Xbyak::Xmm operand2 = ctx.reg_alloc.UseXmm(args[1]);
+                const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
+
+                code.movaps(result, GetVectorOf<fsize, false, 0, 3>(code));
+                FCODE(mulp)(operand1, operand2);
+                FCODE(subp)(result, operand1);
+                FCODE(mulp)(result, GetVectorOf<fsize, false, -1, 1>(code));
+
+                ctx.reg_alloc.DefineValue(inst, result);
+                return;
+            }
+        }
+
+        EmitThreeOpFallback(code, ctx, inst, fallback_fn);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRSqrtStepFused16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitRSqrtStepFused<16>(code, ctx, inst);
+
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRSqrtStepFused32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
-        EmitThreeOpArranged<32>(code, ctx, inst,
-                                [&](auto Vresult, auto Va, auto Vb) { code.FRSQRTS(Vresult, Va, Vb); });
+        EmitRSqrtStepFused<32>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorRSqrtStepFused64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
-        EmitThreeOpArranged<64>(code, ctx, inst,
-                                [&](auto Vresult, auto Va, auto Vb) { code.FRSQRTS(Vresult, Va, Vb); });
+        EmitRSqrtStepFused<64>(code, ctx, inst);
+
     }
 
     template<>
@@ -825,56 +1103,235 @@ namespace Dynarmic::Backend::LoongArch64 {
         ASSERT(rounding_mode == FP::RoundingMode::ToNearest_TieEven);
         const bool fpcr_controlled = args[2].GetImmediateU1();
 
-        auto Dresult = ctx.reg_alloc.WriteD(inst);
-        auto Qoperand = ctx.reg_alloc.ReadQ(args[0]);
-        RegAlloc::Realize(Dresult, Qoperand);
-        ctx.fpsr.Load();
+//        const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
+//        const bool fpcr_controlled = inst->GetArg(2).GetU1();
 
-        MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
-            code.FCVTN(Dresult->H4(), Qoperand->S4());
-        });
+        if (code.HasHostFeature(HostFeature::F16C) && !ctx.FPCR().AHP() && !ctx.FPCR().FZ16()) {
+            auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+            const auto round_imm = ConvertRoundingModeToX64Immediate(rounding_mode);
+
+            const Xbyak::Xmm result = ctx.reg_alloc.UseScratchXmm(args[0]);
+
+            ForceToDefaultNaN<32>(code, ctx.FPCR(fpcr_controlled), result);
+            code.vcvtps2ph(result, result, static_cast<u8>(*round_imm));
+
+            ctx.reg_alloc.DefineValue(inst, result);
+            return;
+        }
+
+        using rounding_list = mp::list<
+                mp::lift_value<FP::RoundingMode::ToNearest_TieEven>,
+                mp::lift_value<FP::RoundingMode::TowardsPlusInfinity>,
+                mp::lift_value<FP::RoundingMode::TowardsMinusInfinity>,
+                mp::lift_value<FP::RoundingMode::TowardsZero>,
+                mp::lift_value<FP::RoundingMode::ToNearest_TieAwayFromZero>>;
+
+        static const auto lut = Common::GenerateLookupTableFromList(
+                []<typename I>(I) {
+                    return std::pair{
+                            mp::lower_to_tuple_v<I>,
+                            Common::FptrCast(
+                                    [](VectorArray<u16>& output, const VectorArray<u32>& input, FP::FPCR fpcr, FP::FPSR& fpsr) {
+                                        constexpr FP::RoundingMode rounding_mode = mp::get<0, I>::value;
+
+                                        for (size_t i = 0; i < output.size(); ++i) {
+                                            if (i < input.size()) {
+                                                output[i] = FP::FPConvert<u16, u32>(input[i], fpcr, rounding_mode, fpsr);
+                                            } else {
+                                                output[i] = 0;
+                                            }
+                                        }
+                                    })};
+                },
+                mp::cartesian_product<rounding_list>{});
+
+        EmitTwoOpFallback<2>(code, ctx, inst, lut.at(std::make_tuple(rounding_mode)));
+    }
+
+
+    template<size_t fsize, bool unsigned_>
+    void EmitFPVectorToFixed(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+        const size_t fbits = inst->GetArg(1).GetU8();
+        const auto rounding = static_cast<FP::RoundingMode>(inst->GetArg(2).GetU8());
+        [[maybe_unused]] const bool fpcr_controlled = inst->GetArg(3).GetU1();
+
+        if constexpr (fsize != 16) {
+            if (code.HasHostFeature(HostFeature::SSE41) && rounding != FP::RoundingMode::ToNearest_TieAwayFromZero) {
+                auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+                const Xbyak::Xmm src = ctx.reg_alloc.UseScratchXmm(args[0]);
+
+                MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
+                    const int round_imm = [&] {
+                        switch (rounding) {
+                            case FP::RoundingMode::ToNearest_TieEven:
+                            default:
+                                return 0b00;
+                            case FP::RoundingMode::TowardsPlusInfinity:
+                                return 0b10;
+                            case FP::RoundingMode::TowardsMinusInfinity:
+                                return 0b01;
+                            case FP::RoundingMode::TowardsZero:
+                                return 0b11;
+                        }
+                    }();
+
+                    const auto perform_conversion = [&code, &ctx](const Xbyak::Xmm& src) {
+                        // MSVC doesn't allow us to use a [&] capture, so we have to do this instead.
+                        (void)ctx;
+
+                        if constexpr (fsize == 32) {
+                            code.cvttps2dq(src, src);
+                        } else {
+                            if (code.HasHostFeature(HostFeature::AVX512_OrthoFloat)) {
+                                code.vcvttpd2qq(src, src);
+                            } else {
+                                const Xbyak::Reg64 hi = ctx.reg_alloc.ScratchGpr();
+                                const Xbyak::Reg64 lo = ctx.reg_alloc.ScratchGpr();
+
+                                code.cvttsd2si(lo, src);
+                                code.punpckhqdq(src, src);
+                                code.cvttsd2si(hi, src);
+                                code.movq(src, lo);
+                                code.pinsrq(src, hi, 1);
+
+                                ctx.reg_alloc.Release(hi);
+                                ctx.reg_alloc.Release(lo);
+                            }
+                        }
+                    };
+
+                    if (fbits != 0) {
+                        const u64 scale_factor = fsize == 32
+                                                 ? static_cast<u64>(fbits + 127) << 23
+                                                 : static_cast<u64>(fbits + 1023) << 52;
+                        FCODE(mulp)(src, GetVectorOf<fsize>(code, scale_factor));
+                    }
+
+                    FCODE(roundp)(src, src, static_cast<u8>(round_imm));
+                    ZeroIfNaN<fsize>(code, src);
+
+                    constexpr u64 float_upper_limit_signed = fsize == 32 ? 0x4f000000 : 0x43e0000000000000;
+                    [[maybe_unused]] constexpr u64 float_upper_limit_unsigned = fsize == 32 ? 0x4f800000 : 0x43f0000000000000;
+
+                    if constexpr (unsigned_) {
+                        if (code.HasHostFeature(HostFeature::AVX512_OrthoFloat)) {
+                            // Mask positive values
+                            code.xorps(xmm0, xmm0);
+                            FCODE(vcmpp)(k1, src, xmm0, Cmp::GreaterEqual_OQ);
+
+                            // Convert positive values to unsigned integers, write 0 anywhere else
+                            // vcvttp*2u*q already saturates out-of-range values to (0xFFFF...)
+                            if constexpr (fsize == 32) {
+                                code.vcvttps2udq(src | k1 | T_z, src);
+                            } else {
+                                code.vcvttpd2uqq(src | k1 | T_z, src);
+                            }
+                        } else {
+                            // Zero is minimum
+                            code.xorps(xmm0, xmm0);
+                            FCODE(cmplep)(xmm0, src);
+                            FCODE(andp)(src, xmm0);
+
+                            // Will we exceed unsigned range?
+                            const Xbyak::Xmm exceed_unsigned = ctx.reg_alloc.ScratchXmm();
+                            code.movaps(exceed_unsigned, GetVectorOf<fsize, float_upper_limit_unsigned>(code));
+                            FCODE(cmplep)(exceed_unsigned, src);
+
+                            // Will be exceed signed range?
+                            const Xbyak::Xmm tmp = ctx.reg_alloc.ScratchXmm();
+                            code.movaps(tmp, GetVectorOf<fsize, float_upper_limit_signed>(code));
+                            code.movaps(xmm0, tmp);
+                            FCODE(cmplep)(xmm0, src);
+                            FCODE(andp)(tmp, xmm0);
+                            FCODE(subp)(src, tmp);
+                            perform_conversion(src);
+                            ICODE(psll)(xmm0, static_cast<u8>(fsize - 1));
+                            FCODE(orp)(src, xmm0);
+
+                            // Saturate to max
+                            FCODE(orp)(src, exceed_unsigned);
+                        }
+                    } else {
+                        using FPT = mcl::unsigned_integer_of_size<fsize>;  // WORKAROUND: For issue 678 on MSVC
+                        constexpr u64 integer_max = static_cast<FPT>(std::numeric_limits<std::conditional_t<unsigned_, FPT, std::make_signed_t<FPT>>>::max());
+
+                        code.movaps(xmm0, GetVectorOf<fsize, float_upper_limit_signed>(code));
+                        FCODE(cmplep)(xmm0, src);
+                        perform_conversion(src);
+                        FCODE(blendvp)(src, GetVectorOf<fsize, integer_max>(code));
+                    }
+                });
+
+                ctx.reg_alloc.DefineValue(inst, src);
+                return;
+            }
+        }
+
+        using fbits_list = mp::lift_sequence<std::make_index_sequence<fsize + 1>>;
+        using rounding_list = mp::list<
+                mp::lift_value<FP::RoundingMode::ToNearest_TieEven>,
+                mp::lift_value<FP::RoundingMode::TowardsPlusInfinity>,
+                mp::lift_value<FP::RoundingMode::TowardsMinusInfinity>,
+                mp::lift_value<FP::RoundingMode::TowardsZero>,
+                mp::lift_value<FP::RoundingMode::ToNearest_TieAwayFromZero>>;
+
+        static const auto lut = Common::GenerateLookupTableFromList(
+                []<typename I>(I) {
+                    using FPT = mcl::unsigned_integer_of_size<fsize>;  // WORKAROUND: For issue 678 on MSVC
+                    return std::pair{
+                            mp::lower_to_tuple_v<I>,
+                            Common::FptrCast(
+                                    [](VectorArray<FPT>& output, const VectorArray<FPT>& input, FP::FPCR fpcr, FP::FPSR& fpsr) {
+                                        constexpr size_t fbits = mp::get<0, I>::value;
+                                        constexpr FP::RoundingMode rounding_mode = mp::get<1, I>::value;
+
+                                        for (size_t i = 0; i < output.size(); ++i) {
+                                            output[i] = static_cast<FPT>(FP::FPToFixed<FPT>(fsize, input[i], fbits, unsigned_, fpcr, rounding_mode, fpsr));
+                                        }
+                                    })};
+                },
+                mp::cartesian_product<fbits_list, rounding_list>{});
+
+        EmitTwoOpFallback<3>(code, ctx, inst, lut.at(std::make_tuple(fbits, rounding)));
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorToSignedFixed16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+//        EmitFPVectorToFixed<16, false>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorToSignedFixed32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitToFixed<32, true>(code, ctx, inst);
+        EmitFPVectorToFixed<32, false>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorToSignedFixed64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                      IR::Inst *inst) {
-        EmitToFixed<64, true>(code, ctx, inst);
+        EmitFPVectorToFixed<64, false>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorToUnsignedFixed16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+//        EmitFPVectorToFixed<16, true>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorToUnsignedFixed32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
-        EmitToFixed<32, false>(code, ctx, inst);
+        EmitFPVectorToFixed<32, true>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorToUnsignedFixed64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
-        EmitToFixed<64, false>(code, ctx, inst);
+//        EmitToFixed<64, false>(code, ctx, inst);
+        EmitFPVectorToFixed<64, true>(code, ctx, inst);
+
     }
 
 }  // namespace Dynarmic::Backend::LoongArch64
