@@ -148,8 +148,10 @@ void EmitIR<IR::Opcode::GetCFlagFromNZCV>(BlockOfCode& code, EmitContext& ctx, I
     auto Wc = ctx.reg_alloc.WriteW(inst);
     auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wc, Wnzcv);
-
-    code.andi(Wc, Wnzcv, 1 << 29);
+    code.srli_w(Wnzcv, Wnzcv, NZCV::arm_c_flag_sft);
+    code.xor_(Wc, Wc, Wc);
+    code.add_imm(Xscratch0, code.zero, NZCV::arm_c_flag_sft, Xscratch1);
+    code.bstrins_d(Wc, Xscratch0, NZCV::arm_c_flag_sft, NZCV::arm_c_flag_sft);
 }
 
 template<>

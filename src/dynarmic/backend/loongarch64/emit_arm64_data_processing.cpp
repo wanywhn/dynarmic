@@ -1034,7 +1034,9 @@ namespace Dynarmic::Backend::LoongArch64 {
                 code.addi_d(carry, code.zero, 1);
             }
         } else {
-            code.add_d(carry, code.zero, ctx.reg_alloc.ReadReg<bitsize>(args[2]));
+            auto op2=ctx.reg_alloc.ReadReg<bitsize>(args[2]);
+            RegAlloc::Realize(op2);
+            code.add_d(carry, code.zero, op2);
         }
 
 
@@ -1090,15 +1092,17 @@ namespace Dynarmic::Backend::LoongArch64 {
                 code.addi_d(carry, code.zero, 1);
             }
         } else {
-            code.add_d(carry, code.zero, ctx.reg_alloc.ReadReg<bitsize>(args[2]));
+            auto _carry = ctx.reg_alloc.ReadReg<bitsize>(args[2]);
+            RegAlloc::Realize(_carry);
+            code.add_d(carry, code.zero, _carry);
         }
-
 
         if (args[1].IsImmediate() && bitsize == 32) {
             const u32 op_arg = args[1].GetImmediateU32();
             code.add_imm(Wscratch2, code.zero, op_arg, Wscratch1);
         } else {
             auto op1 = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
+            RegAlloc::Realize(op1);
             code.add_d(Wscratch2, code.zero, op1);
         }
         code.add_d(Wscratch2, Wscratch2, carry);
@@ -1122,7 +1126,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         if (nzcv_inst) {
             auto Wflags = ctx.reg_alloc.WriteFlags(nzcv_inst);
             // TODO how to impl?
-            RegAlloc::Realize(Rresult, Ra, Wflags);
+            RegAlloc::Realize(Wflags);
         }
 
     }

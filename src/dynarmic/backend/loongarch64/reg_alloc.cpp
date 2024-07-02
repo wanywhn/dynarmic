@@ -270,6 +270,7 @@ void RegAlloc::EmitVerboseDebuggingOutput() {
 
 template<HostLoc::Kind kind>
 unsigned int RegAlloc::GenerateImmediate(const IR::Value& value) {
+    //FIXME this could delete
     ASSERT(value.GetType() != IR::Type::U1);
     if constexpr (kind == HostLoc::Kind::Gpr) {
         const unsigned int new_location_index = AllocateRegister(gprs, gpr_order);
@@ -378,8 +379,8 @@ unsigned int RegAlloc::RealizeReadImpl(const IR::Value& value) {
 template<HostLoc::Kind kind>
 unsigned int RegAlloc::RealizeWriteImpl(const IR::Inst* value) {
     defined_insts.emplace(value);
-
-    ASSERT(!ValueLocation(value));
+    auto op = value->GetType();
+    ASSERT_MSG(!ValueLocation(value), Dynarmic::IR::GetNameOf((IR::Type)op) + " " + std::to_string( value->GetName()) + "\r\n");
 
     if constexpr (kind == HostLoc::Kind::Gpr) {
         const int new_location_index = AllocateRegister(gprs, gpr_order);
