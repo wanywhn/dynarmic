@@ -16,40 +16,37 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 using namespace Xbyak_loongarch64::util;
 
-void EmitVerboseDebuggingOutput(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx) {
+void EmitVerboseDebuggingOutput(BlockOfCode& code, EmitContext& ctx) {
     code.sub_imm(code.sp, code.sp, sizeof(RegisterData), code.t0);
-    for (int i = 0; i < 30; i++) {
-        if (i == 18) {
+    for (unsigned int i = 2; i < 32; i++) {
+        if (i == 21) {
             continue;  // Platform register
         }
         code.st_d(Xbyak_loongarch64::XReg{i}, code.sp, offsetof(RegisterData, x) + i * sizeof(u64));
     }
-    for (int i = 0; i < 32; i++) {
-        code.st_d(Xbyak_loongarch64::VReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
+    for (unsigned int i = 0; i < 32; i++) {
+        code.vst(Xbyak_loongarch64::VReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
     }
-    code.MRS(code.a0, Xbyak_loongarch64::SystemReg::NZCV);
-    code.st_d(code.a0, code.sp, offsetof(RegisterData, nzcv));
-    code.add_imm(code.a0, code.sp, sizeof(RegisterData) + offsetof(StackLayout, spill), t0);
-    code.st_d(code.a0, code.sp, offsetof(RegisterData, spill));
-    code.MRS(code.a0, Xbyak_loongarch64::SystemReg::FPSR);
-    code.st_d(code.a0, code.sp, offsetof(RegisterData, fpsr));
+
+    code.add_imm(Xscratch0, code.sp, sizeof(RegisterData) + offsetof(StackLayout, spill), Xscratch0);
+    code.st_d(Xscratch0, code.sp, offsetof(RegisterData, spill));
+    code.movfcsr2gr(Xscratch0, code.fcsr0);
+    code.st_d(Xscratch0, code.sp, offsetof(RegisterData, fpsr));
 
     ctx.reg_alloc.EmitVerboseDebuggingOutput();
 
-    code.ld_d(code.a0, code.sp, offsetof(RegisterData, fpsr));
-    code.MSR(Xbyak_loongarch64::SystemReg::FPSR, code.a0);
-    code.ld_d(code.a0, code.sp, offsetof(RegisterData, nzcv));
-    code.MSR(Xbyak_loongarch64::SystemReg::NZCV, code.a0);
-    for (int i = 0; i < 32; i++) {
-        code.ld_d(Xbyak_loongarch64::VReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
+    code.ld_d(Xscratch0, code.sp, offsetof(RegisterData, fpsr));
+    code.movgr2fcsr(Xscratch0, code.fcsr0);
+    for (unsigned int i = 0; i < 32; i++) {
+        code.vld(Xbyak_loongarch64::VReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
     }
-    for (int i = 0; i < 30; i++) {
+    for (unsigned int i = 0; i < 30; i++) {
         if (i == 18) {
             continue;  // Platform register
         }
         code.ld_d(Xbyak_loongarch64::XReg{i}, code.sp, offsetof(RegisterData, x) + i * sizeof(u64));
     }
-    code.add_imm(code.sp, code.sp, sizeof(RegisterData), t0);
+    code.add_imm(code.sp, code.sp, sizeof(RegisterData), Xscratch0);
 }
 
 void PrintVerboseDebuggingOutputLine(RegisterData& reg_data, HostLocType reg_type, size_t reg_index, size_t inst_index, IR::Type inst_type) {

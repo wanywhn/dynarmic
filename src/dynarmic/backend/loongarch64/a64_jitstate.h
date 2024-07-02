@@ -84,6 +84,6 @@ struct A64JitState {
 #    pragma warning(pop)
 #endif
 
-using CodePtr = const void*;
+//using CodePtr = const void*;
 
 }  // namespace Dynarmic::Backend::X64

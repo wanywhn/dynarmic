@@ -25,7 +25,7 @@ struct Jit::Impl final {
     Impl(Jit* jit_interface, A32::UserConfig conf)
             : jit_interface(jit_interface)
             , conf(conf)
-            , current_address_space(conf)
+            , current_address_space(conf, JitStateInfo{current_state})
             , core(conf) {}
 
     HaltReason Run() {

@@ -8,6 +8,7 @@
 #include <mcl/stdint.hpp>
 
 #include "xbyak_loongarch64.h"
+#include "block_of_code.h"
 
 namespace oaknut {
 struct PointerCodeGeneratorPolicy;
@@ -20,14 +21,14 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 class FpsrManager {
 public:
-    explicit FpsrManager(Xbyak_loongarch64::CodeGenerator& code, size_t state_fpsr_offset);
+    explicit FpsrManager(BlockOfCode& code, size_t state_fpsr_offset);
 
     void Spill();
     void Load();
     void Overwrite() { fpsr_loaded = false; }
 
 private:
-    Xbyak_loongarch64::CodeGenerator& code;
+    BlockOfCode& code;
     size_t state_fpsr_offset;
     bool fpsr_loaded = false;
 };

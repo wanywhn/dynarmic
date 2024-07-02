@@ -5,75 +5,33 @@
 
 #include "dynarmic/backend/loongarch64/block_of_code.h"
 
-#ifdef _WIN32
-#    define WIN32_LEAN_AND_MEAN
-#    include <windows.h>
-#else
-#    include <sys/mman.h>
-#endif
+
+#include <sys/mman.h>
+
 
 #include <array>
 #include <cstring>
 
 #include <mcl/assert.hpp>
-#include <mcl/bit/bit_field.hpp>
 
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
 #include "dynarmic/backend/loongarch64/abi.h"
-#include "dynarmic/backend/loongarch64/hostloc.h"
-#include "dynarmic/backend/loongarch64/perf_map.h"
+
 #include "dynarmic/backend/loongarch64/stack_layout.h"
 #include "xbyak_loongarch64.h"
 #include "xbyak_loongarch64_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
-#ifdef _WIN32
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_RETURN = HostLocToReg64(Dynarmic::Backend::X64::ABI_RETURN);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM1 = HostLocToReg64(Dynarmic::Backend::X64::ABI_PARAM1);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM2 = HostLocToReg64(Dynarmic::Backend::X64::ABI_PARAM2);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM3 = HostLocToReg64(Dynarmic::Backend::X64::ABI_PARAM3);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM4 = HostLocToReg64(Dynarmic::Backend::X64::ABI_PARAM4);
-const std::array<Xbyak_loongarch64::Reg64, ABI_PARAM_COUNT> BlockOfCode::ABI_PARAMS = {BlockOfCode::ABI_PARAM1, BlockOfCode::ABI_PARAM2, BlockOfCode::ABI_PARAM3, BlockOfCode::ABI_PARAM4};
-#else
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_RETURN = HostLocToReg64(Dynarmic::Backend::LoongArch64::ABI_RETURN);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_RETURN2 = HostLocToReg64(Dynarmic::Backend::LoongArch64::ABI_RETURN2);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM1 = HostLocToReg64(Dynarmic::Backend::LoongArch64::ABI_PARAM1);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM2 = HostLocToReg64(Dynarmic::Backend::LoongArch64::ABI_PARAM2);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM3 = HostLocToReg64(Dynarmic::Backend::LoongArch64::ABI_PARAM3);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM4 = HostLocToReg64(Dynarmic::Backend::LoongArch64::ABI_PARAM4);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM5 = HostLocToReg64(Dynarmic::Backend::LoongArch64::ABI_PARAM5);
-const Xbyak_loongarch64::Reg64 BlockOfCode::ABI_PARAM6 = HostLocToReg64(Dynarmic::Backend::LoongArch64::ABI_PARAM6);
-const std::array<Xbyak_loongarch64::Reg64, ABI_PARAM_COUNT> BlockOfCode::ABI_PARAMS = {BlockOfCode::ABI_PARAM1, BlockOfCode::ABI_PARAM2, BlockOfCode::ABI_PARAM3, BlockOfCode::ABI_PARAM4, BlockOfCode::ABI_PARAM5, BlockOfCode::ABI_PARAM6};
-#endif
-
 namespace {
-
-constexpr size_t CONSTANT_POOL_SIZE = 2 * 1024 * 1024;
-constexpr size_t PRELUDE_COMMIT_SIZE = 16 * 1024 * 1024;
 
 class CustomXbyakAllocator : public Xbyak_loongarch64::Allocator {
 public:
-#ifdef _WIN32
-    uint8_t* alloc(size_t size) override {
-        void* p = VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_READWRITE);
-        if (p == nullptr) {
-            throw Xbyak_loongarch64::Error(Xbyak_loongarch64::ERR_CANT_ALLOC);
-        }
-        return static_cast<uint8_t*>(p);
-    }
-
-    void free(uint8_t* p) override {
-        VirtualFree(static_cast<void*>(p), 0, MEM_RELEASE);
-    }
-
-    bool useProtect() const override { return false; }
-#else
     static constexpr size_t DYNARMIC_PAGE_SIZE = 4096;
 
     // Can't subclass Xbyak_loongarch64::MmapAllocator because it is not a pure interface
     // and doesn't expose its construtor
-    uint8_t* alloc(size_t size) override {
+    uint32_t * alloc(size_t size) override {
         // Waste a page to store the size
         size += DYNARMIC_PAGE_SIZE;
 
@@ -93,19 +51,18 @@ public:
             throw Xbyak_loongarch64::Error(Xbyak_loongarch64::ERR_CANT_ALLOC);
         }
         std::memcpy(p, &size, sizeof(size_t));
-        return static_cast<uint8_t*>(p) + DYNARMIC_PAGE_SIZE;
+        return (uint32_t *)((uint8_t *)p + DYNARMIC_PAGE_SIZE);
     }
 
-    void free(uint8_t* p) override {
+    void free(uint32_t *p) override {
         size_t size;
-        std::memcpy(&size, p - DYNARMIC_PAGE_SIZE, sizeof(size_t));
+        std::memcpy(&size, (uint8_t *)p - DYNARMIC_PAGE_SIZE, sizeof(size_t));
         munmap(p - DYNARMIC_PAGE_SIZE, size);
     }
 
 #    ifdef DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT
     bool useProtect() const override { return false; }
 #    endif
-#endif
 };
 
 // This is threadsafe as Xbyak_loongarch64::Allocator does not contain any state; it is a pure interface.
@@ -126,108 +83,16 @@ void ProtectMemory(const void* base, size_t size, bool is_executable) {
 }
 #endif
 
-HostFeature GetHostFeatures() {
-    HostFeature features = {};
-
-#ifdef DYNARMIC_ENABLE_CPU_FEATURE_DETECTION
-    using Cpu = Xbyak_loongarch64::util::Cpu;
-    Xbyak_loongarch64::util::Cpu cpu_info;
-
-    if (cpu_info.has(Cpu::tSSSE3))
-        features |= HostFeature::SSSE3;
-    if (cpu_info.has(Cpu::tSSE41))
-        features |= HostFeature::SSE41;
-    if (cpu_info.has(Cpu::tSSE42))
-        features |= HostFeature::SSE42;
-    if (cpu_info.has(Cpu::tAVX))
-        features |= HostFeature::AVX;
-    if (cpu_info.has(Cpu::tAVX2))
-        features |= HostFeature::AVX2;
-    if (cpu_info.has(Cpu::tAVX512F))
-        features |= HostFeature::AVX512F;
-    if (cpu_info.has(Cpu::tAVX512CD))
-        features |= HostFeature::AVX512CD;
-    if (cpu_info.has(Cpu::tAVX512VL))
-        features |= HostFeature::AVX512VL;
-    if (cpu_info.has(Cpu::tAVX512BW))
-        features |= HostFeature::AVX512BW;
-    if (cpu_info.has(Cpu::tAVX512DQ))
-        features |= HostFeature::AVX512DQ;
-    if (cpu_info.has(Cpu::tAVX512_BITALG))
-        features |= HostFeature::AVX512BITALG;
-    if (cpu_info.has(Cpu::tAVX512VBMI))
-        features |= HostFeature::AVX512VBMI;
-    if (cpu_info.has(Cpu::tPCLMULQDQ))
-        features |= HostFeature::PCLMULQDQ;
-    if (cpu_info.has(Cpu::tF16C))
-        features |= HostFeature::F16C;
-    if (cpu_info.has(Cpu::tFMA))
-        features |= HostFeature::FMA;
-    if (cpu_info.has(Cpu::tAESNI))
-        features |= HostFeature::AES;
-    if (cpu_info.has(Cpu::tSHA))
-        features |= HostFeature::SHA;
-    if (cpu_info.has(Cpu::tPOPCNT))
-        features |= HostFeature::POPCNT;
-    if (cpu_info.has(Cpu::tBMI1))
-        features |= HostFeature::BMI1;
-    if (cpu_info.has(Cpu::tBMI2))
-        features |= HostFeature::BMI2;
-    if (cpu_info.has(Cpu::tLZCNT))
-        features |= HostFeature::LZCNT;
-    if (cpu_info.has(Cpu::tGFNI))
-        features |= HostFeature::GFNI;
-
-    if (cpu_info.has(Cpu::tBMI2)) {
-        // BMI2 instructions such as pdep and pext have been very slow up until Zen 3.
-        // Check for Zen 3 or newer by its family (0x19).
-        // See also: https://en.wikichip.org/wiki/amd/cpuid
-        if (cpu_info.has(Cpu::tAMD)) {
-            std::array<u32, 4> data{};
-            cpu_info.getCpuid(1, data.data());
-            const u32 family_base = mcl::bit::get_bits<8, 11>(data[0]);
-            const u32 family_extended = mcl::bit::get_bits<20, 27>(data[0]);
-            const u32 family = family_base + family_extended;
-            if (family >= 0x19)
-                features |= HostFeature::FastBMI2;
-        } else {
-            features |= HostFeature::FastBMI2;
-        }
-    }
-#endif
-
-    return features;
-}
-
-#ifdef __APPLE__
-bool IsUnderRosetta() {
-    int result = 0;
-    size_t result_size = sizeof(result);
-    if (sysctlbyname("sysctl.proc_translated", &result, &result_size, nullptr, 0) == -1) {
-        if (errno != ENOENT)
-            fmt::print("IsUnderRosetta: Failed to detect Rosetta state, assuming not under Rosetta");
-        return false;
-    }
-    return result != 0;
-}
-#endif
 
 }  // anonymous namespace
 
-BlockOfCode::BlockOfCode(RunCodeCallbacks cb, JitStateInfo jsi, size_t total_code_size, std::function<void(BlockOfCode&)> rcp)
-        : Xbyak_loongarch64::CodeGenerator(total_code_size, nullptr, &s_allocator)
-        , cb(std::move(cb))
-        , jsi(jsi)
-        , constant_pool(*this, CONSTANT_POOL_SIZE)
-        , host_features(GetHostFeatures()) {
-    EnableWriting();
-    EnsureMemoryCommitted(PRELUDE_COMMIT_SIZE);
-    GenRunCode(rcp);
+BlockOfCode::BlockOfCode(size_t total_code_size, JitStateInfo jsi)
+        : Xbyak_loongarch64::CodeGenerator(total_code_size, nullptr, &s_allocator), jsi(jsi) {
 }
 
 void BlockOfCode::PreludeComplete() {
     prelude_complete = true;
-    code_begin = getCurr();
+//    code_begin = (CodePtr) getCurr();
     ClearCache();
     DisableWriting();
 }
@@ -259,7 +124,7 @@ void BlockOfCode::ClearCache() {
 
 size_t BlockOfCode::SpaceRemaining() const {
     ASSERT(prelude_complete);
-    const u8* current_ptr = getCurr<const u8*>();
+    uint32_t * current_ptr = getCurr<uint32_t *>();
     if (current_ptr >= &top_[maxSize_])
         return 0;
     return &top_[maxSize_] - current_ptr;
@@ -286,165 +151,46 @@ HaltReason BlockOfCode::StepCode(void* jit_state, CodePtr code_ptr) const {
     return step_code(jit_state, code_ptr);
 }
 
-void BlockOfCode::ReturnFromRunCode(bool mxcsr_already_exited) {
-    size_t index = 0;
-    if (mxcsr_already_exited)
-        index |= MXCSR_ALREADY_EXITED;
-    jmp(return_from_run_code[index]);
-}
-
-void BlockOfCode::ForceReturnFromRunCode(bool mxcsr_already_exited) {
-    size_t index = FORCE_RETURN;
-    if (mxcsr_already_exited)
-        index |= MXCSR_ALREADY_EXITED;
-    jmp(return_from_run_code[index]);
-}
-
-void BlockOfCode::GenRunCode(std::function<void(BlockOfCode&)> rcp) {
-    Xbyak_loongarch64::Label return_to_caller, return_to_caller_mxcsr_already_exited;
-
-    align();
-    run_code = getCurr<RunCodeFuncType>();
-
-    // This serves two purposes:
-    // 1. It saves all the registers we as a callee need to save.
-    // 2. It aligns the stack so that the code the JIT emits can assume
-    //    that the stack is appropriately aligned for CALLs.
-    ABI_PushCalleeSaveRegistersAndAdjustStack(*this, sizeof(StackLayout));
-
-    mov(r15, ABI_PARAM1);
-    mov(rbx, ABI_PARAM2);  // save temporarily in non-volatile register
-
-    if (cb.enable_cycle_counting) {
-        cb.GetTicksRemaining->EmitCall(*this);
-        mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_to_run)], ABI_RETURN);
-        mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)], ABI_RETURN);
-    }
-
-    rcp(*this);
-
-    cmp(dword[r15 + jsi.offsetof_halt_reason], 0);
-    jne(return_to_caller_mxcsr_already_exited, T_NEAR);
-
-    SwitchMxcsrOnEntry();
-    jmp(rbx);
-
-    align();
-    step_code = getCurr<RunCodeFuncType>();
-
-    ABI_PushCalleeSaveRegistersAndAdjustStack(*this, sizeof(StackLayout));
-
-    mov(r15, ABI_PARAM1);
-
-    if (cb.enable_cycle_counting) {
-        mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_to_run)], 1);
-        mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)], 1);
-    }
-
-    rcp(*this);
-
-    cmp(dword[r15 + jsi.offsetof_halt_reason], 0);
-    jne(return_to_caller_mxcsr_already_exited, T_NEAR);
-    lock();
-    or_(dword[r15 + jsi.offsetof_halt_reason], static_cast<u32>(HaltReason::Step));
-
-    SwitchMxcsrOnEntry();
-    jmp(ABI_PARAM2);
-
-    // Dispatcher loop
-
-    align();
-    return_from_run_code[0] = getCurr<const void*>();
-
-    cmp(dword[r15 + jsi.offsetof_halt_reason], 0);
-    jne(return_to_caller);
-    if (cb.enable_cycle_counting) {
-        cmp(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)], 0);
-        jng(return_to_caller);
-    }
-    cb.LookupBlock->EmitCall(*this);
-    jmp(ABI_RETURN);
-
-    align();
-    return_from_run_code[MXCSR_ALREADY_EXITED] = getCurr<const void*>();
-
-    cmp(dword[r15 + jsi.offsetof_halt_reason], 0);
-    jne(return_to_caller_mxcsr_already_exited);
-    if (cb.enable_cycle_counting) {
-        cmp(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)], 0);
-        jng(return_to_caller_mxcsr_already_exited);
-    }
-    SwitchMxcsrOnEntry();
-    cb.LookupBlock->EmitCall(*this);
-    jmp(ABI_RETURN);
-
-    align();
-    return_from_run_code[FORCE_RETURN] = getCurr<const void*>();
-    L(return_to_caller);
-
-    SwitchMxcsrOnExit();
-    // fallthrough
-
-    return_from_run_code[MXCSR_ALREADY_EXITED | FORCE_RETURN] = getCurr<const void*>();
-    L(return_to_caller_mxcsr_already_exited);
-
-    if (cb.enable_cycle_counting) {
-        cb.AddTicks->EmitCall(*this, [this](RegList param) {
-            mov(param[0], qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_to_run)]);
-            sub(param[0], qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)]);
-        });
-    }
-
-    xor_(eax, eax);
-    lock();
-    xchg(dword[r15 + jsi.offsetof_halt_reason], eax);
-
-    ABI_PopCalleeSaveRegistersAndAdjustStack(*this, sizeof(StackLayout));
-    ret();
-
-    PerfMapRegister(run_code, getCurr(), "dynarmic_dispatcher");
-}
-
 void BlockOfCode::SwitchMxcsrOnEntry() {
-    stmxcsr(dword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, save_host_MXCSR)]);
-    ldmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
+        movfcsr2gr(Wscratch0, fcsr0);
+        st_w(Wscratch0, sp, offsetof(StackLayout, save_host_fpcr));
+        ld_w(Wscratch0, Xstate, jsi.offsetof_guest_FCSR);
+        movgr2fcsr(fcsr0, Wscratch0);
 }
 
 void BlockOfCode::SwitchMxcsrOnExit() {
-    stmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
-    ldmxcsr(dword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, save_host_MXCSR)]);
+    movfcsr2gr(Wscratch0, Wscratch0);
+    st_w(Wscratch0, Xstate, jsi.offsetof_guest_FCSR);
+
+    ld_w(Wscratch0, sp, offsetof(StackLayout, save_host_fpcr));
+    movgr2fcsr(Wscratch0, Wscratch0);
+    // FIXME r15?
+
+//    stmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
 }
 
 void BlockOfCode::EnterStandardASIMD() {
-    stmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
-    ldmxcsr(dword[r15 + jsi.offsetof_asimd_MXCSR]);
+    movfcsr2gr(Wscratch0, Wscratch0);
+    st_w(Wscratch0, Xstate, jsi.offsetof_guest_FCSR);
+
+    ld_w(Wscratch0, Xstate, jsi.offsetof_asimd_MXCSR);
+    movgr2fcsr(Wscratch0, Wscratch0);
+//    stmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
+//    ldmxcsr(dword[r15 + jsi.offsetof_asimd_MXCSR]);
 }
 
 void BlockOfCode::LeaveStandardASIMD() {
-    stmxcsr(dword[r15 + jsi.offsetof_asimd_MXCSR]);
-    ldmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
+    movfcsr2gr(Wscratch0, Wscratch0);
+    st_w(Wscratch0, Xstate, jsi.offsetof_asimd_MXCSR);
+
+    ld_w(Wscratch0, Xstate, jsi.offsetof_guest_FCSR);
+    movgr2fcsr(Wscratch0, Wscratch0);
+//    stmxcsr(dword[r15 + jsi.offsetof_asimd_MXCSR]);
+//    ldmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
 }
 
-void BlockOfCode::UpdateTicks() {
-    if (!cb.enable_cycle_counting) {
-        return;
-    }
 
-    cb.AddTicks->EmitCall(*this, [this](RegList param) {
-        mov(param[0], qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_to_run)]);
-        sub(param[0], qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)]);
-    });
-
-    cb.GetTicksRemaining->EmitCall(*this);
-    mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_to_run)], ABI_RETURN);
-    mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)], ABI_RETURN);
-}
-
-void BlockOfCode::LookupBlock() {
-    cb.LookupBlock->EmitCall(*this);
-}
-
-void BlockOfCode::LoadRequiredFlagsForCondFromRax(IR::Cond cond) {
+    void BlockOfCode::LoadRequiredFlagsForCondFromRax(IR::Cond cond) {
     // sahf restores SF, ZF, CF
     // add al, 0x7F restores OF
 
@@ -455,23 +201,24 @@ void BlockOfCode::LoadRequiredFlagsForCondFromRax(IR::Cond cond) {
     case IR::Cond::CC:  // !c
     case IR::Cond::MI:  // n
     case IR::Cond::PL:  // !n
-        sahf();
+    // FIXME
+//        sahf();
         break;
     case IR::Cond::VS:  // v
     case IR::Cond::VC:  // !v
-        cmp(al, 0x81);
+//        cmp(al, 0x81);
         break;
     case IR::Cond::HI:  // c & !z
     case IR::Cond::LS:  // !c | z
-        sahf();
-        cmc();
+//        sahf();
+//        cmc();
         break;
     case IR::Cond::GE:  // n == v
     case IR::Cond::LT:  // n != v
     case IR::Cond::GT:  // !z & (n == v)
     case IR::Cond::LE:  // z | (n != v)
-        cmp(al, 0x81);
-        sahf();
+//        cmp(al, 0x81);
+//        sahf();
         break;
     case IR::Cond::AL:
     case IR::Cond::NV:
@@ -480,10 +227,6 @@ void BlockOfCode::LoadRequiredFlagsForCondFromRax(IR::Cond cond) {
         ASSERT_MSG(false, "Unknown cond {}", static_cast<size_t>(cond));
         break;
     }
-}
-
-Xbyak_loongarch64::Address BlockOfCode::MConst(const Xbyak_loongarch64::AddressFrame& frame, u64 lower, u64 upper) {
-    return constant_pool.GetConstant(frame, lower, upper);
 }
 
 CodePtr BlockOfCode::GetCodeBegin() const {
@@ -513,10 +256,24 @@ void BlockOfCode::SetCodePtr(CodePtr code_ptr) {
     setSize(required_size);
 }
 
-void BlockOfCode::EnsurePatchLocationSize(CodePtr begin, size_t size) {
-    size_t current_size = getCurr<const u8*>() - reinterpret_cast<const u8*>(begin);
-    ASSERT(current_size <= size);
-    nop(size - current_size);
-}
+    void BlockOfCode::B(const void *a) {
+        auto fn = (std::uint64_t (*)() )a;
+        JumpFunction(fn);
+    }
+
+    void BlockOfCode::BL(const void *a) {
+    auto fn = (std::uint64_t (*)() )a;
+    CallFunction(fn);
+    }
+
+    void BlockOfCode::LDLableData_d(const Xbyak_loongarch64::XReg &rd, const Xbyak_loongarch64::Label &label) {
+        pcaddi(rd, label);
+        ld_d(rd, rd, 0);
+    }
+
+    void BlockOfCode::LDLableData_w(const Xbyak_loongarch64::XReg &rd, const Xbyak_loongarch64::Label &label) {
+        pcaddi(rd, label);
+        ld_w(rd, rd, 0);
+    }
 
 }  // namespace Dynarmic::Backend::LoongArch64

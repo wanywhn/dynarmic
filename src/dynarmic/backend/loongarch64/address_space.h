@@ -19,12 +19,13 @@
 #include "dynarmic/ir/location_descriptor.h"
 #include "xbyak_loongarch64.h"
 #include "xbyak_loongarch64_util.h"
+#include "block_of_code.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
 class AddressSpace {
 public:
-    explicit AddressSpace(size_t code_cache_size);
+    explicit AddressSpace(size_t code_cache_size, JitStateInfo jsi);
     virtual ~AddressSpace();
 
     virtual IR::Block GenerateIR(IR::LocationDescriptor) const = 0;
@@ -55,8 +56,8 @@ protected:
     FakeCall FastmemCallback(u64 host_pc);
 
     const size_t code_cache_size;
-    // Xbyak_loongarch64::CodeBlock mem;
-    Xbyak_loongarch64::CodeGenerator code;
+//    Xbyak_loongarch64::CodeBlock mem;
+    LoongArch64::BlockOfCode code;
 
     // A IR::LocationDescriptor will have one current CodePtr.
     // However, there can be multiple other CodePtrs which are older, previously invalidated blocks.

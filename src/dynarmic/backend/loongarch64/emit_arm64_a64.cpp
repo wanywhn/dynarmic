@@ -22,10 +22,13 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     using namespace Xbyak_loongarch64::util;
 
-    Xbyak_loongarch64::Label EmitA64Cond(Xbyak_loongarch64::CodeGenerator &code, EmitContext &, IR::Cond cond) {
+    Xbyak_loongarch64::Label EmitA64Cond(BlockOfCode &code, EmitContext &, IR::Cond cond) {
         Xbyak_loongarch64::Label pass;
         // TODO: Flags in host flags
         code.ld_d(Xscratch0, Xstate, offsetof(A64JitState, cpsr_nzcv));
+//        void LoadRequiredFlagsForCondFromRax(IR::Cond cond);
+// FIXME
+
         switch (cond) {
             case IR::Cond::EQ:
                 code.andi(Xscratch0, Xscratch0, NZCV::arm_n_flag_mask);
@@ -82,6 +85,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             case IR::Cond::LE:
                 code.andi(Xscratch1, Xscratch0, NZCV::arm_z_flag_mask);
                 code.bnez(Xscratch1, pass);
+                break;
             case IR::Cond::LT:
                 code.andi(Xscratch0, Xscratch0, NZCV::arm_n_flag_mask | NZCV::arm_v_flag_mask);
                 code.addi_d(Xscratch1, code.zero, NZCV::arm_v_flag_mask);
@@ -96,20 +100,20 @@ namespace Dynarmic::Backend::LoongArch64 {
         return pass;
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::Terminal terminal,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::Terminal terminal,
                          IR::LocationDescriptor initial_location, bool is_single_step);
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &, EmitContext &, IR::Term::Interpret, IR::LocationDescriptor,
+    void EmitA64Terminal(BlockOfCode &, EmitContext &, IR::Term::Interpret, IR::LocationDescriptor,
                          bool) {
         ASSERT_FALSE("Interpret should never be emitted.");
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::ReturnToDispatch,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::ReturnToDispatch,
                          IR::LocationDescriptor, bool) {
         EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::LinkBlock terminal,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::LinkBlock terminal,
                          IR::LocationDescriptor, bool is_single_step) {
         Xbyak_loongarch64::Label fail;
 
@@ -121,7 +125,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 //                code.B(LE, fail);
                 EmitBlockLinkRelocation(code, ctx, terminal.next, BlockRelocationType::Branch);
             } else {
-                code.ll_acq_w(Wscratch0, Xhalt);
+                code.ll_w(Wscratch0, Xhalt, 0);
                 code.bnez(Wscratch0, fail);
                 EmitBlockLinkRelocation(code, ctx, terminal.next, BlockRelocationType::Branch);
             }
@@ -134,7 +138,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::LinkBlockFast terminal,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::LinkBlockFast terminal,
                          IR::LocationDescriptor, bool is_single_step) {
         if (ctx.conf.HasOptimization(OptimizationFlag::BlockLinking) && !is_single_step) {
             EmitBlockLinkRelocation(code, ctx, terminal.next, BlockRelocationType::Branch);
@@ -145,7 +149,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::PopRSBHint,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::PopRSBHint,
                          IR::LocationDescriptor, bool is_single_step) {
         if (ctx.conf.HasOptimization(OptimizationFlag::ReturnStackBuffer) && !is_single_step) {
             Xbyak_loongarch64::Label fail;
@@ -179,14 +183,14 @@ namespace Dynarmic::Backend::LoongArch64 {
         EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::FastDispatchHint,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::FastDispatchHint,
                          IR::LocationDescriptor, bool) {
         EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
 
         // TODO: Implement FastDispatchHint optimization
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::If terminal,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::If terminal,
                          IR::LocationDescriptor initial_location, bool is_single_step) {
         Xbyak_loongarch64::Label pass = EmitA64Cond(code, ctx, terminal.if_);
         EmitA64Terminal(code, ctx, terminal.else_, initial_location, is_single_step);
@@ -194,7 +198,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         EmitA64Terminal(code, ctx, terminal.then_, initial_location, is_single_step);
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::CheckBit terminal,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::CheckBit terminal,
                          IR::LocationDescriptor initial_location, bool is_single_step) {
         Xbyak_loongarch64::Label fail;
         code.ld_b(Wscratch0, code.sp, offsetof(StackLayout, check_bit));
@@ -204,35 +208,35 @@ namespace Dynarmic::Backend::LoongArch64 {
         EmitA64Terminal(code, ctx, terminal.else_, initial_location, is_single_step);
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::CheckHalt terminal,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::CheckHalt terminal,
                          IR::LocationDescriptor initial_location, bool is_single_step) {
         Xbyak_loongarch64::Label fail;
-        code.ll_acq_w(Wscratch0, Xhalt);
+        code.ll_w(Wscratch0, Xhalt, 0);
         code.bnez(Wscratch0, fail);
         EmitA64Terminal(code, ctx, terminal.else_, initial_location, is_single_step);
         code.L(fail);
         EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Term::Terminal terminal,
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx, IR::Term::Terminal terminal,
                          IR::LocationDescriptor initial_location, bool is_single_step) {
         boost::apply_visitor([&](const auto &t) { EmitA64Terminal(code, ctx, t, initial_location, is_single_step); },
                              terminal);
     }
 
-    void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx) {
+    void EmitA64Terminal(BlockOfCode &code, EmitContext &ctx) {
         const A64::LocationDescriptor location{ctx.block.Location()};
         EmitA64Terminal(code, ctx, ctx.block.GetTerminal(), location.SetSingleStepping(false),
                         location.SingleStepping());
     }
 
-    void EmitA64ConditionFailedTerminal(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx) {
+    void EmitA64ConditionFailedTerminal(BlockOfCode &code, EmitContext &ctx) {
         const A64::LocationDescriptor location{ctx.block.Location()};
         EmitA64Terminal(code, ctx, IR::Term::LinkBlock{ctx.block.ConditionFailedLocation()},
                         location.SetSingleStepping(false), location.SingleStepping());
     }
 
-    void EmitA64CheckMemoryAbort(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst,
+    void EmitA64CheckMemoryAbort(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst,
                                  Xbyak_loongarch64::Label &end) {
         if (!ctx.conf.check_halt_on_memory_access) {
             return;
@@ -240,7 +244,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         const A64::LocationDescriptor current_location{IR::LocationDescriptor{inst->GetArg(0).GetU64()}};
 
-        code.ll_acq_w(Xscratch0, Xhalt);
+        code.ll_w(Xscratch0, Xhalt, 0);
         code.add_imm(Xscratch1, code.zero, static_cast<u32>(HaltReason::MemoryAbort), Xscratch2);
         code.beq(Xscratch0, Xscratch1, end);
 //        code.B(EQ, end);
@@ -251,7 +255,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetCheckBit>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetCheckBit>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         if (args[0].IsImmediate()) {
@@ -270,7 +274,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetCFlag>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetCFlag>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Wflag = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wflag);
         code.ld_d(Wflag, Xstate, offsetof(A64JitState, cpsr_nzcv));
@@ -278,7 +282,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetNZCVRaw>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetNZCVRaw>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Wnzcv = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wnzcv);
 
@@ -286,7 +290,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetNZCVRaw>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetNZCVRaw>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wnzcv);
@@ -295,7 +299,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetNZCV>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetNZCV>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wnzcv);
@@ -304,7 +308,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetW>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetW>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const A64::Reg reg = inst->GetArg(0).GetA64RegRef();
 
         auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -312,11 +316,11 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         // TODO: Detect if Gpr vs Fpr is more appropriate
 
-        code.ld_d(Wresult, Xstate, offsetof(A64JitState, reg) + sizeof(u64) * static_cast<size_t>(reg));
+        code.ld_w(Wresult, Xstate, offsetof(A64JitState, reg) + sizeof(u64) * static_cast<size_t>(reg));
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetX>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetX>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const A64::Reg reg = inst->GetArg(0).GetA64RegRef();
 
         auto Xresult = ctx.reg_alloc.WriteX(inst);
@@ -328,31 +332,31 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetS>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetS>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
-        auto Sresult = ctx.reg_alloc.WriteS(inst);
+        auto Sresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Sresult);
-        code.ld_d(Sresult, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
+        code.vld(Sresult, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetD>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetD>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
-        auto Dresult = ctx.reg_alloc.WriteD(inst);
+        auto Dresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Dresult);
-        code.ld_d(Dresult, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
+        code.vld(Dresult, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetQ>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetQ>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
         auto Qresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Qresult);
-        code.ld_d(Qresult, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
+        code.vld(Qresult, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetSP>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetSP>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Xresult = ctx.reg_alloc.WriteX(inst);
         RegAlloc::Realize(Xresult);
 
@@ -360,7 +364,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetFPCR>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetFPCR>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Wresult = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wresult);
 
@@ -372,7 +376,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetFPSR>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetFPSR>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Wresult = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wresult);
 
@@ -386,7 +390,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetW>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetW>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const A64::Reg reg = inst->GetArg(0).GetA64RegRef();
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -394,13 +398,11 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Wvalue = ctx.reg_alloc.ReadW(args[1]);
         RegAlloc::Realize(Wvalue);
 
-        // TODO: Detect if Gpr vs Fpr is more appropriate
-        code.add_d(*Wvalue, Wvalue, code.zero);
         code.st_w(Wvalue, Xstate, offsetof(A64JitState, reg) + sizeof(u64) * static_cast<size_t>(reg));
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetX>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetX>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const A64::Reg reg = inst->GetArg(0).GetA64RegRef();
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -408,25 +410,21 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Xvalue = ctx.reg_alloc.ReadX(args[1]);
         RegAlloc::Realize(Xvalue);
 
-        // TODO: Detect if Gpr vs Fpr is more appropriate
-
         code.st_d(Xvalue, Xstate, offsetof(A64JitState, reg) + sizeof(u64) * static_cast<size_t>(reg));
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetS>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetS>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
         auto Svalue = ctx.reg_alloc.ReadS(args[1]);
         RegAlloc::Realize(Svalue);
 
-//    code.FMOV(Svalue, Svalue);
         code.vstelm_w(Svalue, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec), 0);
-//    code.st_d(Svalue->toQ(), Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetD>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetD>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
         auto Dvalue = ctx.reg_alloc.ReadD(args[1]);
@@ -434,12 +432,10 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         code.vstelm_d(Dvalue, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec), 0);
 
-//    code.FMOV(Dvalue, Dvalue);
-//    code.st_d(Dvalue->toQ(), Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetQ>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetQ>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
         auto Qvalue = ctx.reg_alloc.ReadQ(args[1]);
@@ -450,7 +446,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetSP>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetSP>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Xvalue = ctx.reg_alloc.ReadX(args[0]);
         RegAlloc::Realize(Xvalue);
@@ -463,7 +459,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 
     template<>
-    void EmitIR<IR::Opcode::A64SetFPCR>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetFPCR>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Wvalue = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wvalue);
@@ -480,7 +476,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetFPSR>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetFPSR>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Wvalue = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wvalue);
@@ -488,12 +484,13 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.CallFunction(SetFPSRImpl);
         // TODO lijie guoji
         code.st_w(Wvalue, Xstate, offsetof(A64JitState, guest_FCSR));
+        // FIXME convert to arch spec
         code.movgr2fcsr(code.fcsr0, Wvalue);
 //    code.MSR(Xbyak_loongarch64::SystemReg::FPSR, Wvalue->toX());
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetPC>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetPC>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Xvalue = ctx.reg_alloc.ReadX(args[0]);
         RegAlloc::Realize(Xvalue);
@@ -502,7 +499,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::A64CallSupervisor>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::A64CallSupervisor>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ctx.reg_alloc.PrepareForCall();
 
@@ -525,7 +522,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::A64ExceptionRaised>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::A64ExceptionRaised>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ctx.reg_alloc.PrepareForCall();
 
@@ -546,7 +543,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64DataCacheOperationRaised>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::A64DataCacheOperationRaised>(BlockOfCode &code, EmitContext &ctx,
                                                          IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ctx.reg_alloc.PrepareForCall({}, args[1], args[2]);
@@ -555,7 +552,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::A64InstructionCacheOperationRaised>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+    EmitIR<IR::Opcode::A64InstructionCacheOperationRaised>(BlockOfCode &code, EmitContext &ctx,
                                                            IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ctx.reg_alloc.PrepareForCall({}, args[0], args[1]);
@@ -563,19 +560,19 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64DataSynchronizationBarrier>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &,
+    void EmitIR<IR::Opcode::A64DataSynchronizationBarrier>(BlockOfCode &code, EmitContext &,
                                                            IR::Inst *) {
         code.dbar(0);
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64DataMemoryBarrier>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &, IR::Inst *) {
+    void EmitIR<IR::Opcode::A64DataMemoryBarrier>(BlockOfCode &code, EmitContext &, IR::Inst *) {
         code.dbar(0x700);
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::A64InstructionSynchronizationBarrier>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+    EmitIR<IR::Opcode::A64InstructionSynchronizationBarrier>(BlockOfCode &code, EmitContext &ctx,
                                                              IR::Inst *) {
         if (!ctx.conf.hook_isb) {
             return;
@@ -586,14 +583,14 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetCNTFRQ>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetCNTFRQ>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Xvalue = ctx.reg_alloc.WriteX(inst);
         RegAlloc::Realize(Xvalue);
         code.add_imm(Xvalue, code.zero, ctx.conf.cntfreq_el0, Xscratch0);
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetCNTPCT>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetCNTPCT>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         ctx.reg_alloc.PrepareForCall();
         if (!ctx.conf.wall_clock_cntpct && ctx.conf.enable_cycle_counting) {
             code.ld_d(code.a1, code.sp, offsetof(StackLayout, cycles_to_run));
@@ -608,7 +605,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetCTR>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetCTR>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Wvalue = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wvalue);
         code.add_imm(Wvalue, code.zero, ctx.conf.ctr_el0, Xscratch0);
@@ -616,14 +613,14 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetDCZID>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetDCZID>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Wvalue = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wvalue);
         code.add_imm(Wvalue, code.zero, ctx.conf.dczid_el0, Xscratch0);
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetTPIDR>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetTPIDR>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Xvalue = ctx.reg_alloc.WriteX(inst);
         RegAlloc::Realize(Xvalue);
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(ctx.conf.tpidr_el0), Xscratch0);
@@ -631,7 +628,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64GetTPIDRRO>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64GetTPIDRRO>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Xvalue = ctx.reg_alloc.WriteX(inst);
         RegAlloc::Realize(Xvalue);
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(ctx.conf.tpidrro_el0), Xscratch0);
@@ -639,7 +636,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::A64SetTPIDR>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::A64SetTPIDR>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Xvalue = ctx.reg_alloc.ReadX(args[0]);
         RegAlloc::Realize(Xvalue);

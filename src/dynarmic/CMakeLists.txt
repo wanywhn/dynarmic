@@ -433,14 +433,12 @@ if ("loongarch64" IN_LIST ARCHITECTURE)
             backend/loongarch64/emit_arm64_vector.cpp
             backend/loongarch64/emit_arm64_vector_floating_point.cpp
             backend/loongarch64/emit_arm64_vector_saturation.cpp
-            backend/loongarch64/emit_loongarch64.cpp
-            backend/loongarch64/emit_loongarch64.h
-            backend/loongarch64/emit_loongarch64_a32.cpp
-            backend/loongarch64/emit_loongarch64_a32.h
-            backend/loongarch64/emit_loongarch64_a32_memory.cpp
-            backend/loongarch64/emit_loongarch64_a64.cpp
-            backend/loongarch64/emit_loongarch64_a64.h
-            backend/loongarch64/emit_loongarch64_a64_memory.cpp
+            backend/loongarch64/emit_arm64.cpp
+            backend/loongarch64/emit_arm64.h
+            backend/loongarch64/emit_arm64_a32.cpp
+            backend/loongarch64/emit_arm64_a32_memory.cpp
+            backend/loongarch64/emit_arm64_a64.cpp
+            backend/loongarch64/emit_arm64_a64_memory.cpp
             backend/loongarch64/emit_context.h
             backend/loongarch64/nzcv_util.h
             backend/loongarch64/exclusive_monitor.cpp
@@ -453,8 +451,8 @@ if ("loongarch64" IN_LIST ARCHITECTURE)
             backend/loongarch64/stack_layout.h
             backend/loongarch64/verbose_debugging_output.cpp
             backend/loongarch64/verbose_debugging_output.h
-            common/spin_lock_arm64.cpp
-            common/spin_lock_arm64.h
+            common/spin_lock_loongarch64.cpp
+            common/spin_lock_loongarch64.h
     )
 
 

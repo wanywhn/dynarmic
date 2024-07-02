@@ -14,27 +14,20 @@
 
 #include "dynarmic/backend/loongarch64/abi.h"
 #include "dynarmic/backend/loongarch64/callback.h"
-#include "dynarmic/backend/loongarch64/constant_pool.h"
-#include "dynarmic/backend/loongarch64/host_feature.h"
 #include "dynarmic/backend/loongarch64/jitstate_info.h"
 #include "dynarmic/common/cast_util.h"
 #include "dynarmic/interface/halt_reason.h"
 #include "dynarmic/ir/cond.h"
 
+#include "xbyak_loongarch64.h"
+
 namespace Dynarmic::Backend::LoongArch64 {
 
-using CodePtr = const void*;
+using CodePtr = std::byte*;
 
-struct RunCodeCallbacks {
-    std::unique_ptr<Callback> LookupBlock;
-    std::unique_ptr<Callback> AddTicks;
-    std::unique_ptr<Callback> GetTicksRemaining;
-    bool enable_cycle_counting;
-};
-
-class BlockOfCode final : public Xbyak_loongarch64::CodeGenerator {
+    class BlockOfCode final : public Xbyak_loongarch64::CodeGenerator {
 public:
-    BlockOfCode(RunCodeCallbacks cb, JitStateInfo jsi, size_t total_code_size, std::function<void(BlockOfCode&)> rcp);
+    BlockOfCode(size_t total_code_size, JitStateInfo jsi);
     BlockOfCode(const BlockOfCode&) = delete;
 
     /// Call when external emitters have finished emitting their preludes.
@@ -56,24 +49,14 @@ public:
     HaltReason RunCode(void* jit_state, CodePtr code_ptr) const;
     /// Runs emulated code from code_ptr for a single cycle.
     HaltReason StepCode(void* jit_state, CodePtr code_ptr) const;
-    /// Code emitter: Returns to dispatcher
-    void ReturnFromRunCode(bool mxcsr_already_exited = false);
-    /// Code emitter: Returns to dispatcher, forces return to host
-    void ForceReturnFromRunCode(bool mxcsr_already_exited = false);
-    /// Code emitter: Makes guest MXCSR the current MXCSR
+
+        /// Code emitter: Makes guest MXCSR the current MXCSR
     void SwitchMxcsrOnEntry();
     /// Code emitter: Makes saved host MXCSR the current MXCSR
     void SwitchMxcsrOnExit();
     /// Code emitter: Enter standard ASIMD MXCSR region
     void EnterStandardASIMD();
-    /// Code emitter: Leave standard ASIMD MXCSR region
-    void LeaveStandardASIMD();
-    /// Code emitter: Updates cycles remaining my calling cb.AddTicks and cb.GetTicksRemaining
-    /// @note this clobbers ABI caller-save registers
-    void UpdateTicks();
-    /// Code emitter: Performs a block lookup based on current state
-    /// @note this clobbers ABI caller-save registers
-    void LookupBlock();
+    void LeaveStandardASIMD() ;
 
     /// Code emitter: Load required flags for conditional cond from rax into host rflags
     void LoadRequiredFlagsForCondFromRax(IR::Cond cond);
@@ -85,42 +68,40 @@ public:
                       "Supplied type must be a pointer to a function");
 
         const u64 address = reinterpret_cast<u64>(fn);
-        const u64 distance = address - (getCurr<u64>() + 5);
-
-        if (distance >= 0x0000000080000000ULL && distance < 0xFFFFFFFF80000000ULL) {
+        // Far call FIXME?
+        const u64 distance = address - (getCurr<u64>());
+        if (distance >= 0x2000000ULL && distance < 0xFFFFFFFFFC000000ULL) {
             // Far call
-            mov(rax, address);
-            call(rax);
+            add_imm(Xscratch0, zero, address, Xscratch1);
+            jirl(ra, Xscratch0, 0);
         } else {
-            call(fn);
+            bl((int64_t)distance);
         }
-    }
 
+    }
+    /// Code emitter: Calls the function
+    template<typename FunctionPointer>
+    void JumpFunction(FunctionPointer fn) {
+        static_assert(std::is_pointer_v<FunctionPointer> && std::is_function_v<std::remove_pointer_t<FunctionPointer>>,
+                      "Supplied type must be a pointer to a function");
+
+        const u64 address = reinterpret_cast<u64>(fn);
+        // Far call FIXME?
+        const u64 distance = address - (getCurr<u64>());
+        if (distance >= 0x2000000ULL && distance < 0xFFFFFFFFFC000000ULL) {
+            // Far call
+            add_imm(Xscratch0, zero, address, Xscratch1);
+            jirl(zero, Xscratch0, 0);
+        } else {
+            b((int64_t)distance);
+        }
+
+    }
     /// Code emitter: Calls the lambda. Lambda must not have any captures.
     template<typename Lambda>
     void CallLambda(Lambda l) {
         CallFunction(Common::FptrCast(l));
     }
-
-    void ZeroExtendFrom(size_t bitsize, Xbyak_loongarch64::Reg64 reg) {
-        switch (bitsize) {
-        case 8:
-            movzx(reg.cvt32(), reg.cvt8());
-            return;
-        case 16:
-            movzx(reg.cvt32(), reg.cvt16());
-            return;
-        case 32:
-            mov(reg.cvt32(), reg.cvt32());
-            return;
-        case 64:
-            return;
-        default:
-            UNREACHABLE();
-        }
-    }
-
-    Xbyak_loongarch64::Address MConst(const Xbyak_loongarch64::AddressFrame& frame, u64 lower, u64 upper = 0);
 
     CodePtr GetCodeBegin() const;
     size_t GetTotalCodeSize() const;
@@ -133,7 +114,6 @@ public:
         return return_from_run_code[FORCE_RETURN];
     }
 
-    void int3() { db(0xCC); }
 
     /// Allocate memory of `size` bytes from the same block of memory the code is in.
     /// This is useful for objects that need to be placed close to or within code.
@@ -141,46 +121,30 @@ public:
     void* AllocateFromCodeSpace(size_t size);
 
     void SetCodePtr(CodePtr code_ptr);
-    void EnsurePatchLocationSize(CodePtr begin, size_t size);
+    void B(const void *a);
+    void BL(const void *a);
+    void LDLableData_d(const Xbyak_loongarch64::XReg &rd, const Xbyak_loongarch64::Label &label);
+    void LDLableData_w(const Xbyak_loongarch64::XReg &rd, const Xbyak_loongarch64::Label &label);
 
-    // ABI registers
-#ifdef _WIN32
-    static const Xbyak_loongarch64::Reg64 ABI_RETURN;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM1;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM2;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM3;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM4;
-    static const std::array<Xbyak_loongarch64::Reg64, ABI_PARAM_COUNT> ABI_PARAMS;
-#else
-    static const Xbyak_loongarch64::Reg64 ABI_RETURN;
-    static const Xbyak_loongarch64::Reg64 ABI_RETURN2;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM1;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM2;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM3;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM4;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM5;
-    static const Xbyak_loongarch64::Reg64 ABI_PARAM6;
-    static const std::array<Xbyak_loongarch64::Reg64, ABI_PARAM_COUNT> ABI_PARAMS;
-#endif
+        // ABI registers
+
+    static const Xbyak_loongarch64::XReg ABI_RETURN;
+    static const Xbyak_loongarch64::XReg ABI_RETURN2;
+    static const Xbyak_loongarch64::XReg ABI_PARAM1;
+    static const Xbyak_loongarch64::XReg ABI_PARAM2;
+    static const Xbyak_loongarch64::XReg ABI_PARAM3;
+    static const Xbyak_loongarch64::XReg ABI_PARAM4;
+    static const Xbyak_loongarch64::XReg ABI_PARAM5;
+    static const Xbyak_loongarch64::XReg ABI_PARAM6;
+    static const std::array<Xbyak_loongarch64::XReg, ABI_PARAM_COUNT> ABI_PARAMS;
 
     JitStateInfo GetJitStateInfo() const { return jsi; }
 
-    bool HasHostFeature(HostFeature feature) const {
-        return (host_features & feature) == feature;
-    }
-
-private:
-    RunCodeCallbacks cb;
-    JitStateInfo jsi;
+    private:
+        JitStateInfo jsi;
 
     bool prelude_complete = false;
     CodePtr code_begin = nullptr;
-
-#ifdef _WIN32
-    size_t committed_size = 0;
-#endif
-
-    ConstantPool constant_pool;
 
     using RunCodeFuncType = HaltReason (*)(void*, CodePtr);
     RunCodeFuncType run_code = nullptr;
@@ -188,9 +152,7 @@ private:
     static constexpr size_t MXCSR_ALREADY_EXITED = 1 << 0;
     static constexpr size_t FORCE_RETURN = 1 << 1;
     std::array<const void*, 4> return_from_run_code;
-    void GenRunCode(std::function<void(BlockOfCode&)> rcp);
 
-    const HostFeature host_features;
-};
+    };
 
 }  // namespace Dynarmic::Backend::LoongArch64

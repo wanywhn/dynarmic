@@ -11,7 +11,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 struct JitStateInfo {
     template<typename JitStateType>
-    JitStateInfo(const JitStateType&)
+    explicit JitStateInfo(const JitStateType&)
             : offsetof_guest_FCSR(offsetof(JitStateType, guest_FCSR))
             , offsetof_asimd_MXCSR(offsetof(JitStateType, asimd_MXCSR))
             , offsetof_rsb_ptr(offsetof(JitStateType, rsb_ptr))

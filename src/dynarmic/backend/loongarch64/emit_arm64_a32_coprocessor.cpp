@@ -23,7 +23,7 @@ static void EmitCoprocessorException() {
     ASSERT_FALSE("Should raise coproc exception here");
 }
 
-static void CallCoprocCallback(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, A32::Coprocessor::Callback callback, IR::Inst* inst = nullptr, std::optional<Argument::copyable_reference> arg0 = {}, std::optional<Argument::copyable_reference> arg1 = {}) {
+static void CallCoprocCallback(BlockOfCode& code, EmitContext& ctx, A32::Coprocessor::Callback callback, IR::Inst* inst = nullptr, std::optional<Argument::copyable_reference> arg0 = {}, std::optional<Argument::copyable_reference> arg1 = {}) {
     ctx.reg_alloc.PrepareForCall({}, arg0, arg1);
 
     if (callback.user_arg) {
@@ -40,7 +40,7 @@ static void CallCoprocCallback(Xbyak_loongarch64::CodeGenerator& code, EmitConte
 }
 
 template<>
-void EmitIR<IR::Opcode::A32CoprocInternalOperation>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32CoprocInternalOperation>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     const auto coproc_info = inst->GetArg(0).GetCoprocInfo();
     const size_t coproc_num = coproc_info[0];
     const bool two = coproc_info[1] != 0;
@@ -66,7 +66,7 @@ void EmitIR<IR::Opcode::A32CoprocInternalOperation>(Xbyak_loongarch64::CodeGener
 }
 
 template<>
-void EmitIR<IR::Opcode::A32CoprocSendOneWord>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32CoprocSendOneWord>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     const auto coproc_info = inst->GetArg(0).GetCoprocInfo();
     const size_t coproc_num = coproc_info[0];
@@ -108,7 +108,7 @@ void EmitIR<IR::Opcode::A32CoprocSendOneWord>(Xbyak_loongarch64::CodeGenerator& 
 }
 
 template<>
-void EmitIR<IR::Opcode::A32CoprocSendTwoWords>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32CoprocSendTwoWords>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
     const auto coproc_info = inst->GetArg(0).GetCoprocInfo();
@@ -152,7 +152,7 @@ void EmitIR<IR::Opcode::A32CoprocSendTwoWords>(Xbyak_loongarch64::CodeGenerator&
 }
 
 template<>
-void EmitIR<IR::Opcode::A32CoprocGetOneWord>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32CoprocGetOneWord>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     const auto coproc_info = inst->GetArg(0).GetCoprocInfo();
 
     const size_t coproc_num = coproc_info[0];
@@ -194,7 +194,7 @@ void EmitIR<IR::Opcode::A32CoprocGetOneWord>(Xbyak_loongarch64::CodeGenerator& c
 }
 
 template<>
-void EmitIR<IR::Opcode::A32CoprocGetTwoWords>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32CoprocGetTwoWords>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     const auto coproc_info = inst->GetArg(0).GetCoprocInfo();
     const size_t coproc_num = coproc_info[0];
     const bool two = coproc_info[1] != 0;
@@ -238,7 +238,7 @@ void EmitIR<IR::Opcode::A32CoprocGetTwoWords>(Xbyak_loongarch64::CodeGenerator& 
 }
 
 template<>
-void EmitIR<IR::Opcode::A32CoprocLoadWords>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32CoprocLoadWords>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
     const auto coproc_info = inst->GetArg(0).GetCoprocInfo();
@@ -269,7 +269,7 @@ void EmitIR<IR::Opcode::A32CoprocLoadWords>(Xbyak_loongarch64::CodeGenerator& co
 }
 
 template<>
-void EmitIR<IR::Opcode::A32CoprocStoreWords>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32CoprocStoreWords>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
     const auto coproc_info = inst->GetArg(0).GetCoprocInfo();

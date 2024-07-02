@@ -15,37 +15,38 @@
 #include "dynarmic/ir/opcodes.h"
 #include "xbyak_loongarch64.h"
 #include "xbyak_loongarch64_util.h"
+#include "nzcv_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
 using namespace Xbyak_loongarch64::util;
 
 template<>
-void EmitIR<IR::Opcode::Void>(Xbyak_loongarch64::CodeGenerator&, EmitContext&, IR::Inst*) {}
+void EmitIR<IR::Opcode::Void>(BlockOfCode&, EmitContext&, IR::Inst*) {}
 
 template<>
-void EmitIR<IR::Opcode::Identity>(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::Identity>(BlockOfCode&, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
     ctx.reg_alloc.DefineAsExisting(inst, args[0]);
 }
 
 template<>
-void EmitIR<IR::Opcode::Breakpoint>(Xbyak_loongarch64::CodeGenerator& code, EmitContext&, IR::Inst*) {
-    code.BRK(0);
+void EmitIR<IR::Opcode::Breakpoint>(BlockOfCode& code, EmitContext&, IR::Inst*) {
+    code.break_(0);
 }
 
 template<>
-void EmitIR<IR::Opcode::CallHostFunction>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::CallHostFunction>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
     ctx.reg_alloc.PrepareForCall(args[1], args[2], args[3]);
-    code.add_d(Xscratch0, args[0].GetImmediateU64(), code.zero);
+    code.add_imm(Xscratch0, code.zero, args[0].GetImmediateU64(),  Xscratch1);
     code.jirl(code.ra, Xscratch0, 0);
 }
 
 template<>
-void EmitIR<IR::Opcode::PushRSB>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::PushRSB>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     if (!ctx.conf.HasOptimization(OptimizationFlag::ReturnStackBuffer)) {
         return;
     }
@@ -55,57 +56,66 @@ void EmitIR<IR::Opcode::PushRSB>(Xbyak_loongarch64::CodeGenerator& code, EmitCon
     const IR::LocationDescriptor target{args[0].GetImmediateU64()};
 
     code.ld_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
-    code.add_imm(Wscratch2, Wscratch2, sizeof(RSBEntry), t0);
+    code.add_imm(Wscratch2, Wscratch2, sizeof(RSBEntry), Wscratch0);
     code.andi(Wscratch2, Wscratch2, RSBIndexMask);
     code.st_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
-    code.ADD(Xscratch2, code.sp, Xscratch2);
+    code.add_d(Xscratch2, code.sp, Xscratch2);
 
-    code.add_d(Xscratch0, target.Value(), code.zero);
+    code.add_imm(Xscratch0, code.zero, target.Value(), Wscratch1);
     EmitBlockLinkRelocation(code, ctx, target, BlockRelocationType::MoveToScratch1);
-    code.STP(Xscratch0, Xscratch1, Xscratch2, offsetof(StackLayout, rsb));
+    code.st_d(Xscratch0, Xscratch2, offsetof(StackLayout, rsb));
+    code.st_d(Xscratch1, Xscratch2, offsetof(StackLayout, rsb) + 8);
+//    code.STP(Xscratch0, Xscratch1, Xscratch2, offsetof(StackLayout, rsb));
 }
 
 template<>
-void EmitIR<IR::Opcode::GetCarryFromOp>(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::GetCarryFromOp>(BlockOfCode&, EmitContext& ctx, IR::Inst* inst) {
     [[maybe_unused]] auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     ASSERT(ctx.reg_alloc.WasValueDefined(inst));
 }
 
 template<>
-void EmitIR<IR::Opcode::GetOverflowFromOp>(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::GetOverflowFromOp>(BlockOfCode&, EmitContext& ctx, IR::Inst* inst) {
     [[maybe_unused]] auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     ASSERT(ctx.reg_alloc.WasValueDefined(inst));
 }
 
 template<>
-void EmitIR<IR::Opcode::GetGEFromOp>(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::GetGEFromOp>(BlockOfCode&, EmitContext& ctx, IR::Inst* inst) {
     [[maybe_unused]] auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     ASSERT(ctx.reg_alloc.WasValueDefined(inst));
 }
 
 template<>
-void EmitIR<IR::Opcode::GetNZCVFromOp>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::GetNZCVFromOp>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
     if (ctx.reg_alloc.WasValueDefined(inst)) {
         return;
     }
+    auto Wvalue = ctx.reg_alloc.ReadW(args[0]);
+    RegAlloc::Realize(Wvalue);
 
     switch (args[0].GetType()) {
     case IR::Type::U32: {
-        auto Wvalue = ctx.reg_alloc.ReadW(args[0]);
-        auto flags = ctx.reg_alloc.WriteFlags(inst);
-        RegAlloc::Realize(Wvalue, flags);
+        code.slti(Wscratch0, Wvalue, 0);
+        code.bstrins_w(Wscratch2, Wscratch0, NZCV::arm_n_flag_sft, NZCV::arm_n_flag_sft);
 
-        code.TST(*Wvalue, Wvalue);
+        code.clo_w(Wscratch0, Wvalue);
+        code.sltui(Wscratch0, Wscratch0, 1);
+        code.bstrins_w(Wscratch2, Wscratch0, NZCV::arm_z_flag_sft, NZCV::arm_z_flag_sft);
+        ctx.reg_alloc.DefineAsRegister(inst, Wscratch2);
+//        code.TST(*Wvalue, Wvalue);
         break;
     }
     case IR::Type::U64: {
-        auto Xvalue = ctx.reg_alloc.ReadX(args[0]);
-        auto flags = ctx.reg_alloc.WriteFlags(inst);
-        RegAlloc::Realize(Xvalue, flags);
+        code.slti(Wscratch0, Wvalue, 0);
+        code.bstrins_d(Wscratch2, Wscratch0, NZCV::arm_n_flag_sft, NZCV::arm_n_flag_sft);
 
-        code.TST(*Xvalue, Xvalue);
+        code.clo_d(Wscratch0, Wvalue);
+        code.sltui(Wscratch0, Wscratch0, 1);
+        code.bstrins_d(Wscratch2, Wscratch0, NZCV::arm_z_flag_sft, NZCV::arm_z_flag_sft);
+        ctx.reg_alloc.DefineAsRegister(inst, Wscratch2);
         break;
     }
     default:
@@ -115,50 +125,24 @@ void EmitIR<IR::Opcode::GetNZCVFromOp>(Xbyak_loongarch64::CodeGenerator& code, E
 }
 
 template<>
-void EmitIR<IR::Opcode::GetNZFromOp>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-
-    if (ctx.reg_alloc.WasValueDefined(inst)) {
-        return;
-    }
-
-    switch (args[0].GetType()) {
-    case IR::Type::U32: {
-        auto Wvalue = ctx.reg_alloc.ReadW(args[0]);
-        auto flags = ctx.reg_alloc.WriteFlags(inst);
-        RegAlloc::Realize(Wvalue, flags);
-
-        code.TST(*Wvalue, *Wvalue);
-        break;
-    }
-    case IR::Type::U64: {
-        auto Xvalue = ctx.reg_alloc.ReadX(args[0]);
-        auto flags = ctx.reg_alloc.WriteFlags(inst);
-        RegAlloc::Realize(Xvalue, flags);
-
-        code.TST(*Xvalue, *Xvalue);
-        break;
-    }
-    default:
-        ASSERT_FALSE("Invalid type for GetNZFromOp");
-        break;
-    }
+void EmitIR<IR::Opcode::GetNZFromOp>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitIR<IR::Opcode::GetNZCVFromOp>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::GetUpperFromOp>(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::GetUpperFromOp>(BlockOfCode&, EmitContext& ctx, IR::Inst* inst) {
     [[maybe_unused]] auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     ASSERT(ctx.reg_alloc.WasValueDefined(inst));
 }
 
 template<>
-void EmitIR<IR::Opcode::GetLowerFromOp>(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::GetLowerFromOp>(BlockOfCode&, EmitContext& ctx, IR::Inst* inst) {
     [[maybe_unused]] auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     ASSERT(ctx.reg_alloc.WasValueDefined(inst));
 }
 
 template<>
-void EmitIR<IR::Opcode::GetCFlagFromNZCV>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::GetCFlagFromNZCV>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
     auto Wc = ctx.reg_alloc.WriteW(inst);
@@ -169,29 +153,24 @@ void EmitIR<IR::Opcode::GetCFlagFromNZCV>(Xbyak_loongarch64::CodeGenerator& code
 }
 
 template<>
-void EmitIR<IR::Opcode::NZCVFromPackedFlags>(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::NZCVFromPackedFlags>(BlockOfCode&, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
     ctx.reg_alloc.DefineAsExisting(inst, args[0]);
 }
 
-static void EmitAddCycles(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, size_t cycles_to_add) {
+static void EmitAddCycles(BlockOfCode& code, EmitContext& ctx, size_t cycles_to_add) {
     if (!ctx.conf.enable_cycle_counting) {
         return;
     }
     if (cycles_to_add == 0) {
         return;
     }
-
-    if (Xbyak_loongarch64::AddSubImm::is_valid(cycles_to_add)) {
-        code.sub_imm(Xticks, Xticks, cycles_to_add, code.t0);
-    } else {
-        code.add_d(Xscratch1, cycles_to_add, code.zero);
-        code.sub_d(Xticks, Xticks, Xscratch1);
-    }
+    // TODO use subi more efficient?
+    code.sub_imm(Xticks, Xticks, cycles_to_add, Xscratch0);
 }
 
-EmittedBlockInfo EmitArm64(Xbyak_loongarch64::CodeGenerator& code, IR::Block block, const EmitConfig& conf, FastmemManager& fastmem_manager) {
+EmittedBlockInfo EmitArm64(BlockOfCode& code, IR::Block block, const EmitConfig& conf, FastmemManager& fastmem_manager) {
     if (conf.very_verbose_debugging_output) {
         std::puts(IR::DumpBlock(block).c_str());
     }
@@ -247,12 +226,13 @@ EmittedBlockInfo EmitArm64(Xbyak_loongarch64::CodeGenerator& code, IR::Block blo
         reg_alloc.AssertAllUnlocked();
 
         if (conf.very_verbose_debugging_output) {
-            EmitVerboseDebuggingOutput(code, ctx);
+            // FIXME test this func
+//            EmitVerboseDebuggingOutput(code, ctx);
         }
     }
 
-    fpsr_manager.Spill();
-
+    // TODO : is this need or how to implement?
+//    fpsr_manager.Spill();
     reg_alloc.AssertNoMoreUses();
 
     EmitAddCycles(code, ctx, block.CycleCount());
@@ -268,19 +248,19 @@ EmittedBlockInfo EmitArm64(Xbyak_loongarch64::CodeGenerator& code, IR::Block blo
     return ebi;
 }
 
-void EmitRelocation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, LinkTarget link_target) {
+void EmitRelocation(BlockOfCode& code, EmitContext& ctx, LinkTarget link_target) {
     ctx.ebi.relocations.emplace_back(Relocation{code.getCurr<CodePtr>() - ctx.ebi.entry_point, link_target});
     code.nop();
 }
 
-void EmitBlockLinkRelocation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, const IR::LocationDescriptor& descriptor, BlockRelocationType type) {
+void EmitBlockLinkRelocation(BlockOfCode& code, EmitContext& ctx, const IR::LocationDescriptor& descriptor, BlockRelocationType type) {
     ctx.ebi.block_relocations[descriptor].emplace_back(BlockRelocation{code.getCurr<CodePtr>() - ctx.ebi.entry_point, type});
     switch (type) {
     case BlockRelocationType::Branch:
         code.nop();
         break;
     case BlockRelocationType::MoveToScratch1:
-        code.BRK(0);
+        code.break_(0);
         code.nop();
         break;
     default:

@@ -11,6 +11,7 @@
 
 #include "dynarmic/backend/loongarch64/stack_layout.h"
 #include "xbyak_loongarch64.h"
+#include "block_of_code.h"
 
 namespace oaknut {
 struct PointerCodeGeneratorPolicy;
@@ -30,11 +31,6 @@ struct EmitContext;
 
 using Vector = std::array<u64, 2>;
 
-#ifdef _MSC_VER
-#    pragma warning(push)
-#    pragma warning(disable : 4324)  // Structure was padded due to alignment specifier
-#endif
-
 enum class HostLocType {
     X,
     Q,
@@ -50,11 +46,7 @@ struct alignas(16) RegisterData {
     u32 fpsr;
 };
 
-#ifdef _MSC_VER
-#    pragma warning(pop)
-#endif
-
-void EmitVerboseDebuggingOutput(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx);
+void EmitVerboseDebuggingOutput(BlockOfCode& code, EmitContext& ctx);
 void PrintVerboseDebuggingOutputLine(RegisterData& reg_data, HostLocType reg_type, size_t reg_index, size_t inst_index, IR::Type inst_type);
 
 }  // namespace Dynarmic::Backend::LoongArch64

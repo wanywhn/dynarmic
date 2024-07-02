@@ -15,14 +15,15 @@
 
 namespace Dynarmic::Backend::LoongArch64 {
 
-AddressSpace::AddressSpace(size_t code_cache_size)
+AddressSpace::AddressSpace(size_t code_cache_size, JitStateInfo jsi)
         : code_cache_size(code_cache_size)
         //        , mem(code_cache_size)
-        , code(code_cache_size)
+        , code(code_cache_size, jsi)
         , fastmem_manager(exception_handler) {
-    ASSERT_MSG(code_cache_size <= 128 * 1024 * 1024, "code_cache_size > 128 MiB not currently supported");
+    // limited by jump
+    ASSERT_MSG(code_cache_size <= 128 * 1024 * 1024, "code_cache_size > 64 MiB not currently supported");
 
-    exception_handler.Register(&code);
+    exception_handler.Register(code);
     exception_handler.SetFastmemCallback([this](u64 host_pc) {
         return FastmemCallback(host_pc);
     });
@@ -66,7 +67,6 @@ CodePtr AddressSpace::GetOrEmit(IR::LocationDescriptor descriptor) {
 }
 
 void AddressSpace::InvalidateBasicBlocks(const tsl::robin_set<IR::LocationDescriptor>& descriptors) {
-    mem.unprotect();
 
     for (const auto& descriptor : descriptors) {
         const auto iter = block_entries.find(descriptor);
@@ -81,19 +81,20 @@ void AddressSpace::InvalidateBasicBlocks(const tsl::robin_set<IR::LocationDescri
         block_entries.erase(iter);
     }
 
-    mem.protect();
 }
 
 void AddressSpace::ClearCache() {
+    code.ClearCache();
+    code.SetCodePtr(reinterpret_cast<CodePtr>(prelude_info.end_of_prelude));
     block_entries.clear();
     reverse_block_entries.clear();
     block_infos.clear();
     block_references.clear();
-    code.set_ptr(prelude_info.end_of_prelude);
+//    code.set_ptr(prelude_info.end_of_prelude);
 }
 
 size_t AddressSpace::GetRemainingSize() {
-    return code_cache_size - (code.getCurr<CodePtr>() - reinterpret_cast<CodePtr>(mem.ptr()));
+    return code_cache_size - (code.getCurr<CodePtr>() - code.getCode<CodePtr>());
 }
 
 EmittedBlockInfo AddressSpace::Emit(IR::Block block) {
@@ -101,7 +102,6 @@ EmittedBlockInfo AddressSpace::Emit(IR::Block block) {
         ClearCache();
     }
 
-    mem.unprotect();
 
     EmittedBlockInfo block_info = EmitArm64(code, std::move(block), GetEmitConfig(), fastmem_manager);
 
@@ -112,50 +112,55 @@ EmittedBlockInfo AddressSpace::Emit(IR::Block block) {
     Link(block_info);
     RelinkForDescriptor(block.Location(), block_info.entry_point);
 
-    mem.invalidate(reinterpret_cast<u32*>(block_info.entry_point), block_info.size);
-    mem.protect();
+    // FIXME
+//    mem.invalidate(reinterpret_cast<u32*>(block_info.entry_point), block_info.size);
 
     RegisterNewBasicBlock(block, block_info);
 
     return block_info;
 }
 
-static void LinkBlockLinks(const CodePtr entry_point, const CodePtr target_ptr, const std::vector<BlockRelocation>& block_relocations_list, void* return_to_dispatcher) {
+static void LinkBlockLinks(LoongArch64::BlockOfCode &c, const CodePtr entry_point, const CodePtr target_ptr, const std::vector<BlockRelocation>& block_relocations_list, void* return_to_dispatcher) {
 //    using namespace oaknut;
     using namespace Xbyak_loongarch64::util;
     using namespace Xbyak_loongarch64;
+    const auto save_code_ptr = c.getCurr<CodePtr>();
     for (auto [ptr_offset, type] : block_relocations_list) {
-        CodeGenerator c{reinterpret_cast<u32*>(entry_point + ptr_offset)};
-
+//        CodeGenerator c{reinterpret_cast<u32*>(entry_point + ptr_offset)};
+        c.SetCodePtr(reinterpret_cast<CodePtr>(entry_point + ptr_offset));
         switch (type) {
         case BlockRelocationType::Branch:
             if (target_ptr) {
-                c.B((void*)target_ptr);
+                c.B(target_ptr);
             } else {
                 c.nop();
             }
             break;
         case BlockRelocationType::MoveToScratch1:
             if (target_ptr) {
-                c.ADRL(Xscratch1, (void*)target_ptr);
+                // FIXME
+                c.add_imm(Xscratch1, c.zero, (intptr_t)target_ptr, Xscratch2);
             } else {
-                c.ADRL(Xscratch1, return_to_dispatcher);
+                c.add_imm(Xscratch1, c.zero, (intptr_t)return_to_dispatcher, Xscratch2);
             }
-            break;
+                c.ld_d(Xscratch1, Xscratch1, 0);
+
+                break;
         default:
             ASSERT_FALSE("Invalid BlockRelocationType");
         }
     }
+    c.SetCodePtr(save_code_ptr);
 }
 
 void AddressSpace::Link(EmittedBlockInfo& block_info) {
 //    using namespace oaknut;
     using namespace Xbyak_loongarch64::util;
     using namespace Xbyak_loongarch64;
-
+    const auto save_code_ptr = code.getCurr<CodePtr>();
     for (auto [ptr_offset, target] : block_info.relocations) {
-        CodeGenerator c{reinterpret_cast<u32*>(block_info.entry_point + ptr_offset)};
-
+        code.SetCodePtr(reinterpret_cast<CodePtr>(block_info.entry_point + ptr_offset));
+        LoongArch64::BlockOfCode &c = code;
         switch (target) {
         case LinkTarget::ReturnToDispatcher:
             c.B(prelude_info.return_to_dispatcher);
@@ -281,10 +286,10 @@ void AddressSpace::Link(EmittedBlockInfo& block_info) {
             ASSERT_FALSE("Invalid relocation target");
         }
     }
-
+    code.SetCodePtr(save_code_ptr);
     for (auto [target_descriptor, list] : block_info.block_relocations) {
         block_references[target_descriptor].emplace(block_info.entry_point);
-        LinkBlockLinks(block_info.entry_point, Get(target_descriptor), list, prelude_info.return_to_dispatcher);
+        LinkBlockLinks(code,block_info.entry_point, Get(target_descriptor), list, prelude_info.return_to_dispatcher);
     }
 }
 
@@ -294,10 +299,10 @@ void AddressSpace::RelinkForDescriptor(IR::LocationDescriptor target_descriptor,
             const EmittedBlockInfo& block_info = block_iter->second;
 
             if (auto relocation_iter = block_info.block_relocations.find(target_descriptor); relocation_iter != block_info.block_relocations.end()) {
-                LinkBlockLinks(block_info.entry_point, target_ptr, relocation_iter->second, prelude_info.return_to_dispatcher);
+                LinkBlockLinks(code, block_info.entry_point, target_ptr, relocation_iter->second, prelude_info.return_to_dispatcher);
             }
-
-            mem.invalidate(reinterpret_cast<u32*>(block_info.entry_point), block_info.size);
+            // FIXME
+//            mem.invalidate(reinterpret_cast<u32*>(block_info.entry_point), block_info.size);
         }
     }
 }

@@ -23,8 +23,6 @@
 
 namespace Dynarmic::Backend::LoongArch64 {
 
-using namespace Xbyak_loongarch64::util;
-
 constexpr size_t spill_offset = offsetof(StackLayout, spill);
 constexpr size_t spill_slot_size = sizeof(decltype(StackLayout::spill)::value_type);
 
@@ -166,9 +164,9 @@ void RegAlloc::PrepareForCall(std::optional<Argument::copyable_reference> arg0, 
 
     // FIXME is this is args reg, should change to a0?
     // AAPCS64 Next General-purpose Register Number
-    int ngrn = 0;
+    unsigned int ngrn = 0;
     // AAPCS64 Next SIMD and Floating-point Register Number
-    int nsrn = 0;
+    unsigned int nsrn = 0;
 
     for (int i = 0; i < 4; i++) {
         if (args[i]) {
@@ -247,13 +245,13 @@ void RegAlloc::EmitVerboseDebuggingOutput() {
     code.add_imm(code.s0, code.zero,mcl::bit_cast<u64>(&PrintVerboseDebuggingOutputLine), Xscratch0);  // Non-volatile register
 
     const auto do_location = [&](HostLocInfo& info, HostLocType type, size_t index) {
-        using namespace Xbyak_loongarch64::util;
         for (const IR::Inst* value : info.values) {
             code.add_d(code.a0, code.sp, code.zero);
-            code.add_d(code.a1, static_cast<u64>(type), code.zero);
-            code.add_d(code.a2, index, code.zero);
-            code.add_d(X3, value->GetName(), code.zero);
-            code.add_d(X4, static_cast<u64>(value->GetType()), code.zero);
+            code.add_imm(code.a1, code.zero, static_cast<u64>(type), Xscratch0);
+            code.add_imm(code.a2, code.zero, index, Xscratch0);
+            code.add_imm(code.a3, code.zero, value->GetName(), Xscratch0);
+            code.add_imm(code.a4, code.zero, static_cast<u64>(value->GetType()), Xscratch0);
+
             code.jirl(code.ra, code.s0, 0);
         }
     };
@@ -271,10 +269,10 @@ void RegAlloc::EmitVerboseDebuggingOutput() {
 }
 
 template<HostLoc::Kind kind>
-int RegAlloc::GenerateImmediate(const IR::Value& value) {
+unsigned int RegAlloc::GenerateImmediate(const IR::Value& value) {
     ASSERT(value.GetType() != IR::Type::U1);
     if constexpr (kind == HostLoc::Kind::Gpr) {
-        const int new_location_index = AllocateRegister(gprs, gpr_order);
+        const unsigned int new_location_index = AllocateRegister(gprs, gpr_order);
         SpillGpr(new_location_index);
         gprs[new_location_index].SetupScratchLocation();
 
@@ -282,7 +280,7 @@ int RegAlloc::GenerateImmediate(const IR::Value& value) {
 
         return new_location_index;
     } else if constexpr (kind == HostLoc::Kind::Fpr) {
-        const int new_location_index = AllocateRegister(fprs, fpr_order);
+        const unsigned int new_location_index = AllocateRegister(fprs, fpr_order);
         SpillFpr(new_location_index);
         fprs[new_location_index].SetupScratchLocation();
 
@@ -295,7 +293,8 @@ int RegAlloc::GenerateImmediate(const IR::Value& value) {
         flags.SetupScratchLocation();
 
         code.add_imm(Xscratch0, code.zero, value.GetImmediateAsU64(), Xscratch1);
-        code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
+        // FIXME
+//        code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
 
         return 0;
     } else {
@@ -304,7 +303,7 @@ int RegAlloc::GenerateImmediate(const IR::Value& value) {
 }
 
 template<HostLoc::Kind required_kind>
-int RegAlloc::RealizeReadImpl(const IR::Value& value) {
+unsigned int RegAlloc::RealizeReadImpl(const IR::Value& value) {
     if (value.IsImmediate()) {
         return GenerateImmediate<required_kind>(value);
     }
@@ -321,7 +320,7 @@ int RegAlloc::RealizeReadImpl(const IR::Value& value) {
     ASSERT(ValueInfo(*current_location).locked);
 
     if constexpr (required_kind == HostLoc::Kind::Gpr) {
-        const int new_location_index = AllocateRegister(gprs, gpr_order);
+        const unsigned int new_location_index = AllocateRegister(gprs, gpr_order);
         SpillGpr(new_location_index);
 
         switch (current_location->kind) {
@@ -336,7 +335,8 @@ int RegAlloc::RealizeReadImpl(const IR::Value& value) {
             code.ld_d(Xbyak_loongarch64::XReg{new_location_index}, code.sp, spill_offset + current_location->index * spill_slot_size);
             break;
         case HostLoc::Kind::Flags:
-            code.MRS(Xbyak_loongarch64::XReg{new_location_index}, Xbyak_loongarch64::SystemReg::NZCV);
+            // FIXME
+//            code.MRS(Xbyak_loongarch64::XReg{new_location_index}, Xbyak_loongarch64::SystemReg::NZCV);
             break;
         }
 
@@ -344,7 +344,7 @@ int RegAlloc::RealizeReadImpl(const IR::Value& value) {
         gprs[new_location_index].realized = true;
         return new_location_index;
     } else if constexpr (required_kind == HostLoc::Kind::Fpr) {
-        const int new_location_index = AllocateRegister(fprs, fpr_order);
+        const unsigned int new_location_index = AllocateRegister(fprs, fpr_order);
         SpillFpr(new_location_index);
 
         switch (current_location->kind) {
@@ -376,7 +376,7 @@ int RegAlloc::RealizeReadImpl(const IR::Value& value) {
 }
 
 template<HostLoc::Kind kind>
-int RegAlloc::RealizeWriteImpl(const IR::Inst* value) {
+unsigned int RegAlloc::RealizeWriteImpl(const IR::Inst* value) {
     defined_insts.emplace(value);
 
     ASSERT(!ValueLocation(value));
@@ -401,12 +401,12 @@ int RegAlloc::RealizeWriteImpl(const IR::Inst* value) {
 }
 
 template<HostLoc::Kind kind>
-int RegAlloc::RealizeReadWriteImpl(const IR::Value& read_value, const IR::Inst* write_value) {
+unsigned int RegAlloc::RealizeReadWriteImpl(const IR::Value& read_value, const IR::Inst* write_value) {
     defined_insts.emplace(write_value);
 
     // TODO: Move elimination
 
-    const int write_loc = RealizeWriteImpl<kind>(write_value);
+    const unsigned int write_loc = RealizeWriteImpl<kind>(write_value);
 
     if constexpr (kind == HostLoc::Kind::Gpr) {
         LoadCopyInto(read_value, Xbyak_loongarch64::XReg{write_loc});
@@ -421,15 +421,15 @@ int RegAlloc::RealizeReadWriteImpl(const IR::Value& read_value, const IR::Inst* 
     }
 }
 
-template int RegAlloc::RealizeReadImpl<HostLoc::Kind::Gpr>(const IR::Value& value);
-template int RegAlloc::RealizeReadImpl<HostLoc::Kind::Fpr>(const IR::Value& value);
-template int RegAlloc::RealizeReadImpl<HostLoc::Kind::Flags>(const IR::Value& value);
-template int RegAlloc::RealizeWriteImpl<HostLoc::Kind::Gpr>(const IR::Inst* value);
-template int RegAlloc::RealizeWriteImpl<HostLoc::Kind::Fpr>(const IR::Inst* value);
-template int RegAlloc::RealizeWriteImpl<HostLoc::Kind::Flags>(const IR::Inst* value);
-template int RegAlloc::RealizeReadWriteImpl<HostLoc::Kind::Gpr>(const IR::Value&, const IR::Inst*);
-template int RegAlloc::RealizeReadWriteImpl<HostLoc::Kind::Fpr>(const IR::Value&, const IR::Inst*);
-template int RegAlloc::RealizeReadWriteImpl<HostLoc::Kind::Flags>(const IR::Value&, const IR::Inst*);
+template unsigned int RegAlloc::RealizeReadImpl<HostLoc::Kind::Gpr>(const IR::Value& value);
+template unsigned int RegAlloc::RealizeReadImpl<HostLoc::Kind::Fpr>(const IR::Value& value);
+template unsigned int RegAlloc::RealizeReadImpl<HostLoc::Kind::Flags>(const IR::Value& value);
+template unsigned int RegAlloc::RealizeWriteImpl<HostLoc::Kind::Gpr>(const IR::Inst* value);
+template unsigned int RegAlloc::RealizeWriteImpl<HostLoc::Kind::Fpr>(const IR::Inst* value);
+template unsigned int RegAlloc::RealizeWriteImpl<HostLoc::Kind::Flags>(const IR::Inst* value);
+template unsigned int RegAlloc::RealizeReadWriteImpl<HostLoc::Kind::Gpr>(const IR::Value& read_value, const IR::Inst* write_value);
+template unsigned int RegAlloc::RealizeReadWriteImpl<HostLoc::Kind::Fpr>(const IR::Value& read_value, const IR::Inst* write_value);
+template unsigned int RegAlloc::RealizeReadWriteImpl<HostLoc::Kind::Flags>(const IR::Value& read_value, const IR::Inst* write_value);
 
 int RegAlloc::AllocateRegister(const std::array<HostLocInfo, 32>& regs, const std::vector<int>& order) const {
     const auto empty = std::find_if(order.begin(), order.end(), [&](int i) { return regs[i].IsCompletelyEmpty(); });
@@ -445,7 +445,7 @@ int RegAlloc::AllocateRegister(const std::array<HostLocInfo, 32>& regs, const st
     return candidates[dis(rand_gen)];
 }
 
-void RegAlloc::SpillGpr(int index) {
+void RegAlloc::SpillGpr(unsigned int index) {
     ASSERT(!gprs[index].locked && !gprs[index].realized);
     if (gprs[index].values.empty()) {
         return;
@@ -455,13 +455,13 @@ void RegAlloc::SpillGpr(int index) {
     spills[new_location_index] = std::exchange(gprs[index], {});
 }
 
-void RegAlloc::SpillFpr(int index) {
+void RegAlloc::SpillFpr(unsigned int index) {
     ASSERT(!fprs[index].locked && !fprs[index].realized);
     if (fprs[index].values.empty()) {
         return;
     }
     const int new_location_index = FindFreeSpill();
-    code.st_d(Xbyak_loongarch64::VReg{index}, code.sp, spill_offset + new_location_index * spill_slot_size);
+    code.fst_d(Xbyak_loongarch64::XReg{index}, code.sp, spill_offset + new_location_index * spill_slot_size);
     spills[new_location_index] = std::exchange(fprs[index], {});
 }
 
@@ -479,13 +479,15 @@ void RegAlloc::ReadWriteFlags(Argument& read, IR::Inst* write) {
         if (!flags.values.empty()) {
             SpillFlags();
         }
-        code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xbyak_loongarch64::XReg{current_location->index});
+        // FIXME
+//        code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xbyak_loongarch64::XReg{current_location->index});
     } else if (current_location->kind == HostLoc::Kind::Spill) {
         if (!flags.values.empty()) {
             SpillFlags();
         }
         code.ld_d(Wscratch0, code.sp, spill_offset + current_location->index * spill_slot_size);
-        code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
+        // FIXME
+//        code.MSR(Xbyak_loongarch64::SystemReg::NZCV, Xscratch0);
     } else {
         ASSERT_FALSE("Invalid current location for flags");
     }
@@ -495,15 +497,16 @@ void RegAlloc::ReadWriteFlags(Argument& read, IR::Inst* write) {
         flags.realized = false;
     }
 }
-
+// no need probably
 void RegAlloc::SpillFlags() {
     ASSERT(!flags.locked && !flags.realized);
     if (flags.values.empty()) {
         return;
     }
-    const int new_location_index = AllocateRegister(gprs, gpr_order);
+    const unsigned int new_location_index = AllocateRegister(gprs, gpr_order);
     SpillGpr(new_location_index);
-    code.MRS(Xbyak_loongarch64::XReg{new_location_index}, Xbyak_loongarch64::SystemReg::NZCV);
+    // FIXME
+//    code.MRS(Xbyak_loongarch64::XReg{new_location_index}, Xbyak_loongarch64::SystemReg::NZCV);
     gprs[new_location_index] = std::exchange(flags, {});
 }
 
@@ -533,7 +536,8 @@ void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::XReg reg)
         code.ld_d(reg, code.sp, spill_offset + current_location->index * spill_slot_size);
         break;
     case HostLoc::Kind::Flags:
-        code.MRS(reg, Xbyak_loongarch64::SystemReg::NZCV);
+        // FIXME
+//        code.MRS(reg, Xbyak_loongarch64::SystemReg::NZCV);
         break;
     }
 }
@@ -570,16 +574,16 @@ std::optional<HostLoc> RegAlloc::ValueLocation(const IR::Inst* value) const {
     const auto contains_value = [value](const HostLocInfo& info) { return info.Contains(value); };
 
     if (const auto iter = std::find_if(gprs.begin(), gprs.end(), contains_value); iter != gprs.end()) {
-        return HostLoc{HostLoc::Kind::Gpr, static_cast<int>(iter - gprs.begin())};
+        return HostLoc{HostLoc::Kind::Gpr, static_cast<unsigned int>(iter - gprs.begin())};
     }
     if (const auto iter = std::find_if(fprs.begin(), fprs.end(), contains_value); iter != fprs.end()) {
-        return HostLoc{HostLoc::Kind::Fpr, static_cast<int>(iter - fprs.begin())};
+        return HostLoc{HostLoc::Kind::Fpr, static_cast<unsigned int>(iter - fprs.begin())};
     }
     if (contains_value(flags)) {
         return HostLoc{HostLoc::Kind::Flags, 0};
     }
     if (const auto iter = std::find_if(spills.begin(), spills.end(), contains_value); iter != spills.end()) {
-        return HostLoc{HostLoc::Kind::Spill, static_cast<int>(iter - spills.begin())};
+        return HostLoc{HostLoc::Kind::Spill, static_cast<unsigned int>(iter - spills.begin())};
     }
     return std::nullopt;
 }

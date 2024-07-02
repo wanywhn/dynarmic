@@ -9,6 +9,8 @@
 
 #include <mcl/stdint.hpp>
 
+#include "dynarmic/frontend/A32/a32_location_descriptor.h"
+
 namespace Dynarmic::Backend::LoongArch64 {
 
 class BlockOfCode;
@@ -59,9 +61,12 @@ struct A32JitState {
     u32 Fpscr() const;
     void SetFpscr(u32 FPSCR);
 
-    u64 GetUniqueHash() const noexcept {
-        return (static_cast<u64>(upper_location_descriptor) << 32) | (static_cast<u64>(Reg[15]));
+    IR::LocationDescriptor GetLocationDescriptor() const {
+        return IR::LocationDescriptor{regs[15] | (static_cast<u64>(upper_location_descriptor) << 32)};
     }
+//    u64 GetUniqueHash() const noexcept {
+//        return (static_cast<u64>(upper_location_descriptor) << 32) | (static_cast<u64>(Reg[15]));
+//    }
 
 };
 
@@ -69,6 +74,6 @@ struct A32JitState {
 #    pragma warning(pop)
 #endif
 
-using CodePtr = const void*;
+//using CodePtr = const void*;
 
 }  // namespace Dynarmic::Backend::X64

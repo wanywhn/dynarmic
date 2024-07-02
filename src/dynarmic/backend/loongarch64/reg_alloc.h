@@ -21,6 +21,7 @@
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/value.h"
 #include "xbyak_loongarch64.h"
+#include "block_of_code.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -34,7 +35,7 @@ struct HostLoc final {
         Flags,
         Spill,
     } kind;
-    int index;
+    unsigned int index;
 };
 
 enum RWType {
@@ -80,8 +81,8 @@ private:
     template<typename>
     friend struct RAReg;
 
-    explicit FlagsTag(int) {}
-    int getIdx() const { return 0; }
+    explicit FlagsTag(unsigned int) {}
+    uint32_t getIdx() const { return 0; }
 };
 
 template<typename T>
@@ -97,6 +98,8 @@ public:
     operator Xbyak_loongarch64::XReg () const { return reg.value(); }
     operator Xbyak_loongarch64::WReg() const { return reg.value(); }
     operator Xbyak_loongarch64::VReg() const { return reg.value(); }
+    operator Xbyak_loongarch64::XVReg() const { return reg.value(); }
+
     //    operator Xbyak_loongarch64::WRegWsp() const
     //    requires(std::is_same_v<T, Xbyak_loongarch64::WReg>)
     //    {
@@ -159,7 +162,7 @@ class RegAlloc final {
 public:
     using ArgumentInfo = std::array<Argument, IR::max_arg_count>;
 
-    explicit RegAlloc(Xbyak_loongarch64::CodeGenerator& code, FpsrManager& fpsr_manager, std::vector<int> gpr_order, std::vector<int> fpr_order)
+    explicit RegAlloc(BlockOfCode& code, FpsrManager& fpsr_manager, std::vector<int> gpr_order, std::vector<int> fpr_order)
             : code{code}, fpsr_manager{fpsr_manager}, gpr_order{gpr_order}, fpr_order{fpr_order}, rand_gen{std::random_device{}()} {}
 
     ArgumentInfo GetArgumentInfo(IR::Inst* inst);
@@ -169,10 +172,12 @@ public:
     auto ReadW(Argument& arg) { return RAReg<Xbyak_loongarch64::WReg>{*this, RWType::Read, arg.value, nullptr}; }
 
     auto ReadQ(Argument& arg) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Read, arg.value, nullptr}; }
-    auto ReadD(Argument& arg) { return RAReg<Xbyak_loongarch64::DReg>{*this, RWType::Read, arg.value, nullptr}; }
-    auto ReadS(Argument& arg) { return RAReg<Xbyak_loongarch64::SReg>{*this, RWType::Read, arg.value, nullptr}; }
-    auto ReadH(Argument& arg) { return RAReg<Xbyak_loongarch64::HReg>{*this, RWType::Read, arg.value, nullptr}; }
-    auto ReadB(Argument& arg) { return RAReg<Xbyak_loongarch64::BReg>{*this, RWType::Read, arg.value, nullptr}; }
+    auto ReadD(Argument& arg) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Read, arg.value, nullptr}; }
+    auto ReadXV(Argument& arg) { return RAReg<Xbyak_loongarch64::XVReg>{*this, RWType::Read, arg.value, nullptr}; }
+
+    auto ReadS(Argument& arg) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Read, arg.value, nullptr}; }
+    auto ReadH(Argument& arg) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Read, arg.value, nullptr}; }
+    auto ReadB(Argument& arg) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Read, arg.value, nullptr}; }
 
     template<size_t size>
     auto ReadReg(Argument& arg) {
@@ -206,10 +211,11 @@ public:
     auto WriteW(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::WReg>{*this, RWType::Write, {}, inst}; }
 
     auto WriteQ(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Write, {}, inst}; }
-    auto WriteD(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::DReg>{*this, RWType::Write, {}, inst}; }
-    auto WriteS(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::SReg>{*this, RWType::Write, {}, inst}; }
-    auto WriteH(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::HReg>{*this, RWType::Write, {}, inst}; }
-    auto WriteB(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::BReg>{*this, RWType::Write, {}, inst}; }
+    auto WriteD(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Write, {}, inst}; }
+    auto WriteXV(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::XVReg>{*this, RWType::Write, {}, inst}; }
+    auto WriteS(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Write, {}, inst}; }
+    auto WriteH(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Write, {}, inst}; }
+    auto WriteB(IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::Write, {}, inst}; }
 
     auto WriteFlags(IR::Inst* inst) { return RAReg<FlagsTag>{*this, RWType::Write, {}, inst}; }
 
@@ -245,10 +251,10 @@ public:
     auto ReadWriteW(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::WReg>{*this, RWType::ReadWrite, arg.value, inst}; }
 
     auto ReadWriteQ(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::ReadWrite, arg.value, inst}; }
-    auto ReadWriteD(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::DReg>{*this, RWType::ReadWrite, arg.value, inst}; }
-    auto ReadWriteS(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::SReg>{*this, RWType::ReadWrite, arg.value, inst}; }
-    auto ReadWriteH(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::HReg>{*this, RWType::ReadWrite, arg.value, inst}; }
-    auto ReadWriteB(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::BReg>{*this, RWType::ReadWrite, arg.value, inst}; }
+    auto ReadWriteD(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::ReadWrite, arg.value, inst}; }
+    auto ReadWriteS(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::ReadWrite, arg.value, inst}; }
+    auto ReadWriteH(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::ReadWrite, arg.value, inst}; }
+    auto ReadWriteB(Argument& arg, const IR::Inst* inst) { return RAReg<Xbyak_loongarch64::VReg>{*this, RWType::ReadWrite, arg.value, inst}; }
 
     template<size_t size>
     auto ReadWriteReg(Argument& arg, const IR::Inst* inst) {
@@ -305,17 +311,17 @@ private:
     friend struct RAReg;
 
     template<HostLoc::Kind kind>
-    int GenerateImmediate(const IR::Value& value);
+    unsigned int GenerateImmediate(const IR::Value& value);
     template<HostLoc::Kind kind>
-    int RealizeReadImpl(const IR::Value& value);
+    unsigned int RealizeReadImpl(const IR::Value& value);
     template<HostLoc::Kind kind>
-    int RealizeWriteImpl(const IR::Inst* value);
+    unsigned int RealizeWriteImpl(const IR::Inst* value);
     template<HostLoc::Kind kind>
-    int RealizeReadWriteImpl(const IR::Value& read_value, const IR::Inst* write_value);
+    unsigned int RealizeReadWriteImpl(const IR::Value&, const IR::Inst*);
 
     int AllocateRegister(const std::array<HostLocInfo, 32>& regs, const std::vector<int>& order) const;
-    void SpillGpr(int index);
-    void SpillFpr(int index);
+    void SpillGpr(unsigned int index);
+    void SpillFpr(unsigned int index);
     int FindFreeSpill() const;
 
     void LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::XReg reg);
@@ -325,7 +331,7 @@ private:
     HostLocInfo& ValueInfo(HostLoc host_loc);
     HostLocInfo& ValueInfo(const IR::Inst* value);
 
-    Xbyak_loongarch64::CodeGenerator& code;
+    BlockOfCode& code;
     FpsrManager& fpsr_manager;
     std::vector<int> gpr_order;
     std::vector<int> fpr_order;

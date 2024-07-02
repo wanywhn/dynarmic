@@ -4,6 +4,8 @@
  */
 
 #include <mcl/stdint.hpp>
+#include "xbyak_loongarch64.h"
+#include "block_of_code.h"
 
 namespace oaknut {
 struct PointerCodeGeneratorPolicy;
@@ -24,12 +26,12 @@ struct EmitContext;
 enum class LinkTarget;
 
 template<size_t bitsize>
-void EmitReadMemory(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst);
+void EmitReadMemory(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst);
 template<size_t bitsize>
-void EmitExclusiveReadMemory(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst);
+void EmitExclusiveReadMemory(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst);
 template<size_t bitsize>
-void EmitWriteMemory(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst);
+void EmitWriteMemory(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst);
 template<size_t bitsize>
-void EmitExclusiveWriteMemory(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst);
+void EmitExclusiveWriteMemory(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst);
 
 }  // namespace Dynarmic::Backend::LoongArch64

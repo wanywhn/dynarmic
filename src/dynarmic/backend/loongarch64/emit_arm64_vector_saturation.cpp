@@ -23,7 +23,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 using namespace Xbyak_loongarch64::util;
 
 template<size_t size, typename EmitFn>
-static void Emit(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
+static void Emit(BlockOfCode&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     auto Qresult = ctx.reg_alloc.WriteQ(inst);
     auto Qa = ctx.reg_alloc.ReadQ(args[0]);
@@ -35,27 +35,28 @@ static void Emit(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::I
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorSignedSaturatedAdd8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorSignedSaturatedAdd8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    // FIX this all
     Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_b(Vresult, Va, Vb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorSignedSaturatedAdd16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorSignedSaturatedAdd16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_h(Vresult, Va, Vb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorSignedSaturatedAdd32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorSignedSaturatedAdd32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_w(Vresult, Va, Vb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorSignedSaturatedAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorSignedSaturatedAdd64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_d(Vresult, Va, Vb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorSignedSaturatedSub8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorSignedSaturatedSub8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
 //        code.vxor_v(code.vr6, code.vr6, code.vr6);
@@ -70,7 +71,7 @@ void EmitIR<IR::Opcode::VectorSignedSaturatedSub8>(Xbyak_loongarch64::CodeGenera
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorSignedSaturatedSub16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorSignedSaturatedSub16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
 //        code.vxor_v(code.vr6, code.vr6, code.vr6);
@@ -86,7 +87,7 @@ void EmitIR<IR::Opcode::VectorSignedSaturatedSub16>(Xbyak_loongarch64::CodeGener
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorSignedSaturatedSub32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorSignedSaturatedSub32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
 //        code.vxor_v(code.vr6, code.vr6, code.vr6);
@@ -102,7 +103,7 @@ void EmitIR<IR::Opcode::VectorSignedSaturatedSub32>(Xbyak_loongarch64::CodeGener
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorSignedSaturatedSub64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorSignedSaturatedSub64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
 //        code.vxor_v(code.vr6, code.vr6, code.vr6);
@@ -118,27 +119,27 @@ void EmitIR<IR::Opcode::VectorSignedSaturatedSub64>(Xbyak_loongarch64::CodeGener
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_bu(Vresult, Va, Vb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_hu(Vresult, Va, Vb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_wu(Vresult, Va, Vb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorUnsignedSaturatedAdd64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsadd_du(Vresult, Va, Vb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<8>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which scr reg?
 //        code.vxor_v(code.vr6, code.vr6, code.vr6);
@@ -153,7 +154,7 @@ void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub8>(Xbyak_loongarch64::CodeGene
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<16>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
 //        code.vxor_v(code.vr6, code.vr6, code.vr6);
@@ -169,7 +170,7 @@ void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub16>(Xbyak_loongarch64::CodeGen
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<32>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
 //        code.vxor_v(code.vr6, code.vr6, code.vr6);
@@ -185,7 +186,7 @@ void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub32>(Xbyak_loongarch64::CodeGen
 }
 
 template<>
-void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::VectorUnsignedSaturatedSub64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     Emit<64>(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
         // FIXME use which sch reg?
 //        code.vxor_v(code.vr6, code.vr6, code.vr6);

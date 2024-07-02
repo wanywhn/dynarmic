@@ -23,6 +23,9 @@ constexpr Xbyak_loongarch64::XReg Xticks{29};
 constexpr Xbyak_loongarch64::XReg Xfastmem{28};
 constexpr Xbyak_loongarch64::XReg Xpagetable{27};
 
+constexpr size_t ABI_PARAM_COUNT = 6;
+
+
 constexpr Xbyak_loongarch64::XReg Xscratch0{18}, Xscratch1{19}, Xscratch2{20};
 constexpr Xbyak_loongarch64::WReg Wscratch0{18}, Wscratch1{19}, Wscratch2{20};
 constexpr Xbyak_loongarch64::VReg Vscratch0{18}, Vscratch1{19}, Vscratch2{20};
@@ -73,9 +76,9 @@ constexpr RegisterList ToRegList(Xbyak_loongarch64::Reg reg) {
 
 // constexpr RegisterList ABI_CALLEE_SAVE = 0x0000ff00'7ff80000;
 //  !FIXME 0xff00??
-constexpr RegisterList ABI_CALLEE_SAVE = 0x0000ff00'ffc0000A;
+constexpr RegisterList ABI_CALLEE_SAVE = 0xffe00000'ffc00002;
 // constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'4000ffff;
-constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'001FFFF2;
+constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'001FFFF2 & ~0x1C0000; // 18\19\20
 
 void ABI_PushRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, size_t stack_space);
 void ABI_PopRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, size_t stack_space);

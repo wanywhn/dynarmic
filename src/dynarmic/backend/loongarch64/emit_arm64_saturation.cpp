@@ -19,7 +19,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 using namespace Xbyak_loongarch64::util;
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedAddWithFlag32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedAddWithFlag32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     const auto overflow_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetOverflowFromOp);
     ASSERT(overflow_inst);
 
@@ -51,7 +51,7 @@ void EmitIR<IR::Opcode::SignedSaturatedAddWithFlag32>(Xbyak_loongarch64::CodeGen
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedSubWithFlag32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedSubWithFlag32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     const auto overflow_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetOverflowFromOp);
     ASSERT(overflow_inst);
 
@@ -81,7 +81,7 @@ void EmitIR<IR::Opcode::SignedSaturatedSubWithFlag32>(Xbyak_loongarch64::CodeGen
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturation>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturation>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     const auto overflow_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetOverflowFromOp);
 
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -133,7 +133,7 @@ void EmitIR<IR::Opcode::SignedSaturation>(Xbyak_loongarch64::CodeGenerator& code
 }
 
 template<>
-void EmitIR<IR::Opcode::UnsignedSaturation>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::UnsignedSaturation>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     const auto overflow_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetOverflowFromOp);
 
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -168,7 +168,7 @@ void EmitIR<IR::Opcode::UnsignedSaturation>(Xbyak_loongarch64::CodeGenerator& co
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedAdd8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedAdd8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -176,7 +176,7 @@ void EmitIR<IR::Opcode::SignedSaturatedAdd8>(Xbyak_loongarch64::CodeGenerator& c
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedAdd16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedAdd16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -184,7 +184,7 @@ void EmitIR<IR::Opcode::SignedSaturatedAdd16>(Xbyak_loongarch64::CodeGenerator& 
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedAdd32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedAdd32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -192,7 +192,7 @@ void EmitIR<IR::Opcode::SignedSaturatedAdd32>(Xbyak_loongarch64::CodeGenerator& 
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedAdd64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -200,7 +200,7 @@ void EmitIR<IR::Opcode::SignedSaturatedAdd64>(Xbyak_loongarch64::CodeGenerator& 
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedDoublingMultiplyReturnHigh16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedDoublingMultiplyReturnHigh16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -208,7 +208,7 @@ void EmitIR<IR::Opcode::SignedSaturatedDoublingMultiplyReturnHigh16>(Xbyak_loong
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedDoublingMultiplyReturnHigh32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedDoublingMultiplyReturnHigh32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -216,7 +216,7 @@ void EmitIR<IR::Opcode::SignedSaturatedDoublingMultiplyReturnHigh32>(Xbyak_loong
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedSub8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedSub8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -224,7 +224,7 @@ void EmitIR<IR::Opcode::SignedSaturatedSub8>(Xbyak_loongarch64::CodeGenerator& c
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedSub16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedSub16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -232,7 +232,7 @@ void EmitIR<IR::Opcode::SignedSaturatedSub16>(Xbyak_loongarch64::CodeGenerator& 
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedSub32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedSub32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -240,7 +240,7 @@ void EmitIR<IR::Opcode::SignedSaturatedSub32>(Xbyak_loongarch64::CodeGenerator& 
 }
 
 template<>
-void EmitIR<IR::Opcode::SignedSaturatedSub64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::SignedSaturatedSub64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -248,7 +248,7 @@ void EmitIR<IR::Opcode::SignedSaturatedSub64>(Xbyak_loongarch64::CodeGenerator& 
 }
 
 template<>
-void EmitIR<IR::Opcode::UnsignedSaturatedAdd8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::UnsignedSaturatedAdd8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -256,7 +256,7 @@ void EmitIR<IR::Opcode::UnsignedSaturatedAdd8>(Xbyak_loongarch64::CodeGenerator&
 }
 
 template<>
-void EmitIR<IR::Opcode::UnsignedSaturatedAdd16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::UnsignedSaturatedAdd16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -264,7 +264,7 @@ void EmitIR<IR::Opcode::UnsignedSaturatedAdd16>(Xbyak_loongarch64::CodeGenerator
 }
 
 template<>
-void EmitIR<IR::Opcode::UnsignedSaturatedAdd32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::UnsignedSaturatedAdd32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -272,7 +272,7 @@ void EmitIR<IR::Opcode::UnsignedSaturatedAdd32>(Xbyak_loongarch64::CodeGenerator
 }
 
 template<>
-void EmitIR<IR::Opcode::UnsignedSaturatedAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::UnsignedSaturatedAdd64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -280,7 +280,7 @@ void EmitIR<IR::Opcode::UnsignedSaturatedAdd64>(Xbyak_loongarch64::CodeGenerator
 }
 
 template<>
-void EmitIR<IR::Opcode::UnsignedSaturatedSub8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::UnsignedSaturatedSub8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -288,7 +288,7 @@ void EmitIR<IR::Opcode::UnsignedSaturatedSub8>(Xbyak_loongarch64::CodeGenerator&
 }
 
 template<>
-void EmitIR<IR::Opcode::UnsignedSaturatedSub16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::UnsignedSaturatedSub16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -296,7 +296,7 @@ void EmitIR<IR::Opcode::UnsignedSaturatedSub16>(Xbyak_loongarch64::CodeGenerator
 }
 
 template<>
-void EmitIR<IR::Opcode::UnsignedSaturatedSub32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::UnsignedSaturatedSub32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -304,7 +304,7 @@ void EmitIR<IR::Opcode::UnsignedSaturatedSub32>(Xbyak_loongarch64::CodeGenerator
 }
 
 template<>
-void EmitIR<IR::Opcode::UnsignedSaturatedSub64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::UnsignedSaturatedSub64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;

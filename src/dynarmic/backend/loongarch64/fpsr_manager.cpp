@@ -13,7 +13,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 using namespace Xbyak_loongarch64::util;
 
-FpsrManager::FpsrManager(Xbyak_loongarch64::CodeGenerator& code, size_t state_fpsr_offset)
+FpsrManager::FpsrManager(BlockOfCode& code, size_t state_fpsr_offset)
         : code{code}, state_fpsr_offset{state_fpsr_offset} {}
 
 void FpsrManager::Spill() {
@@ -21,7 +21,7 @@ void FpsrManager::Spill() {
         return;
 
     code.ld_d(Wscratch0, Xstate, state_fpsr_offset);
-    code.MRS(Xscratch1, Xbyak_loongarch64::SystemReg::FPSR);
+//    code.MRS(Xscratch1, Xbyak_loongarch64::SystemReg::FPSR);
     code.or_(Wscratch0, Wscratch0, Wscratch1);
     code.st_d(Wscratch0, Xstate, state_fpsr_offset);
 
@@ -32,7 +32,7 @@ void FpsrManager::Load() {
     if (fpsr_loaded)
         return;
 
-    code.MSR(Xbyak_loongarch64::SystemReg::FPSR, code.zero);
+//    code.MSR(Xbyak_loongarch64::SystemReg::FPSR, code.zero);
 
     fpsr_loaded = true;
 }

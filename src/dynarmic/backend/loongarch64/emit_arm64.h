@@ -18,6 +18,7 @@
 #include "dynarmic/interface/optimization_flags.h"
 #include "dynarmic/ir/location_descriptor.h"
 #include "xbyak_loongarch64.h"
+#include "block_of_code.h"
 
 namespace oaknut {
 struct PointerCodeGeneratorPolicy;
@@ -42,15 +43,19 @@ enum class Opcode;
 namespace Dynarmic::Backend::LoongArch64 {
 using A64FullVectorWidth = std::integral_constant<size_t, 128>;
 
-    // Array alias that always sizes itself according to the given type T
+// Array alias that always sizes itself according to the given type T
 // relative to the size of a vector register. e.g. T = u32 would result
 // in a std::array<u32, 4>.
 template<typename T>
 using VectorArray = std::array<T, A64FullVectorWidth::value / mcl::bitsizeof<T>>;
 
-struct EmitContext;
+template<typename T>
+using HalfVectorArray = std::array<T, A64FullVectorWidth::value / mcl::bitsizeof<T> / 2>;
 
-using CodePtr = std::byte*;
+
+    struct EmitContext;
+
+//using CodePtr = const void*;
 
 enum class LinkTarget {
     ReturnToDispatcher,
@@ -158,10 +163,10 @@ struct EmitConfig {
 
     // Frontend specific callbacks
     FP::FPCR (*descriptor_to_fpcr)(const IR::LocationDescriptor& descriptor);
-    Xbyak_loongarch64::Label (*emit_cond)(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Cond cond);
-    void (*emit_condition_failed_terminal)(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx);
-    void (*emit_terminal)(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx);
-    void (*emit_check_memory_abort)(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, Xbyak_loongarch64::Label& end);
+    Xbyak_loongarch64::Label (*emit_cond)(BlockOfCode& code, EmitContext& ctx, IR::Cond cond);
+    void (*emit_condition_failed_terminal)(BlockOfCode& code, EmitContext& ctx);
+    void (*emit_terminal)(BlockOfCode& code, EmitContext& ctx);
+    void (*emit_check_memory_abort)(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, Xbyak_loongarch64::Label& end);
 
     // State offsets
     size_t state_nzcv_offset;
@@ -175,19 +180,19 @@ struct EmitConfig {
     bool very_verbose_debugging_output;
 };
 
-EmittedBlockInfo EmitArm64(Xbyak_loongarch64::CodeGenerator& code, IR::Block block, const EmitConfig& emit_conf, FastmemManager& fastmem_manager);
+EmittedBlockInfo EmitArm64(BlockOfCode& code, IR::Block block, const EmitConfig& emit_conf, FastmemManager& fastmem_manager);
 
 template<IR::Opcode op>
-void EmitIR(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst);
-void EmitRelocation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, LinkTarget link_target);
-void EmitBlockLinkRelocation(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, const IR::LocationDescriptor& descriptor, BlockRelocationType type);
-Xbyak_loongarch64::Label EmitA32Cond(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Cond cond);
-Xbyak_loongarch64::Label EmitA64Cond(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Cond cond);
-void EmitA32Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx);
-void EmitA64Terminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx);
-void EmitA32ConditionFailedTerminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx);
-void EmitA64ConditionFailedTerminal(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx);
-void EmitA32CheckMemoryAbort(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, Xbyak_loongarch64::Label& end);
-void EmitA64CheckMemoryAbort(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, Xbyak_loongarch64::Label& end);
+void EmitIR(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst);
+void EmitRelocation(BlockOfCode& code, EmitContext& ctx, LinkTarget link_target);
+void EmitBlockLinkRelocation(BlockOfCode& code, EmitContext& ctx, const IR::LocationDescriptor& descriptor, BlockRelocationType type);
+Xbyak_loongarch64::Label EmitA32Cond(BlockOfCode& code, EmitContext& ctx, IR::Cond cond);
+Xbyak_loongarch64::Label EmitA64Cond(BlockOfCode& code, EmitContext& ctx, IR::Cond cond);
+void EmitA32Terminal(BlockOfCode& code, EmitContext& ctx);
+void EmitA64Terminal(BlockOfCode& code, EmitContext& ctx);
+void EmitA32ConditionFailedTerminal(BlockOfCode& code, EmitContext& ctx);
+void EmitA64ConditionFailedTerminal(BlockOfCode& code, EmitContext& ctx);
+void EmitA32CheckMemoryAbort(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, Xbyak_loongarch64::Label& end);
+void EmitA64CheckMemoryAbort(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, Xbyak_loongarch64::Label& end);
 
 }  // namespace Dynarmic::Backend::LoongArch64

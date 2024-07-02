@@ -15,7 +15,7 @@ struct EmittedBlockInfo;
 
 class A64AddressSpace final : public AddressSpace {
 public:
-    explicit A64AddressSpace(const A64::UserConfig& conf);
+    explicit A64AddressSpace(const A64::UserConfig& conf, JitStateInfo jsi);
 
     IR::Block GenerateIR(IR::LocationDescriptor) const override;
 

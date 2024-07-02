@@ -15,41 +15,119 @@
 #include "dynarmic/ir/opcodes.h"
 #include "xbyak_loongarch64.h"
 #include "xbyak_loongarch64_util.h"
+#include "nzcv_util.h"
+#include "mcl/type_traits/integer_of_size.hpp"
+#include "dynarmic/common/fp/op/FPRecipStepFused.h"
+#include "dynarmic/common/lut_from_list.h"
+#include "dynarmic/common/fp/op/FPToFixed.h"
+#include "mcl/bit_cast.hpp"
+#include <mcl/assert.hpp>
+#include <mcl/mp/metavalue/lift_value.hpp>
+#include <mcl/mp/typelist/cartesian_product.hpp>
+#include <mcl/mp/typelist/get.hpp>
+#include <mcl/mp/typelist/lift_sequence.hpp>
+#include <mcl/mp/typelist/list.hpp>
+#include <mcl/mp/typelist/lower_to_tuple.hpp>
+#include <mcl/stdint.hpp>
+#include <mcl/type_traits/integer_of_size.hpp>
+#include "dynarmic/common/fp/op.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
 using namespace Xbyak_loongarch64::util;
 
+    constexpr u64 f32_negative_zero = 0x80000000u;
+    constexpr u64 f32_nan = 0x7fc00000u;
+    constexpr u64 f32_non_sign_mask = 0x7fffffffu;
+    constexpr u64 f32_smallest_normal = 0x00800000u;
+
+    constexpr u64 f64_negative_zero = 0x8000000000000000u;
+    constexpr u64 f64_nan = 0x7ff8000000000000u;
+    constexpr u64 f64_non_sign_mask = 0x7fffffffffffffffu;
+    constexpr u64 f64_smallest_normal = 0x0010000000000000u;
+
+    constexpr u64 f64_min_s16 = 0xc0e0000000000000u;      // -32768 as a double
+    constexpr u64 f64_max_s16 = 0x40dfffc000000000u;      // 32767 as a double
+    constexpr u64 f64_min_u16 = 0x0000000000000000u;      // 0 as a double
+    constexpr u64 f64_max_u16 = 0x40efffe000000000u;      // 65535 as a double
+    constexpr u64 f64_max_s32 = 0x41dfffffffc00000u;      // 2147483647 as a double
+    constexpr u64 f64_max_u32 = 0x41efffffffe00000u;      // 4294967295 as a double
+    constexpr u64 f64_max_s64_lim = 0x43e0000000000000u;  // 2^63 as a double (actual maximum unrepresentable)
+
+
+#define FCODE(NAME)                  \
+    [&code](auto... args) {          \
+        if constexpr (fsize == 32) { \
+            code.NAME##s(args...);   \
+        } else {                     \
+            code.NAME##d(args...);   \
+        }                            \
+    }
+#define ICODE(NAME)                  \
+    [&code](auto... args) {          \
+        if constexpr (fsize == 32) { \
+            code.NAME##d(args...);   \
+        } else {                     \
+            code.NAME##q(args...);   \
+        }                            \
+    }
+
+
+    template<size_t fsize>
+    void ForceToDefaultNaN(BlockOfCode& code, Xbyak_loongarch64::XReg result) {
+
+        Xbyak_loongarch64::Label end;
+        FCODE(fcmp_sun_)(0, result, result);
+        code.movcf2gr(Xscratch0, 0);
+        code.beqz(Xscratch0, end);
+        code.add_imm(Xscratch0, code.zero, fsize == 32 ? f32_nan : f64_nan, Xscratch2);
+        code.fmov_s(result, Xscratch0);
+        code.L(end);
+
+    }
+
 template<size_t bitsize, typename EmitFn>
-static void EmitTwoOp(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
+static void EmitTwoOp(BlockOfCode&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Vresult = ctx.reg_alloc.WriteVec<bitsize>(inst);
-    auto Voperand = ctx.reg_alloc.ReadVec<bitsize>(args[0]);
+    auto Vresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
+    auto Voperand = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
     RegAlloc::Realize(Vresult, Voperand);
-    ctx.fpsr.Load();
 
     emit(Vresult, Voperand);
 }
 
 template<size_t bitsize, typename EmitFn>
-static void EmitThreeOp(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
+static void EmitThreeOp(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Vresult = ctx.reg_alloc.WriteVec<bitsize>(inst);
-    auto Va = ctx.reg_alloc.ReadVec<bitsize>(args[0]);
-    auto Vb = ctx.reg_alloc.ReadVec<bitsize>(args[1]);
+    auto Vresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
+    auto Va = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
+    auto Vb = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
     RegAlloc::Realize(Vresult, Va, Vb);
-    ctx.fpsr.Load();
 
+    if (ctx.FPCR().DN() || ctx.conf.HasOptimization(OptimizationFlag::Unsafe_InaccurateNaN)) {
+            code.movfcsr2gr(Wscratch0, code.f1);
+            code.bstrins_w(Wscratch0, code.zero, 4, 4);
+            code.movgr2fcsr(code.f1, Wscratch0);
+            emit(Vresult, Va, Vb);
+
+
+        if (!ctx.conf.HasOptimization(OptimizationFlag::Unsafe_InaccurateNaN)) {
+            // FIXME
+            ForceToDefaultNaN<bitsize>(code, Vresult);
+        }
+        return;
+    }
+// FIXME see x86
     emit(Vresult, Va, Vb);
 }
 
 template<size_t bitsize, typename EmitFn>
-static void EmitFourOp(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
+static void EmitFourOp(BlockOfCode&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Vresult = ctx.reg_alloc.WriteVec<bitsize>(inst);
-    auto Va = ctx.reg_alloc.ReadVec<bitsize>(args[0]);
-    auto Vb = ctx.reg_alloc.ReadVec<bitsize>(args[1]);
-    auto Vc = ctx.reg_alloc.ReadVec<bitsize>(args[2]);
+    auto Vresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
+    auto Va = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
+    auto Vb = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
+    auto Vc = ctx.reg_alloc.ReadReg<bitsize>(args[2]);
     RegAlloc::Realize(Vresult, Va, Vb, Vc);
     ctx.fpsr.Load();
 
@@ -57,7 +135,7 @@ static void EmitFourOp(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::
 }
 
 template<size_t bitsize_from, size_t bitsize_to, typename EmitFn>
-static void EmitConvert(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
+static void EmitConvert(BlockOfCode&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     auto Vto = ctx.reg_alloc.WriteVec<bitsize_to>(inst);
     auto Vfrom = ctx.reg_alloc.ReadVec<bitsize_from>(args[0]);
@@ -69,98 +147,55 @@ static void EmitConvert(Xbyak_loongarch64::CodeGenerator&, EmitContext& ctx, IR:
 
     emit(Vto, Vfrom);
 }
+namespace mp = mcl::mp;
 
 template<size_t bitsize_from, size_t bitsize_to, bool is_signed>
-static void EmitToFixed(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+static void EmitToFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     auto Rto = ctx.reg_alloc.WriteReg<std::max<size_t>(bitsize_to, 32)>(inst);
-    auto Vfrom = ctx.reg_alloc.ReadVec<bitsize_from>(args[0]);
+    auto Vfrom = ctx.reg_alloc.ReadReg<bitsize_from>(args[0]);
     const size_t fbits = args[1].GetImmediateU8();
     const auto rounding_mode = static_cast<FP::RoundingMode>(args[2].GetImmediateU8());
     RegAlloc::Realize(Rto, Vfrom);
     ctx.fpsr.Load();
 
-    if (rounding_mode == FP::RoundingMode::TowardsZero) {
-        if constexpr (is_signed) {
-            if constexpr (bitsize_to == 16) {
-                code.FCVTZS(Rto, Vfrom, fbits + 16);
-                code.srai_w(Wscratch0, Rto, 31);
-                code.ADD(Rto, Rto, Wscratch0, LSR, 16);  // Round towards zero when truncating
-                code.srli_w(Rto, Rto, 16);
-            } else if (fbits) {
-                code.FCVTZS(Rto, Vfrom, fbits);
-            } else {
-                code.FCVTZS(Rto, Vfrom);
-            }
-        } else {
-            if constexpr (bitsize_to == 16) {
-                code.FCVTZU(Rto, Vfrom, fbits + 16);
-                code.srli_w(Rto, Rto, 16);
-            } else if (fbits) {
-                code.FCVTZU(Rto, Vfrom, fbits);
-            } else {
-                code.FCVTZU(Rto, Vfrom);
-            }
-        }
-    } else {
-        ASSERT(fbits == 0);
-        ASSERT(bitsize_to != 16);
-        if constexpr (is_signed) {
-            switch (rounding_mode) {
-            case FP::RoundingMode::ToNearest_TieEven:
-                code.FCVTNS(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::TowardsPlusInfinity:
-                code.FCVTPS(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::TowardsMinusInfinity:
-                code.FCVTMS(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::TowardsZero:
-                code.FCVTZS(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::ToNearest_TieAwayFromZero:
-                code.FCVTAS(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::ToOdd:
-                ASSERT_FALSE("Unimplemented");
-                break;
-            default:
-                ASSERT_FALSE("Invalid RoundingMode");
-                break;
-            }
-        } else {
-            switch (rounding_mode) {
-            case FP::RoundingMode::ToNearest_TieEven:
-                code.FCVTNU(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::TowardsPlusInfinity:
-                code.FCVTPU(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::TowardsMinusInfinity:
-                code.FCVTMU(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::TowardsZero:
-                code.FCVTZU(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::ToNearest_TieAwayFromZero:
-                code.FCVTAU(Rto, Vfrom);
-                break;
-            case FP::RoundingMode::ToOdd:
-                ASSERT_FALSE("Unimplemented");
-                break;
-            default:
-                ASSERT_FALSE("Invalid RoundingMode");
-                break;
-            }
-        }
-    }
+    using fbits_list = mp::lift_sequence<std::make_index_sequence<bitsize_to + 1>>;
+    using rounding_list = mp::list<
+    mp::lift_value<FP::RoundingMode::ToNearest_TieEven>,
+    mp::lift_value<FP::RoundingMode::TowardsPlusInfinity>,
+    mp::lift_value<FP::RoundingMode::TowardsMinusInfinity>,
+    mp::lift_value<FP::RoundingMode::TowardsZero>,
+    mp::lift_value<FP::RoundingMode::ToNearest_TieAwayFromZero>>;
+
+    static const auto lut = Common::GenerateLookupTableFromList(
+            []<typename I>(I) {
+                return std::pair{
+                        mp::lower_to_tuple_v<I>,
+                        Common::FptrCast(
+                                [](u64 input, FP::FPSR& fpsr, FP::FPCR fpcr) {
+                                    constexpr size_t fbits = mp::get<0, I>::value;
+                                    constexpr FP::RoundingMode rounding_mode = mp::get<1, I>::value;
+                                    using FPT = mcl::unsigned_integer_of_size<bitsize_from>;
+
+                                    return FP::FPToFixed<FPT>(bitsize_to, static_cast<FPT>(input), fbits, is_signed, fpcr, rounding_mode, fpsr);
+                                })};
+            },
+            mp::cartesian_product<fbits_list, rounding_list>{});
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    code.movfr2gr_d(Wscratch0, Vfrom);
+    code.add_d(code.a0, code.zero, Wscratch0);
+    code.addi_d(code.a1, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+    code.add_imm(code.a2, code.zero, ctx.FPCR().Value(), Xscratch2);
+    code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(lut.at(std::make_tuple(fbits, rounding_mode))), Xscratch2);
+    code.jirl(code.ra, Xscratch0, 0);
+    code.add_d(Rto, code.zero, code.a0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
 }
 
 template<size_t bitsize_from, size_t bitsize_to, typename EmitFn>
-static void EmitFromFixed(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
+static void EmitFromFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Vto = ctx.reg_alloc.WriteVec<bitsize_to>(inst);
+    auto Vto = ctx.reg_alloc.WriteReg<bitsize_to>(inst);
     auto Rfrom = ctx.reg_alloc.ReadReg<std::max<size_t>(bitsize_from, 32)>(args[0]);
     const size_t fbits = args[1].GetImmediateU8();
     const auto rounding_mode = static_cast<FP::RoundingMode>(args[2].GetImmediateU8());
@@ -171,20 +206,28 @@ static void EmitFromFixed(Xbyak_loongarch64::CodeGenerator& code, EmitContext& c
         emit(Vto, Rfrom, fbits);
     } else {
         FP::FPCR new_fpcr = ctx.FPCR();
+        // FIXME convert to arch spefic rounding_mode mode ?
         new_fpcr.RMode(rounding_mode);
 
-        code.add_d(Wscratch0, new_fpcr.Value(), code.zero);
-        code.MSR(Xbyak_loongarch64::SystemReg::FPCR, Xscratch0);
+        if constexpr (bitsize_from != 32) {
+            code.add_imm(Wscratch0, code.zero, new_fpcr.Value(), Xscratch2);
+            code.movgr2fcsr(code.fcsr3, Wscratch0);
+        } else {
+            code.EnterStandardASIMD();
+        }
 
         emit(Vto, Rfrom, fbits);
-
-        code.add_d(Wscratch0, ctx.FPCR().Value(), code.zero);
-        code.MSR(Xbyak_loongarch64::SystemReg::FPCR, Xscratch0);
+        if constexpr (bitsize_from != 32) {
+            code.add_imm(Wscratch0, code.zero, ctx.FPCR().Value(), Xscratch2);
+            code.movgr2fcsr(code.fcsr3, Wscratch0);
+        } else {
+            code.EnterStandardASIMD();
+        }
     }
 }
 
 template<>
-void EmitIR<IR::Opcode::FPAbs16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPAbs16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -192,153 +235,154 @@ void EmitIR<IR::Opcode::FPAbs16>(Xbyak_loongarch64::CodeGenerator& code, EmitCon
 }
 
 template<>
-void EmitIR<IR::Opcode::FPAbs32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.FABS(Sresult, Soperand); });
+void EmitIR<IR::Opcode::FPAbs32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.fabs_s(Sresult, Soperand); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPAbs64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.FABS(Dresult, Doperand); });
+void EmitIR<IR::Opcode::FPAbs64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.fabs_d(Dresult, Doperand); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPAdd32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FADD(Sresult, Sa, Sb); });
+void EmitIR<IR::Opcode::FPAdd32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fadd_s(Sresult, Sa, Sb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FADD(Dresult, Da, Db); });
+void EmitIR<IR::Opcode::FPAdd64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fadd_d(Dresult, Da, Db); });
 }
 
-    static Xbyak::Reg64 SetFpscrNzcvFromFlags(BlockOfCode& code, EmitContext& ctx) {
-        ctx.reg_alloc.ScratchGpr(HostLoc::RCX);  // shifting requires use of cl
-        const Xbyak::Reg64 nzcv = ctx.reg_alloc.ScratchGpr();
 
-        //               x64 flags    ARM flags
-        //               ZF  PF  CF     NZCV
-        // Unordered      1   1   1     0011
-        // Greater than   0   0   0     0010
-        // Less than      0   0   1     1000
-        // Equal          1   0   0     0110
-        //
-        // Thus we can take use ZF:CF as an index into an array like so:
-        //  x64      ARM      ARM as x64
-        // ZF:CF     NZCV     NZ-----C-------V
-        //   0       0010     0000000100000000 = 0x0100
-        //   1       1000     1000000000000000 = 0x8000
-        //   2       0110     0100000100000000 = 0x4100
-        //   3       0011     0000000100000001 = 0x0101
+#define GetNZCV_W(Wscratch0, Wscratch1, Wscratch2, Va, Vb, s_u, d_w) \
+    code.xor_(Wscratch1, code.zero, code.zero);\
+    code.fcmp_##s_u##eq_##d_w(0, Va, Vb);\
+    code.movcf2gr(Wscratch2, 0);\
+    code.bstrins_w(Wscratch1, Wscratch2, NZCV::arm_z_flag_sft, NZCV::arm_z_flag_sft);\
+    code.fcmp_##s_u##lt_##d_w(0, Va, Vb);\
+    code.movcf2gr(Wscratch2, 0);\
+    code.bstrins_w(Wscratch1, Wscratch2, NZCV::arm_n_flag_sft, NZCV::arm_n_flag_sft);\
+    code.addi_w(Wscratch2, Wscratch2, 1);\
+    code.bstrins_w(Wscratch1, Wscratch2, NZCV::arm_c_flag_sft, NZCV::arm_c_flag_sft);\
+    code.fcmp_##s_u##un_##d_w(0, Va, Vb);\
+    code.movcf2gr(Wscratch2, 0);\
+    code.bstrins_w(Wscratch1, Wscratch2, NZCV::arm_v_flag_sft, NZCV::arm_v_flag_sft);
 
-        code.mov(nzcv, 0x0101'4100'8000'0100);
-        code.sete(cl);
-        code.rcl(cl, 5);  // cl = ZF:CF:0000
-        code.shr(nzcv, cl);
+#define GetNZCV_D(Wscratch0, Wscratch1, Wscratch2, Va, Vb, s_u, d_w) \
+    code.xor_(Wscratch1, code.zero, code.zero);\
+    code.fcmp_##s_u##eq_##d_w(0, Va, Vb);\
+    code.movcf2gr(Wscratch2, 0);\
+    code.bstrins_d(Wscratch1, Wscratch2, NZCV::arm_z_flag_sft, NZCV::arm_z_flag_sft);\
+    code.fcmp_##s_u##lt_##d_w(0, Va, Vb);\
+    code.movcf2gr(Wscratch2, 0);\
+    code.bstrins_d(Wscratch1, Wscratch2, NZCV::arm_n_flag_sft, NZCV::arm_n_flag_sft);\
+    code.addi_d(Wscratch2, Wscratch2, 1);\
+    code.bstrins_d(Wscratch1, Wscratch2, NZCV::arm_c_flag_sft, NZCV::arm_c_flag_sft);\
+    code.fcmp_##s_u##un_##d_w(0, Va, Vb);\
+    code.movcf2gr(Wscratch2, 0);\
+    code.bstrins_d(Wscratch1, Wscratch2, NZCV::arm_v_flag_sft, NZCV::arm_v_flag_sft);
 
-        return nzcv;
-    }
 
 template<size_t size>
-void EmitCompare(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitCompare(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto flags = ctx.reg_alloc.WriteFlags(inst);
-    auto Va = ctx.reg_alloc.ReadVec<size>(args[0]);
+    auto flags = ctx.reg_alloc.WriteReg<32>(inst);
+    auto Va = ctx.reg_alloc.ReadReg<size>(args[0]);
+    auto Vb = ctx.reg_alloc.ReadReg<size>(args[1]);
+
     const bool exc_on_qnan = args[2].GetImmediateU1();
 
-    if (args[1].IsImmediate() && args[1].GetImmediateU64() == 0) {
-        RegAlloc::Realize(flags, Va);
-        ctx.fpsr.Load();
-
-        if (exc_on_qnan) {
-            code.FCMPE(Va, 0);
+    RegAlloc::Realize(flags, Va, Vb);
+    if (exc_on_qnan) {
+        if constexpr (size == 32) {
+            GetNZCV_W(Wscratch0, flags, Wscratch2, Va, Vb, s, s);
         } else {
-            code.FCMP(Va, 0);
+            GetNZCV_D(Wscratch0, flags, Wscratch2, Va, Vb, s, d);
         }
     } else {
-        auto Vb = ctx.reg_alloc.ReadVec<size>(args[1]);
-        RegAlloc::Realize(flags, Va, Vb);
-        ctx.fpsr.Load();
-
-        if (exc_on_qnan) {
-            code.FCMPE(Va, Vb);
+        if constexpr (size == 32) {
+            GetNZCV_W(Wscratch0, flags, Wscratch2, Va, Vb, c, s);
         } else {
-            code.FCMP(Va, Vb);
+            GetNZCV_D(Wscratch0, flags, Wscratch2, Va, Vb, c, d);
         }
     }
+
+
 }
 
 template<>
-void EmitIR<IR::Opcode::FPCompare32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPCompare32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitCompare<32>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPCompare64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPCompare64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitCompare<64>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPDiv32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FDIV(Sresult, Sa, Sb); });
+void EmitIR<IR::Opcode::FPDiv32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fdiv_s(Sresult, Sa, Sb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPDiv64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FDIV(Dresult, Da, Db); });
+void EmitIR<IR::Opcode::FPDiv64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fdiv_d(Dresult, Da, Db); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMax32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FMAX(Sresult, Sa, Sb); });
+void EmitIR<IR::Opcode::FPMax32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmax_s(Sresult, Sa, Sb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMax64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FMAX(Dresult, Da, Db); });
+void EmitIR<IR::Opcode::FPMax64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmax_d(Dresult, Da, Db); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMaxNumeric32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FMAXNM(Sresult, Sa, Sb); });
+void EmitIR<IR::Opcode::FPMaxNumeric32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {// FIXME
+    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmax_s(Sresult, Sa, Sb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMaxNumeric64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FMAXNM(Dresult, Da, Db); });
+void EmitIR<IR::Opcode::FPMaxNumeric64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmax_d(Dresult, Da, Db); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMin32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FMIN(Sresult, Sa, Sb); });
+void EmitIR<IR::Opcode::FPMin32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmin_s(Sresult, Sa, Sb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMin64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FMIN(Dresult, Da, Db); });
+void EmitIR<IR::Opcode::FPMin64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmin_d(Dresult, Da, Db); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMinNumeric32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FMINNM(Sresult, Sa, Sb); });
+void EmitIR<IR::Opcode::FPMinNumeric32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {// FIXME
+    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmin_s(Sresult, Sa, Sb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMinNumeric64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FMINNM(Dresult, Da, Db); });
+void EmitIR<IR::Opcode::FPMinNumeric64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmin_d(Dresult, Da, Db); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMul32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FMUL(Sresult, Sa, Sb); });
+void EmitIR<IR::Opcode::FPMul32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmul_s(Sresult, Sa, Sb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMul64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FMUL(Dresult, Da, Db); });
+void EmitIR<IR::Opcode::FPMul64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmul_d(Dresult, Da, Db); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMulAdd16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPMulAdd16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -346,27 +390,27 @@ void EmitIR<IR::Opcode::FPMulAdd16>(Xbyak_loongarch64::CodeGenerator& code, Emit
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMulAdd32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitFourOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& S1, auto& S2) { code.FMADD(Sresult, S1, S2, Sa); });
+void EmitIR<IR::Opcode::FPMulAdd32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFourOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& S1, auto& S2) { code.fmadd_s(Sresult, S1, S2, Sa); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMulAdd64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitFourOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& D1, auto& D2) { code.FMADD(Dresult, D1, D2, Da); });
+void EmitIR<IR::Opcode::FPMulAdd64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFourOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& D1, auto& D2) { code.fmadd_d(Dresult, D1, D2, Da); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMulX32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FMULX(Sresult, Sa, Sb); });
+void EmitIR<IR::Opcode::FPMulX32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) { // FIXME
+    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmul_s(Sresult, Sa, Sb); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPMulX64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FMULX(Dresult, Da, Db); });
+void EmitIR<IR::Opcode::FPMulX64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmul_d(Dresult, Da, Db); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPNeg16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPNeg16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -374,17 +418,17 @@ void EmitIR<IR::Opcode::FPNeg16>(Xbyak_loongarch64::CodeGenerator& code, EmitCon
 }
 
 template<>
-void EmitIR<IR::Opcode::FPNeg32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.FNEG(Sresult, Soperand); });
+void EmitIR<IR::Opcode::FPNeg32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.fneg_s(Sresult, Soperand); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPNeg64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.FNEG(Dresult, Doperand); });
+void EmitIR<IR::Opcode::FPNeg64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.fneg_d(Dresult, Doperand); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPRecipEstimate16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPRecipEstimate16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -392,267 +436,415 @@ void EmitIR<IR::Opcode::FPRecipEstimate16>(Xbyak_loongarch64::CodeGenerator& cod
 }
 
 template<>
-void EmitIR<IR::Opcode::FPRecipEstimate32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.FRECPE(Sresult, Soperand); });
+void EmitIR<IR::Opcode::FPRecipEstimate32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) { // FIXME frecipe_s
+    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.frecip_s(Sresult, Soperand); });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPRecipEstimate64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.FRECPE(Dresult, Doperand); });
+void EmitIR<IR::Opcode::FPRecipEstimate64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.frecip_d(Dresult, Doperand); });
 }
+    template<size_t fsize>
+    static void EmitFPRecipExponent(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
 
-template<>
-void EmitIR<IR::Opcode::FPRecipExponent16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    (void)code;
-    (void)ctx;
-    (void)inst;
-    ASSERT_FALSE("Unimplemented");
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRecipExponent32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.FRECPX(Sresult, Soperand); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRecipExponent64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.FRECPX(Dresult, Doperand); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRecipStepFused16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    (void)code;
-    (void)ctx;
-    (void)inst;
-    ASSERT_FALSE("Unimplemented");
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRecipStepFused32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FRECPS(Sresult, Sa, Sb); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRecipStepFused64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FRECPS(Dresult, Da, Db); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRoundInt16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    (void)code;
-    (void)ctx;
-    (void)inst;
-    ASSERT_FALSE("Unimplemented");
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRoundInt32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
-    const bool exact = inst->GetArg(2).GetU1();
-
-    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Sresult = ctx.reg_alloc.WriteS(inst);
-    auto Soperand = ctx.reg_alloc.ReadS(args[0]);
-    RegAlloc::Realize(Sresult, Soperand);
-    ctx.fpsr.Load();
-
-    if (exact) {
-        ASSERT(ctx.FPCR().RMode() == rounding_mode);
-        code.FRINTX(Sresult, Soperand);
-    } else {
-        switch (rounding_mode) {
-        case FP::RoundingMode::ToNearest_TieEven:
-            code.FRINTN(Sresult, Soperand);
-            break;
-        case FP::RoundingMode::TowardsPlusInfinity:
-            code.FRINTP(Sresult, Soperand);
-            break;
-        case FP::RoundingMode::TowardsMinusInfinity:
-            code.FRINTM(Sresult, Soperand);
-            break;
-        case FP::RoundingMode::TowardsZero:
-            code.FRINTZ(Sresult, Soperand);
-            break;
-        case FP::RoundingMode::ToNearest_TieAwayFromZero:
-            code.FRINTA(Sresult, Soperand);
-            break;
-        default:
-            ASSERT_FALSE("Invalid RoundingMode");
-        }
-    }
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRoundInt64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
-    const bool exact = inst->GetArg(2).GetU1();
-
-    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Dresult = ctx.reg_alloc.WriteD(inst);
-    auto Doperand = ctx.reg_alloc.ReadD(args[0]);
-    RegAlloc::Realize(Dresult, Doperand);
-    ctx.fpsr.Load();
-
-    if (exact) {
-        ASSERT(ctx.FPCR().RMode() == rounding_mode);
-        code.FRINTX(Dresult, Doperand);
-    } else {
-        switch (rounding_mode) {
-        case FP::RoundingMode::ToNearest_TieEven:
-            code.FRINTN(Dresult, Doperand);
-            break;
-        case FP::RoundingMode::TowardsPlusInfinity:
-            code.FRINTP(Dresult, Doperand);
-            break;
-        case FP::RoundingMode::TowardsMinusInfinity:
-            code.FRINTM(Dresult, Doperand);
-            break;
-        case FP::RoundingMode::TowardsZero:
-            code.FRINTZ(Dresult, Doperand);
-            break;
-        case FP::RoundingMode::ToNearest_TieAwayFromZero:
-            code.FRINTA(Dresult, Doperand);
-            break;
-        default:
-            ASSERT_FALSE("Invalid RoundingMode");
-        }
-    }
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRSqrtEstimate16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    (void)code;
-    (void)ctx;
-    (void)inst;
-    ASSERT_FALSE("Unimplemented");
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRSqrtEstimate32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.FRSQRTE(Sresult, Soperand); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRSqrtEstimate64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.FRSQRTE(Dresult, Doperand); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRSqrtStepFused16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    (void)code;
-    (void)ctx;
-    (void)inst;
-    ASSERT_FALSE("Unimplemented");
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRSqrtStepFused32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FRSQRTS(Sresult, Sa, Sb); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPRSqrtStepFused64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FRSQRTS(Dresult, Da, Db); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPSqrt32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.FSQRT(Sresult, Soperand); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPSqrt64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.FSQRT(Dresult, Doperand); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPSub32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.FSUB(Sresult, Sa, Sb); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPSub64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.FSUB(Dresult, Da, Db); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPHalfToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitConvert<16, 64>(code, ctx, inst, [&](auto& Dto, auto& Hfrom) { code.FCVT(Dto, Hfrom); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPHalfToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitConvert<16, 32>(code, ctx, inst, [&](auto& Sto, auto& Hfrom) { code.FCVT(Sto, Hfrom); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPSingleToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitConvert<32, 64>(code, ctx, inst, [&](auto& Dto, auto& Sfrom) { code.FCVT(Dto, Sfrom); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPSingleToHalf>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitConvert<32, 16>(code, ctx, inst, [&](auto& Hto, auto& Sfrom) { code.FCVT(Hto, Sfrom); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPDoubleToHalf>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitConvert<64, 16>(code, ctx, inst, [&](auto& Hto, auto& Dfrom) { code.FCVT(Hto, Dfrom); });
-}
-
-template<>
-void EmitIR<IR::Opcode::FPDoubleToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
-
-    if (rounding_mode == FP::RoundingMode::ToOdd) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        auto Sto = ctx.reg_alloc.WriteS(inst);
-        auto Dfrom = ctx.reg_alloc.ReadD(args[0]);
-        RegAlloc::Realize(Sto, Dfrom);
-        ctx.fpsr.Load();
 
-        code.FCVTXN(Sto, Dfrom);
 
-        return;
+        auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+        auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+        RegAlloc::Realize(Rto, Vfrom);
+
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        code.movfr2gr_d(Wscratch0, Vfrom);
+        code.add_d(code.a0, code.zero, Wscratch0);
+        code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
+        code.addi_d(code.a2, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+        code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPRecipExponent<FPT>), Xscratch2);
+        code.jirl(code.ra, Xscratch0, 0);
+        code.add_d(Rto, code.zero, code.a0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
     }
 
-    EmitConvert<64, 32>(code, ctx, inst, [&](auto& Sto, auto& Dfrom) { code.FCVT(Sto, Dfrom); });
+template<>
+void EmitIR<IR::Opcode::FPRecipExponent16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRecipExponent<16>(code, ctx, inst);
+
 }
 
 template<>
-void EmitIR<IR::Opcode::FPDoubleToFixedS16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPRecipExponent32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) { // FIXME
+    EmitFPRecipExponent<32>(code, ctx, inst);
+}
+
+template<>
+void EmitIR<IR::Opcode::FPRecipExponent64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRecipExponent<64>(code, ctx, inst);
+}
+    template<size_t fsize>
+    static void EmitFPRecipStepFused(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+
+        auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+        auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+        auto arg1 = ctx.reg_alloc.ReadReg<64>(args[1]);
+
+        RegAlloc::Realize(Rto, Vfrom);
+
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        code.movfr2gr_d(Wscratch0, Vfrom);
+        code.add_d(code.a0, code.zero, Wscratch0);
+        code.add_d(code.a1, code.zero, arg1);
+        code.add_imm(code.a2, code.zero, ctx.FPCR().Value(), Xscratch2);
+        code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+
+        code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPRecipStepFused<FPT>), Xscratch2);
+        code.jirl(code.ra, Xscratch0, 0);
+        code.add_d(Rto, code.zero, code.a0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    }
+
+
+template<>
+void EmitIR<IR::Opcode::FPRecipStepFused16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRecipStepFused<16>(code, ctx, inst);
+
+}
+
+template<>
+void EmitIR<IR::Opcode::FPRecipStepFused32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRecipStepFused<32>(code, ctx, inst);
+
+}
+
+template<>
+void EmitIR<IR::Opcode::FPRecipStepFused64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRecipStepFused<64>(code, ctx, inst);
+}
+
+    static void EmitFPRound(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, size_t fsize) {
+        const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
+        const bool exact = inst->GetArg(2).GetU1();
+
+        using fsize_list = mp::list<mp::lift_value<size_t(16)>,
+                mp::lift_value<size_t(32)>,
+                mp::lift_value<size_t(64)>>;
+        using rounding_list = mp::list<
+                mp::lift_value<FP::RoundingMode::ToNearest_TieEven>,
+                mp::lift_value<FP::RoundingMode::TowardsPlusInfinity>,
+                mp::lift_value<FP::RoundingMode::TowardsMinusInfinity>,
+                mp::lift_value<FP::RoundingMode::TowardsZero>,
+                mp::lift_value<FP::RoundingMode::ToNearest_TieAwayFromZero>>;
+        using exact_list = mp::list<std::true_type, std::false_type>;
+
+        static const auto lut = Common::GenerateLookupTableFromList(
+                []<typename I>(I) {
+                    return std::pair{
+                            mp::lower_to_tuple_v<I>,
+                            Common::FptrCast(
+                                    [](u64 input, FP::FPSR& fpsr, FP::FPCR fpcr) {
+                                        constexpr size_t fsize = mp::get<0, I>::value;
+                                        constexpr FP::RoundingMode rounding_mode = mp::get<1, I>::value;
+                                        constexpr bool exact = mp::get<2, I>::value;
+                                        using InputSize = mcl::unsigned_integer_of_size<fsize>;
+
+                                        return FP::FPRoundInt<InputSize>(static_cast<InputSize>(input), fpcr, rounding_mode, exact, fpsr);
+                                    })};
+                },
+                mp::cartesian_product<fsize_list, rounding_list, exact_list>{});
+
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+        auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+        auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+        RegAlloc::Realize(Rto, Vfrom);
+
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        code.movfr2gr_d(Wscratch0, Vfrom);
+        code.add_d(code.a0, code.zero, Wscratch0);
+        code.addi_d(code.a1, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+        code.add_imm(code.a2, code.zero, ctx.FPCR().Value(), Xscratch2);
+
+        code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(lut.at(std::make_tuple(fsize, rounding_mode, exact))), Xscratch2);
+        code.jirl(code.ra, Xscratch0, 0);
+        code.add_d(Rto, code.zero, code.a0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    }
+
+template<>
+void EmitIR<IR::Opcode::FPRoundInt16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRound(code, ctx, inst, 16);
+
+}
+
+template<>
+void EmitIR<IR::Opcode::FPRoundInt32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRound(code, ctx, inst, 32);
+
+}
+
+template<>
+void EmitIR<IR::Opcode::FPRoundInt64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRound(code, ctx, inst, 64);
+}
+    template<size_t fsize>
+    static void EmitFPRSqrtEstimate(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+        auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+        auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+        RegAlloc::Realize(Rto, Vfrom);
+
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        code.movfr2gr_d(Wscratch0, Vfrom);
+        code.add_d(code.a0, code.zero, Wscratch0);
+        code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
+        code.addi_d(code.a2, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+        code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPRSqrtEstimate<FPT>), Xscratch2);
+        code.jirl(code.ra, Xscratch0, 0);
+        code.add_d(Rto, code.zero, code.a0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+
+
+    }
+template<>
+void EmitIR<IR::Opcode::FPRSqrtEstimate16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRSqrtEstimate<16>(code,ctx, inst);
+
+}
+
+template<>
+void EmitIR<IR::Opcode::FPRSqrtEstimate32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRSqrtEstimate<32>(code,ctx, inst);
+}
+
+
+template<>
+void EmitIR<IR::Opcode::FPRSqrtEstimate64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFPRSqrtEstimate<64>(code,ctx, inst);
+}
+
+template<>
+void EmitIR<IR::Opcode::FPRSqrtStepFused16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    (void)code;
+    (void)ctx;
+    (void)inst;
+    ASSERT_FALSE("Unimplemented");
+}
+
+template<>
+void EmitIR<IR::Opcode::FPRSqrtStepFused32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa) { code.frsqrt_s(Sresult, Sa); });
+}
+
+template<>
+void EmitIR<IR::Opcode::FPRSqrtStepFused64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da) { code.frsqrt_d(Dresult, Da); });
+}
+
+template<>
+void EmitIR<IR::Opcode::FPSqrt32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Soperand) { code.fsqrt_s(Sresult, Soperand); });
+}
+
+template<>
+void EmitIR<IR::Opcode::FPSqrt64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Doperand) { code.fsqrt_d(Dresult, Doperand); });
+}
+
+template<>
+void EmitIR<IR::Opcode::FPSub32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fsub_s(Sresult, Sa, Sb); });
+}
+
+template<>
+void EmitIR<IR::Opcode::FPSub64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fsub_d(Dresult, Da, Db); });
+}
+
+template<>
+void EmitIR<IR::Opcode::FPHalfToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    RegAlloc::Realize(Rto, Vfrom);
+
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    code.movfr2gr_d(Wscratch0, Vfrom);
+    code.add_d(code.a0, code.zero, Wscratch0);
+    code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
+    code.add_imm(code.a2, code.zero, static_cast<u32>(rounding_mode), Xscratch2);
+    code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+    code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u64, u16>), Xscratch2);
+    code.jirl(code.ra, Xscratch0, 0);
+    code.add_d(Rto, code.zero, code.a0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+
+}
+
+template<>
+void EmitIR<IR::Opcode::FPHalfToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    RegAlloc::Realize(Rto, Vfrom);
+
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    code.movfr2gr_d(Wscratch0, Vfrom);
+    code.add_d(code.a0, code.zero, Wscratch0);
+    code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
+    code.add_imm(code.a2, code.zero, static_cast<u32>(rounding_mode), Xscratch2);
+    code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+    code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u32, u16>), Xscratch2);
+    code.jirl(code.ra, Xscratch0, 0);
+    code.add_d(Rto, code.zero, code.a0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+}
+
+template<>
+void EmitIR<IR::Opcode::FPSingleToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    RegAlloc::Realize(Rto, Vfrom);
+
+    // We special-case the non-IEEE-defined ToOdd rounding mode.
+    if (rounding_mode == ctx.FPCR().RMode() && rounding_mode != FP::RoundingMode::ToOdd) {
+        code.fcvt_s_d(Rto, Vfrom);
+        if (ctx.FPCR().DN()) {
+            ForceToDefaultNaN<64>(code, Rto);
+        }
+    } else {
+
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        code.movfr2gr_d(Wscratch0, Vfrom);
+        code.add_d(code.a0, code.zero, Wscratch0);
+        code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
+        code.add_imm(code.a2, code.zero, static_cast<u32>(rounding_mode), Xscratch2);
+        code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+        code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u64, u32>), Xscratch2);
+        code.jirl(code.ra, Xscratch0, 0);
+        code.add_d(Rto, code.zero, code.a0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    }}
+
+template<>
+void EmitIR<IR::Opcode::FPSingleToHalf>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    RegAlloc::Realize(Rto, Vfrom);
+
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    code.movfr2gr_d(Wscratch0, Vfrom);
+    code.add_d(code.a0, code.zero, Wscratch0);
+    code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
+    code.add_imm(code.a2, code.zero, static_cast<u32>(rounding_mode), Xscratch2);
+    code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+    code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u16, u32>), Xscratch2);
+    code.jirl(code.ra, Xscratch0, 0);
+    code.add_d(Rto, code.zero, code.a0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+}
+
+template<>
+void EmitIR<IR::Opcode::FPDoubleToHalf>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    RegAlloc::Realize(Rto, Vfrom);
+
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    code.movfr2gr_d(Wscratch0, Vfrom);
+    code.add_d(code.a0, code.zero, Wscratch0);
+    code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
+    code.add_imm(code.a2, code.zero, static_cast<u32>(rounding_mode), Xscratch2);
+    code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+    code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u16, u64>), Xscratch2);
+    code.jirl(code.ra, Xscratch0, 0);
+    code.add_d(Rto, code.zero, code.a0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+}
+
+template<>
+void EmitIR<IR::Opcode::FPDoubleToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
+    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    RegAlloc::Realize(Rto, Vfrom);
+
+    // We special-case the non-IEEE-defined ToOdd rounding mode.
+    if (rounding_mode == ctx.FPCR().RMode() && rounding_mode != FP::RoundingMode::ToOdd) {
+        code.fcvt_d_s(Rto, Vfrom);
+        if (ctx.FPCR().DN()) {
+            ForceToDefaultNaN<32>(code, Rto);
+        }
+    } else {
+
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        code.movfr2gr_d(Wscratch0, Vfrom);
+        code.add_d(code.a0, code.zero, Wscratch0);
+        code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
+        code.add_imm(code.a2, code.zero, static_cast<u32>(rounding_mode), Xscratch2);
+        code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+        code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u32, u64>), Xscratch2);
+        code.jirl(code.ra, Xscratch0, 0);
+        code.add_d(Rto, code.zero, code.a0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    }
+}
+
+template<>
+void EmitIR<IR::Opcode::FPDoubleToFixedS16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitToFixed<64, 16, true>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPDoubleToFixedS32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPDoubleToFixedS32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitToFixed<64, 32, true>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPDoubleToFixedS64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPDoubleToFixedS64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
     EmitToFixed<64, 64, true>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPDoubleToFixedU16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPDoubleToFixedU16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitToFixed<64, 16, false>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPDoubleToFixedU32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPDoubleToFixedU32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitToFixed<64, 32, false>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPDoubleToFixedU64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPDoubleToFixedU64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
     EmitToFixed<64, 64, false>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPHalfToFixedS16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPHalfToFixedS16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -660,7 +852,7 @@ void EmitIR<IR::Opcode::FPHalfToFixedS16>(Xbyak_loongarch64::CodeGenerator& code
 }
 
 template<>
-void EmitIR<IR::Opcode::FPHalfToFixedS32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPHalfToFixedS32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -668,7 +860,7 @@ void EmitIR<IR::Opcode::FPHalfToFixedS32>(Xbyak_loongarch64::CodeGenerator& code
 }
 
 template<>
-void EmitIR<IR::Opcode::FPHalfToFixedS64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPHalfToFixedS64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -676,7 +868,7 @@ void EmitIR<IR::Opcode::FPHalfToFixedS64>(Xbyak_loongarch64::CodeGenerator& code
 }
 
 template<>
-void EmitIR<IR::Opcode::FPHalfToFixedU16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPHalfToFixedU16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -684,7 +876,7 @@ void EmitIR<IR::Opcode::FPHalfToFixedU16>(Xbyak_loongarch64::CodeGenerator& code
 }
 
 template<>
-void EmitIR<IR::Opcode::FPHalfToFixedU32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPHalfToFixedU32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -692,7 +884,7 @@ void EmitIR<IR::Opcode::FPHalfToFixedU32>(Xbyak_loongarch64::CodeGenerator& code
 }
 
 template<>
-void EmitIR<IR::Opcode::FPHalfToFixedU64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPHalfToFixedU64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
     (void)ctx;
     (void)inst;
@@ -700,111 +892,214 @@ void EmitIR<IR::Opcode::FPHalfToFixedU64>(Xbyak_loongarch64::CodeGenerator& code
 }
 
 template<>
-void EmitIR<IR::Opcode::FPSingleToFixedS16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPSingleToFixedS16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitToFixed<32, 16, true>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPSingleToFixedS32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPSingleToFixedS32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
     EmitToFixed<32, 32, true>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPSingleToFixedS64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPSingleToFixedS64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitToFixed<32, 64, true>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPSingleToFixedU16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPSingleToFixedU16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitToFixed<32, 16, false>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPSingleToFixedU32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPSingleToFixedU32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
     EmitToFixed<32, 32, false>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPSingleToFixedU64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPSingleToFixedU64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitToFixed<32, 64, false>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedU16ToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPFixedU16ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
-        code.slli_w(Wscratch0, Wfrom, 16);
-        code.UCVTF(Sto, Wscratch0, fbits + 16);
+        code.bstrpick_w(Wscratch0, Wfrom, 15, 0);
+        code.ffint_s_w(Sto, Wscratch0);
+        if (fbits != 0) {
+            const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
+            code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+
+            code.fmul_s(Sto, Sto, code.f0);
+        }
     });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedS16ToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPFixedS16ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
-        code.slli_w(Wscratch0, Wfrom, 16);
-        code.SCVTF(Sto, Wscratch0, fbits + 16);
+        code.add_w(Wscratch0, code.zero, Wfrom);
+        code.ffint_s_w(Sto, Wscratch0);
+        if (fbits != 0) {
+            const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
+            code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+
+            code.fmul_s(Sto, Sto, code.f0);
+        }
     });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedU16ToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPFixedU16ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
-        code.slli_w(Wscratch0, Wfrom, 16);
-        code.UCVTF(Dto, Wscratch0, fbits + 16);
+        code.bstrpick_w(Wscratch0, Wfrom, 15, 0);
+        code.ffint_d_w(Dto, Wscratch0);
+        if (fbits != 0) {
+            const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
+            code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+
+            code.fmul_d(Dto, Dto, code.f0);
+        }
     });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedS16ToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPFixedS16ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
-        code.slli_w(Wscratch0, Wfrom, 16);
-        code.SCVTF(Dto, Wscratch0, fbits + 16);
+        code.add_w(Wscratch0, code.zero, Wfrom);
+        code.ffint_d_w(Dto, Wscratch0);
+        if (fbits != 0) {
+            const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
+            code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
+            code.fmul_d(Dto, Dto, code.f0);
+        }
     });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedU32ToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPFixedU32ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
-    EmitFromFixed<32, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) { fbits ? code.UCVTF(Sto, Wfrom, fbits) : code.UCVTF(Sto, Wfrom); });
+    EmitFromFixed<32, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
+        code.bstrpick_d(Xscratch0, Wfrom, 31, 0);
+        code.ffint_s_w(Sto, Xscratch0);
+        if (fbits != 0) {
+            const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
+            code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+
+            code.fmul_s(Sto, Sto, code.f0);
+        }
+    });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedS32ToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPFixedS32ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
-    EmitFromFixed<32, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) { fbits ? code.SCVTF(Sto, Wfrom, fbits) : code.SCVTF(Sto, Wfrom); });
+    EmitFromFixed<32, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
+        code.add_d(Wscratch0, code.zero, Wfrom);
+        code.ffint_s_l(Sto, Wscratch0);
+        if (fbits != 0) {
+            const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
+            code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+
+            code.fmul_s(Sto, Sto, code.f0);
+        }
+
+    });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedU32ToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitFromFixed<32, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) { fbits ? code.UCVTF(Dto, Wfrom, fbits) : code.UCVTF(Dto, Wfrom); });
+void EmitIR<IR::Opcode::FPFixedU32ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFromFixed<32, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
+        code.bstrpick_d(Xscratch0, Wfrom, 31, 0);
+        code.ffint_d_w(Dto, Xscratch0);
+        if (fbits != 0) {
+            const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
+            code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+            code.fmul_d(Dto, Dto, code.f0);
+        }
+
+    });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedS32ToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitFromFixed<32, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) { fbits ? code.SCVTF(Dto, Wfrom, fbits) : code.SCVTF(Dto, Wfrom); });
+void EmitIR<IR::Opcode::FPFixedS32ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFromFixed<32, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
+        code.add_d(Wscratch0, code.zero, Wfrom);
+        code.ffint_d_w(Dto, Xscratch0);
+        if (fbits != 0) {
+            const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
+            code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+            code.fmul_d(Dto, Dto, code.f0);
+        }
+    });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedU64ToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPFixedU64ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
-    EmitFromFixed<64, 64>(code, ctx, inst, [&](auto& Dto, auto& Xfrom, u8 fbits) { fbits ? code.UCVTF(Dto, Xfrom, fbits) : code.UCVTF(Dto, Xfrom); });
+    EmitFromFixed<64, 64>(code, ctx, inst, [&](auto& Dto, auto& Xfrom, u8 fbits) {
+        code.bstrpick_d(Xscratch0, Xfrom, 63, 0);
+        code.ffint_d_l(Dto, Xscratch0);
+        if (fbits != 0) {
+            const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
+            code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+            code.fmul_d(Dto, Dto, code.f0);
+        }
+    });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedU64ToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitFromFixed<64, 32>(code, ctx, inst, [&](auto& Sto, auto& Xfrom, u8 fbits) { fbits ? code.UCVTF(Sto, Xfrom, fbits) : code.UCVTF(Sto, Xfrom); });
+void EmitIR<IR::Opcode::FPFixedU64ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFromFixed<64, 32>(code, ctx, inst, [&](auto& Sto, auto& Xfrom, u8 fbits) {
+        code.bstrpick_d(Xscratch0, Xfrom, 63, 0);
+        code.ffint_s_l(Sto, Xscratch0);
+        if (fbits != 0) {
+            const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
+            code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+            code.fmul_d(Sto, Sto, code.f0);
+        }
+
+    });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedS64ToDouble>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::FPFixedS64ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
-    EmitFromFixed<64, 64>(code, ctx, inst, [&](auto& Dto, auto& Xfrom, u8 fbits) { fbits ? code.SCVTF(Dto, Xfrom, fbits) : code.SCVTF(Dto, Xfrom); });
+    EmitFromFixed<64, 64>(code, ctx, inst, [&](auto& Dto, auto& Xfrom, u8 fbits) {
+        code.add_d(Wscratch0, code.zero, Xfrom);
+        code.ffint_d_w(Dto, Xscratch0);
+        if (fbits != 0) {
+            const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
+            code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+            code.fmul_d(Dto, Dto, code.f0);
+        }
+    });
 }
 
 template<>
-void EmitIR<IR::Opcode::FPFixedS64ToSingle>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitFromFixed<64, 32>(code, ctx, inst, [&](auto& Sto, auto& Xfrom, u8 fbits) { fbits ? code.SCVTF(Sto, Xfrom, fbits) : code.SCVTF(Sto, Xfrom); });
+void EmitIR<IR::Opcode::FPFixedS64ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    EmitFromFixed<64, 32>(code, ctx, inst, [&](auto& Sto, auto& Xfrom, u8 fbits) {
+        code.add_d(Wscratch0, code.zero, Xfrom);
+        code.ffint_s_w(Sto, Xscratch0);
+        if (fbits != 0) {
+            const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
+            code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
+            code.movgr2fr_d(code.f0, Xscratch0);
+            code.fmul_s(Sto, Sto, code.f0);
+        }
+    });
 }
 
 }  // namespace Dynarmic::Backend::LoongArch64

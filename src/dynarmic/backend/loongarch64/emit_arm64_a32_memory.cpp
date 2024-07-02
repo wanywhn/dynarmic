@@ -20,87 +20,87 @@ namespace Dynarmic::Backend::LoongArch64 {
 using namespace Xbyak_loongarch64::util;
 
 template<>
-void EmitIR<IR::Opcode::A32ClearExclusive>(Xbyak_loongarch64::CodeGenerator& code, EmitContext&, IR::Inst*) {
+void EmitIR<IR::Opcode::A32ClearExclusive>(BlockOfCode& code, EmitContext&, IR::Inst*) {
     code.st_d(code.zero, Xstate, offsetof(A32JitState, exclusive_state));
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ReadMemory8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ReadMemory8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitReadMemory<8>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ReadMemory16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ReadMemory16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitReadMemory<16>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ReadMemory32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ReadMemory32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitReadMemory<32>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ReadMemory64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ReadMemory64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitReadMemory<64>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ExclusiveReadMemory8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ExclusiveReadMemory8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitExclusiveReadMemory<8>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ExclusiveReadMemory16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ExclusiveReadMemory16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitExclusiveReadMemory<16>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ExclusiveReadMemory32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ExclusiveReadMemory32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitExclusiveReadMemory<32>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ExclusiveReadMemory64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ExclusiveReadMemory64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitExclusiveReadMemory<64>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32WriteMemory8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32WriteMemory8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitWriteMemory<8>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32WriteMemory16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32WriteMemory16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitWriteMemory<16>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32WriteMemory32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32WriteMemory32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitWriteMemory<32>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32WriteMemory64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32WriteMemory64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitWriteMemory<64>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ExclusiveWriteMemory8>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ExclusiveWriteMemory8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitExclusiveWriteMemory<8>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ExclusiveWriteMemory16>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ExclusiveWriteMemory16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitExclusiveWriteMemory<16>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ExclusiveWriteMemory32>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ExclusiveWriteMemory32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitExclusiveWriteMemory<32>(code, ctx, inst);
 }
 
 template<>
-void EmitIR<IR::Opcode::A32ExclusiveWriteMemory64>(Xbyak_loongarch64::CodeGenerator& code, EmitContext& ctx, IR::Inst* inst) {
+void EmitIR<IR::Opcode::A32ExclusiveWriteMemory64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitExclusiveWriteMemory<64>(code, ctx, inst);
 }
 

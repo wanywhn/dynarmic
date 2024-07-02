@@ -131,7 +131,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
         template<size_t bitsize>
-        void CallbackOnlyEmitReadMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        void CallbackOnlyEmitReadMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
             auto args = ctx.reg_alloc.GetArgumentInfo(inst);
             ctx.reg_alloc.PrepareForCall({}, args[1]);
             const bool ordered = IsOrdered(args[2].GetImmediateAccType());
@@ -153,7 +153,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         template<size_t bitsize>
         void
-        CallbackOnlyEmitExclusiveReadMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        CallbackOnlyEmitExclusiveReadMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
             auto args = ctx.reg_alloc.GetArgumentInfo(inst);
             ctx.reg_alloc.PrepareForCall({}, args[1]);
             const bool ordered = IsOrdered(args[2].GetImmediateAccType());
@@ -178,7 +178,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
         template<size_t bitsize>
-        void CallbackOnlyEmitWriteMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        void CallbackOnlyEmitWriteMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
             auto args = ctx.reg_alloc.GetArgumentInfo(inst);
             ctx.reg_alloc.PrepareForCall({}, args[1], args[2]);
             const bool ordered = IsOrdered(args[3].GetImmediateAccType());
@@ -194,7 +194,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         template<size_t bitsize>
         void
-        CallbackOnlyEmitExclusiveWriteMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        CallbackOnlyEmitExclusiveWriteMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
             auto args = ctx.reg_alloc.GetArgumentInfo(inst);
             ctx.reg_alloc.PrepareForCall({}, args[1], args[2]);
             const bool ordered = IsOrdered(args[3].GetImmediateAccType());
@@ -223,7 +223,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 // This function may use Xscratch0 as a scratch register
 // Trashes NZCV
         template<size_t bitsize>
-        void EmitDetectMisalignedVAddr(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+        void EmitDetectMisalignedVAddr(BlockOfCode &code, EmitContext &ctx,
                                        Xbyak_loongarch64::XReg Xaddr, const SharedLabel &fallback) {
             static_assert(bitsize == 8 || bitsize == 16 || bitsize == 32 || bitsize == 64 || bitsize == 128);
 
@@ -262,7 +262,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 // Trashes NZCV
         template<size_t bitsize>
         std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg>
-        InlinePageTableEmitVAddrLookup(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx,
+        InlinePageTableEmitVAddrLookup(BlockOfCode &code, EmitContext &ctx,
                                        Xbyak_loongarch64::XReg Xaddr, const SharedLabel &fallback) {
             const size_t valid_page_index_bits = ctx.conf.page_table_address_space_bits - page_bits;
             const size_t unused_top_bits = 64 - ctx.conf.page_table_address_space_bits;
@@ -294,10 +294,10 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
         template<std::size_t bitsize>
-        CodePtr EmitMemoryLdr(Xbyak_loongarch64::CodeGenerator &code, int value_idx, Xbyak_loongarch64::XReg Xbase,
+        CodePtr EmitMemoryLdr(BlockOfCode &code, unsigned int value_idx, Xbyak_loongarch64::XReg Xbase,
                               Xbyak_loongarch64::XReg Xoffset, bool ordered, bool extend32 = false) {
-
-            CodePtr fastmem_location = code.getCurr<CodePtr>();
+            (void) extend32;
+            auto fastmem_location = code.getCurr<CodePtr>();
 
             if (ordered) {
                 code.add_d(Xscratch0, Xbase, Xoffset);
@@ -314,10 +314,10 @@ namespace Dynarmic::Backend::LoongArch64 {
                         code.dbar(0x700);
                         break;
                     case 32:
-                        code.ll_acq_w(Xbyak_loongarch64::WReg{value_idx}, Xscratch0, 0);
+                        code.ll_w(Xbyak_loongarch64::WReg{value_idx}, Xscratch0, 0);
                         break;
                     case 64:
-                        code.ll_acq_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0, 0);
+                        code.ll_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0, 0);
                         break;
                     case 128:
                         code.vld(Xbyak_loongarch64::VReg{value_idx}, Xscratch0, 0);
@@ -354,9 +354,9 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
         template<std::size_t bitsize>
-        CodePtr EmitMemoryStr(Xbyak_loongarch64::CodeGenerator &code, int value_idx, Xbyak_loongarch64::XReg Xbase,
+        CodePtr EmitMemoryStr(BlockOfCode &code, unsigned int value_idx, Xbyak_loongarch64::XReg Xbase,
                               Xbyak_loongarch64::XReg Xoffset, bool ordered, bool extend32 = false) {
-
+            (void) extend32;
             CodePtr fastmem_location;
 
             if (ordered) {
@@ -381,10 +381,10 @@ namespace Dynarmic::Backend::LoongArch64 {
 
                         break;
                     case 32:
-                        code.sc_rel_w(Xbyak_loongarch64::WReg{value_idx}, Xscratch0);
+                        code.sc_w(Xbyak_loongarch64::WReg{value_idx}, Xscratch0, 0);
                         break;
                     case 64:
-                        code.sc_rel_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0);
+                        code.sc_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0, 0);
                         break;
                     case 128:
                         code.dbar(0x700);
@@ -412,7 +412,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                         code.stx_d(Xbyak_loongarch64::XReg{value_idx}, Xbase, Xoffset);
                         break;
                     case 128:
-                        code.vstx(Xbyak_loongarch64::VReg{value_idx}, Xbase, Xoffset)
+                        code.vstx(Xbyak_loongarch64::VReg{value_idx}, Xbase, Xoffset);
                         break;
                     default:
                         ASSERT_FALSE("Invalid bitsize");
@@ -423,7 +423,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
         template<size_t bitsize>
-        void InlinePageTableEmitReadMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        void InlinePageTableEmitReadMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
             auto args = ctx.reg_alloc.GetArgumentInfo(inst);
             auto Xaddr = ctx.reg_alloc.ReadX(args[1]);
             auto Rvalue = [&] {
@@ -466,7 +466,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
         template<size_t bitsize>
-        void InlinePageTableEmitWriteMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+        void InlinePageTableEmitWriteMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
             auto args = ctx.reg_alloc.GetArgumentInfo(inst);
             auto Xaddr = ctx.reg_alloc.ReadX(args[1]);
             auto Rvalue = [&] {
@@ -533,7 +533,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 // Trashes NZCV
         template<size_t bitsize>
         std::pair<Xbyak_loongarch64::XReg, Xbyak_loongarch64::XReg>
-        FastmemEmitVAddrLookup(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, Xbyak_loongarch64::XReg Xaddr,
+        FastmemEmitVAddrLookup(BlockOfCode &code, EmitContext &ctx, Xbyak_loongarch64::XReg Xaddr,
                                const SharedLabel &fallback) {
             if (ctx.conf.fastmem_address_space_bits == 64 || ShouldExt32(ctx)) {
                 return std::make_pair(Xfastmem, Xaddr);
@@ -550,7 +550,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
         template<size_t bitsize>
-        void FastmemEmitReadMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst,
+        void FastmemEmitReadMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst,
                                    DoNotFastmemMarker marker) {
             auto args = ctx.reg_alloc.GetArgumentInfo(inst);
             auto Xaddr = ctx.reg_alloc.ReadX(args[1]);
@@ -579,7 +579,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                                 FastmemPatchInfo{
                                         .marker = marker,
                                         .fc = FakeCall{
-                                                .call_rip = mcl::bit_cast<u64>(code.getCurr < void(*)() > ()),
+                                                .call_pc = mcl::bit_cast<u64>(code.getCurr < void(*)() > ()),
                                         },
                                         .recompile = ctx.conf.recompile_on_fastmem_failure,
                                 });
@@ -605,7 +605,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
         template<size_t bitsize>
-        void FastmemEmitWriteMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst,
+        void FastmemEmitWriteMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst,
                                     DoNotFastmemMarker marker) {
             auto args = ctx.reg_alloc.GetArgumentInfo(inst);
             auto Xaddr = ctx.reg_alloc.ReadX(args[1]);
@@ -634,7 +634,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                                 FastmemPatchInfo{
                                         .marker = marker,
                                         .fc = FakeCall{
-                                                .call_rip = mcl::bit_cast<u64>(code.getCurr < void(*)() > ()),
+                                                .call_pc = mcl::bit_cast<u64>(code.getCurr < void(*)() > ()),
                                         },
                                         .recompile = ctx.conf.recompile_on_fastmem_failure,
                                 });
@@ -667,7 +667,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }  // namespace
 
     template<size_t bitsize>
-    void EmitReadMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitReadMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         if (const auto marker = ShouldFastmem(ctx, inst)) {
             FastmemEmitReadMemory<bitsize>(code, ctx, inst, *marker);
         } else if (ctx.conf.page_table_pointer != 0) {
@@ -678,12 +678,12 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<size_t bitsize>
-    void EmitExclusiveReadMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitExclusiveReadMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         CallbackOnlyEmitExclusiveReadMemory<bitsize>(code, ctx, inst);
     }
 
     template<size_t bitsize>
-    void EmitWriteMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitWriteMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         if (const auto marker = ShouldFastmem(ctx, inst)) {
             FastmemEmitWriteMemory<bitsize>(code, ctx, inst, *marker);
         } else if (ctx.conf.page_table_pointer != 0) {
@@ -694,53 +694,53 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<size_t bitsize>
-    void EmitExclusiveWriteMemory(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitExclusiveWriteMemory(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         CallbackOnlyEmitExclusiveWriteMemory<bitsize>(code, ctx, inst);
     }
 
-    template void EmitReadMemory<8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    template void EmitReadMemory<8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
-    template void EmitReadMemory<16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    template void EmitReadMemory<16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
-    template void EmitReadMemory<32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    template void EmitReadMemory<32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
-    template void EmitReadMemory<64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    template void EmitReadMemory<64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
-    template void EmitReadMemory<128>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    template void EmitReadMemory<128>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
-    template void EmitExclusiveReadMemory<8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    template void EmitExclusiveReadMemory<8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
-    template void EmitExclusiveReadMemory<16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    template void EmitExclusiveReadMemory<16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
-    template void EmitExclusiveReadMemory<32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    template void EmitExclusiveReadMemory<32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
-    template void EmitExclusiveReadMemory<64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
-
-    template void
-    EmitExclusiveReadMemory<128>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
-
-    template void EmitWriteMemory<8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
-
-    template void EmitWriteMemory<16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
-
-    template void EmitWriteMemory<32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
-
-    template void EmitWriteMemory<64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
-
-    template void EmitWriteMemory<128>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
-
-    template void EmitExclusiveWriteMemory<8>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    template void EmitExclusiveReadMemory<64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
     template void
-    EmitExclusiveWriteMemory<16>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    EmitExclusiveReadMemory<128>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
+
+    template void EmitWriteMemory<8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
+
+    template void EmitWriteMemory<16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
+
+    template void EmitWriteMemory<32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
+
+    template void EmitWriteMemory<64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
+
+    template void EmitWriteMemory<128>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
+
+    template void EmitExclusiveWriteMemory<8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
     template void
-    EmitExclusiveWriteMemory<32>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    EmitExclusiveWriteMemory<16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
     template void
-    EmitExclusiveWriteMemory<64>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    EmitExclusiveWriteMemory<32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
     template void
-    EmitExclusiveWriteMemory<128>(Xbyak_loongarch64::CodeGenerator &code, EmitContext &ctx, IR::Inst *inst);
+    EmitExclusiveWriteMemory<64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
+
+    template void
+    EmitExclusiveWriteMemory<128>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst);
 
 }  // namespace Dynarmic::Backend::LoongArch64

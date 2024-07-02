@@ -25,7 +25,7 @@ using namespace Backend::LoongArch64;
 struct Jit::Impl final {
     Impl(Jit*, A64::UserConfig conf)
             : conf(conf)
-            , current_address_space(conf)
+            , current_address_space(conf, JitStateInfo{current_state})
             , core(conf) {}
 
     HaltReason Run() {
@@ -117,27 +117,27 @@ struct Jit::Impl final {
     }
 
     std::uint32_t Fpcr() const {
-        return current_state.fpcr;
+        return current_state.GetFpcr();
     }
 
     void SetFpcr(std::uint32_t value) {
-        current_state.fpcr = value;
+        current_state.SetFpcr(value);
     }
 
     std::uint32_t Fpsr() const {
-        return current_state.fpsr;
+        return current_state.GetFpsr();
     }
 
     void SetFpsr(std::uint32_t value) {
-        current_state.fpsr = value;
+        current_state.SetFpsr(value);
     }
 
     std::uint32_t Pstate() const {
-        return current_state.cpsr_nzcv;
+        return current_state.GetPstate();
     }
 
     void SetPstate(std::uint32_t value) {
-        current_state.cpsr_nzcv = value;
+        current_state.SetPstate(value);
     }
 
     void ClearExclusiveState() {
