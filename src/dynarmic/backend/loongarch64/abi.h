@@ -28,7 +28,7 @@ constexpr size_t ABI_PARAM_COUNT = 6;
 
 constexpr Xbyak_loongarch64::XReg Xscratch0{18}, Xscratch1{19}, Xscratch2{20};
 constexpr Xbyak_loongarch64::WReg Wscratch0{18}, Wscratch1{19}, Wscratch2{20};
-constexpr Xbyak_loongarch64::VReg Vscratch0{18}, Vscratch1{19}, Vscratch2{20};
+constexpr Xbyak_loongarch64::VReg Vscratch0{21}, Vscratch1{22}, Vscratch2{23};
 
 // TODO no need in LoongArch ,LoongArch use instruction to distinguish
 template<size_t bitsize>
@@ -53,8 +53,8 @@ constexpr auto Rscratch1() {
     }
 }
 
-constexpr std::initializer_list<int> GPR_ORDER{19, 20, 21, 22, 23, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7, 8};
-constexpr std::initializer_list<int> FPR_ORDER{8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+constexpr std::initializer_list<int> GPR_ORDER{23, 24, 25, 26, 12, 13, 14, 15, 16, 17, 18, 19, 20, 4, 5, 6, 7, 8, 9, 10, 11};
+constexpr std::initializer_list<int> FPR_ORDER{8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 24, 25, 26, 27, 28, 29, 30, 31};
 
 using RegisterList = u64;
 
@@ -75,10 +75,9 @@ constexpr RegisterList ToRegList(Xbyak_loongarch64::Reg reg) {
 }
 
 // constexpr RegisterList ABI_CALLEE_SAVE = 0x0000ff00'7ff80000;
-//  !FIXME 0xff00??
-constexpr RegisterList ABI_CALLEE_SAVE = 0xffe00000'ffc00002;
+constexpr RegisterList ABI_CALLEE_SAVE = 0xff000000'ff800000;
 // constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'4000ffff;
-constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'001FFFF2 & ~0x1C0000; // 18\19\20
+constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'001FFFF0;
 
 void ABI_PushRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, size_t stack_space);
 void ABI_PopRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, size_t stack_space);
