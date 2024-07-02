@@ -336,7 +336,9 @@ namespace Dynarmic::Backend::LoongArch64 {
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
         auto Sresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Sresult);
-        code.vld(Sresult, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
+        code.vxor_v(Sresult, Sresult, Sresult);
+        code.vld(Vscratch0, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
+        code.vextrins_w(Sresult, Vscratch0, 0);
     }
 
     template<>
@@ -344,7 +346,10 @@ namespace Dynarmic::Backend::LoongArch64 {
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
         auto Dresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Dresult);
-        code.vld(Dresult, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
+        code.vxor_v(Dresult, Dresult, Dresult);
+        code.vld(Vscratch0, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
+        code.vextrins_d(Dresult, Vscratch0, 0);
+
     }
 
     template<>
@@ -441,8 +446,6 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Qvalue = ctx.reg_alloc.ReadQ(args[1]);
         RegAlloc::Realize(Qvalue);
         code.vst(Qvalue, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
-
-//    code.st_d(Qvalue, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
     }
 
     template<>

@@ -1391,23 +1391,31 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorPairedAddLower8>(BlockOfCode &code, EmitContext &ctx,
                                                    IR::Inst *inst) {
-        ASSERT_FALSE("Unexpected VectorPairedAddLower8");
-        (void)code;
-        (void)ctx;
-        (void)inst;
-//        EmitThreeOpArrangedLowe(code, ctx, inst,
-//                                    [&](auto Vresult, auto Va, auto Vb) { code.ADDP(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst,
+                    [&](auto Vresult, auto Va, auto Vb) {
+                        code.vpickev_b(Vresult, Va, Va);
+                        code.vpickod_b(Vscratch0, Va, Va);
+                        code.vadd_b(Vresult, Vresult, Vscratch0);
+                        code.vpickev_b(Vscratch1, Vb, Vb);
+                        code.vpickod_b(Vscratch0, Vb, Vb);
+                        code.vadd_b(Vscratch1, Vscratch1, Vscratch0);
+                        code.vextrins_w(Vresult, Vscratch1, 0x12);
+                    });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorPairedAddLower16>(BlockOfCode &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
-        ASSERT_FALSE("Unexpected VectorPairedAddLower16");
-        (void)code;
-        (void)ctx;
-        (void)inst;
-//        EmitThreeOp<16>(code, ctx, inst,
-//                                     [&](auto Vresult, auto Va, auto Vb) { code.ADDP(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst,
+                    [&](auto Vresult, auto Va, auto Vb) {
+                        code.vpickev_h(Vresult, Va, Va);
+                        code.vpickod_h(Vscratch0, Va, Va);
+                        code.vadd_h(Vresult, Vresult, Vscratch0);
+                        code.vpickev_h(Vscratch1, Vb, Vb);
+                        code.vpickod_h(Vscratch0, Vb, Vb);
+                        code.vadd_h(Vscratch1, Vscratch1, Vscratch0);
+                        code.vextrins_w(Vresult, Vscratch1, 0x12);
+                    });
     }
 
     template<>
@@ -1415,9 +1423,13 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                     IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst,
                                      [&](auto Vresult, auto Va, auto Vb) {
-            code.vpickev_w(Vresult, Va, Vb);
-            code.vpickod_w(Vscratch0, Va, Vb);
+            code.vpickev_w(Vresult, Va, Va);
+            code.vpickod_w(Vscratch0, Va, Va);
             code.vadd_w(Vresult, Vresult, Vscratch0);
+            code.vpickev_w(Vscratch1, Vb, Vb);
+            code.vpickod_w(Vscratch0, Vb, Vb);
+            code.vadd_w(Vscratch1, Vscratch1, Vscratch0);
+            code.vextrins_w(Vresult, Vscratch1, 0x12);
         });
     }
 
