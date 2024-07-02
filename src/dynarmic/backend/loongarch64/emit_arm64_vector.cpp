@@ -1413,12 +1413,12 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorPairedAddLower32>(BlockOfCode &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
-        ASSERT_FALSE("Unexpected VectorPairedAddLower32");
-        (void)code;
-        (void)ctx;
-        (void)inst;
-//        EmitThreeOp(code, ctx, inst,
-//                                     [&](auto Vresult, auto Va, auto Vb) { code.ADDP(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst,
+                                     [&](auto Vresult, auto Va, auto Vb) {
+            code.vpickev_w(Vresult, Va, Vb);
+            code.vpickod_w(Vscratch0, Va, Vb);
+            code.vadd_w(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>

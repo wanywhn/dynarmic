@@ -271,7 +271,7 @@ void RegAlloc::EmitVerboseDebuggingOutput() {
 template<HostLoc::Kind kind>
 unsigned int RegAlloc::GenerateImmediate(const IR::Value& value) {
     //FIXME this could delete
-    ASSERT(value.GetType() != IR::Type::U1);
+//    ASSERT(value.GetType() != IR::Type::U1);
     if constexpr (kind == HostLoc::Kind::Gpr) {
         const unsigned int new_location_index = AllocateRegister(gprs, gpr_order);
         SpillGpr(new_location_index);

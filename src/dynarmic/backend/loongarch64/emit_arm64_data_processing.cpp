@@ -24,7 +24,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     using namespace Xbyak_loongarch64::util;
 
     template<size_t bitsize, typename EmitFn>
-    static void EmitTwoOp(BlockOfCode&, EmitContext &ctx, IR::Inst *inst, EmitFn emit) {
+    static void EmitTwoOp(BlockOfCode &, EmitContext &ctx, IR::Inst *inst, EmitFn emit) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         auto Rresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
@@ -35,7 +35,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<size_t bitsize, typename EmitFn>
-    static void EmitThreeOp(BlockOfCode&, EmitContext &ctx, IR::Inst *inst, EmitFn emit) {
+    static void EmitThreeOp(BlockOfCode &, EmitContext &ctx, IR::Inst *inst, EmitFn emit) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         auto Rresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
@@ -47,7 +47,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::Pack2x32To1x64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Pack2x32To1x64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         auto Wlo = ctx.reg_alloc.ReadW(args[0]);
@@ -60,7 +60,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::Pack2x64To1x128>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Pack2x64To1x128>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         if (args[0].IsInGpr() && args[1].IsInGpr()) {
@@ -105,7 +105,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::LeastSignificantWord>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::LeastSignificantWord>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -118,7 +118,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::LeastSignificantHalf>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::LeastSignificantHalf>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -131,7 +131,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::LeastSignificantByte>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::LeastSignificantByte>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -144,7 +144,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::MostSignificantWord>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::MostSignificantWord>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const auto carry_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetCarryFromOp);
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -168,7 +168,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::MostSignificantBit>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::MostSignificantBit>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -179,7 +179,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::IsZero32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::IsZero32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -193,7 +193,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::IsZero64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::IsZero64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -206,7 +206,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::TestBit>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::TestBit>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Xresult = ctx.reg_alloc.WriteX(inst);
         auto Xoperand = ctx.reg_alloc.ReadX(args[0]);
@@ -221,7 +221,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 // bind to EmitA32Cond
     template<size_t bitsize>
-    static void EmitConditionalSelect(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    static void EmitConditionalSelect(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         const IR::Cond cond = args[0].GetImmediateCond();
         auto Xresult = ctx.reg_alloc.WriteX(inst);
@@ -314,25 +314,25 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::ConditionalSelect32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ConditionalSelect32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitConditionalSelect<32>(code, ctx, inst);
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::ConditionalSelect64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ConditionalSelect64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitConditionalSelect<64>(code, ctx, inst);
     }
 
     template<>
-    void EmitIR<IR::Opcode::ConditionalSelectNZCV>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::ConditionalSelectNZCV>(BlockOfCode &code, EmitContext &ctx,
                                                    IR::Inst *inst) {
         EmitIR<IR::Opcode::ConditionalSelect32>(code, ctx, inst);
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::LogicalShiftLeft32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::LogicalShiftLeft32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const auto carry_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetCarryFromOp);
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -446,7 +446,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::LogicalShiftLeft64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::LogicalShiftLeft64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         if (args[1].IsImmediate()) {
@@ -476,7 +476,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::LogicalShiftRight32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::LogicalShiftRight32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const auto carry_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetCarryFromOp);
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -587,7 +587,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::LogicalShiftRight64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::LogicalShiftRight64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
         if (args[1].IsImmediate()) {
@@ -617,7 +617,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::ArithmeticShiftRight32>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::ArithmeticShiftRight32>(BlockOfCode &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
         const auto carry_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetCarryFromOp);
 
@@ -727,7 +727,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::ArithmeticShiftRight64>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::ArithmeticShiftRight64>(BlockOfCode &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto &operand_arg = args[0];
@@ -749,7 +749,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::RotateRight32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::RotateRight32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const auto carry_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetCarryFromOp);
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -824,7 +824,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::RotateRight64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::RotateRight64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto &operand_arg = args[0];
         auto &shift_arg = args[1];
@@ -846,7 +846,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::RotateRightExtended>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::RotateRightExtended>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const auto carry_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetCarryFromOp);
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -881,7 +881,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<typename ShiftI, typename ShiftR>
-    static void EmitMaskedShift32(BlockOfCode&, EmitContext &ctx, IR::Inst *inst, ShiftI si_fn,
+    static void EmitMaskedShift32(BlockOfCode &, EmitContext &ctx, IR::Inst *inst, ShiftI si_fn,
                                   ShiftR sr_fn) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto &operand_arg = args[0];
@@ -905,7 +905,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<typename ShiftI, typename ShiftR>
-    static void EmitMaskedShift64(BlockOfCode&, EmitContext &ctx, IR::Inst *inst, ShiftI si_fn,
+    static void EmitMaskedShift64(BlockOfCode &, EmitContext &ctx, IR::Inst *inst, ShiftI si_fn,
                                   ShiftR sr_fn) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto &operand_arg = args[0];
@@ -929,7 +929,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::LogicalShiftLeftMasked32>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::LogicalShiftLeftMasked32>(BlockOfCode &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
         EmitMaskedShift32(
                 code, ctx, inst,
@@ -938,7 +938,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::LogicalShiftLeftMasked64>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::LogicalShiftLeftMasked64>(BlockOfCode &code, EmitContext &ctx,
                                                       IR::Inst *inst) {
         EmitMaskedShift64(
                 code, ctx, inst,
@@ -947,7 +947,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::LogicalShiftRightMasked32>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::LogicalShiftRightMasked32>(BlockOfCode &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
         EmitMaskedShift32(
                 code, ctx, inst,
@@ -956,7 +956,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::LogicalShiftRightMasked64>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::LogicalShiftRightMasked64>(BlockOfCode &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
         EmitMaskedShift64(
                 code, ctx, inst,
@@ -965,7 +965,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::ArithmeticShiftRightMasked32>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::ArithmeticShiftRightMasked32>(BlockOfCode &code, EmitContext &ctx,
                                                           IR::Inst *inst) {
         EmitMaskedShift32(
                 code, ctx, inst,
@@ -974,7 +974,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::ArithmeticShiftRightMasked64>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::ArithmeticShiftRightMasked64>(BlockOfCode &code, EmitContext &ctx,
                                                           IR::Inst *inst) {
         EmitMaskedShift64(
                 code, ctx, inst,
@@ -984,7 +984,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::RotateRightMasked32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::RotateRightMasked32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaskedShift32(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &Woperand, auto shift) { code.rotri_w(Wresult, Woperand, shift); },
@@ -993,7 +993,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::RotateRightMasked64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::RotateRightMasked64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaskedShift64(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xoperand, auto shift) { code.rotri_d(Xresult, Xoperand, shift); },
@@ -1001,7 +1001,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<size_t bitsize, typename EmitFn>
-    static void MaybeAddSubImm(BlockOfCode&code, u64 imm, EmitFn emit_fn) {
+    static void MaybeAddSubImm(BlockOfCode &code, u64 imm, EmitFn emit_fn) {
         static_assert(bitsize == 32 || bitsize == 64);
         if constexpr (bitsize == 32) {
             imm = static_cast<u32>(imm);
@@ -1017,7 +1017,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<size_t bitsize>
-    static void EmitAdd(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    static void EmitAdd(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const auto carry_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetCarryFromOp);
         const auto nzcv_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetNZCVFromOp);
         const auto overflow_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetOverflowFromOp);
@@ -1026,34 +1026,21 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         auto Rresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
         auto Ra = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
-        auto carry_in = args[2];
-        RegAlloc::Realize(Rresult, Ra);
-        auto carry = Wscratch0;
-        if (carry_in.IsImmediate()) {
-            if (carry_in.GetImmediateU1()) {
-                code.addi_d(carry, code.zero, 1);
-            }
-        } else {
-            auto op2=ctx.reg_alloc.ReadReg<bitsize>(args[2]);
-            RegAlloc::Realize(op2);
-            code.add_d(carry, code.zero, op2);
+        auto Rb = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
+        auto carry_in = ctx.reg_alloc.ReadReg<bitsize>(args[2]);
+        RegAlloc::Realize(Rresult, Ra, Rb, carry_in);
+
+        decltype(&BlockOfCode::add_d) addfn;
+        if constexpr (bitsize == 32) {
+            addfn = &BlockOfCode::add_w;
+        } else if constexpr (bitsize == 64) {
+            addfn = &BlockOfCode::add_d;
         }
-
-
-        if (args[1].IsImmediate() && bitsize == 32) {
-            const u32 op_arg = args[1].GetImmediateU32();
-            code.add_imm(Wscratch2, code.zero, op_arg, Wscratch1);
-        } else {
-            auto op1 = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
-            RegAlloc::Realize(op1);
-            code.add_d(Wscratch2, code.zero, op1);
-        }
-        code.add_d(Ra, Ra, carry);
-        code.add_d(Rresult, Wscratch2, Ra);
-
+        (code.*addfn)(Rresult, Ra, Rb);
+        (code.*addfn)(Rresult, Rresult, carry_in);
 
         if (overflow_inst) {
-            code.xor_(Xscratch0, Wscratch2, Ra);
+            code.xor_(Xscratch0, Rb, Ra);
             code.xor_(Xscratch1, Rresult, Ra);
             code.and_(Xscratch0, Xscratch0, Xscratch1);
 
@@ -1069,13 +1056,13 @@ namespace Dynarmic::Backend::LoongArch64 {
         if (nzcv_inst) {
             auto Wflags = ctx.reg_alloc.WriteFlags(nzcv_inst);
             // TODO how to impl?
-            RegAlloc::Realize(Rresult, Ra, Wflags);
+            RegAlloc::Realize(Wflags);
         }
 
     }
 
     template<size_t bitsize>
-    static void EmitSub(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    static void EmitSub(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const auto carry_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetCarryFromOp);
         const auto nzcv_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetNZCVFromOp);
         const auto overflow_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetOverflowFromOp);
@@ -1084,44 +1071,27 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         auto Rresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
         auto Ra = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
-        auto carry_in = args[2];
-        RegAlloc::Realize(Rresult, Ra);
-        auto carry = Wscratch0;
-        if (carry_in.IsImmediate()) {
-            if (carry_in.GetImmediateU1()) {
-                code.addi_d(carry, code.zero, 1);
-            }
-        } else {
-            auto _carry = ctx.reg_alloc.ReadReg<bitsize>(args[2]);
-            RegAlloc::Realize(_carry);
-            code.add_d(carry, code.zero, _carry);
-        }
+        auto Rb = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
+        auto carry_in = ctx.reg_alloc.ReadReg<bitsize>(args[2]);
+        RegAlloc::Realize(Rresult, Ra, Rb, carry_in);
 
-        if (args[1].IsImmediate() && bitsize == 32) {
-            const u32 op_arg = args[1].GetImmediateU32();
-            code.add_imm(Wscratch2, code.zero, op_arg, Wscratch1);
-        } else {
-            auto op1 = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
-            RegAlloc::Realize(op1);
-            code.add_d(Wscratch2, code.zero, op1);
-        }
-        code.add_d(Wscratch2, Wscratch2, carry);
+        code.add_d(Rb, Rb, carry_in);
         code.sub_d(Rresult, Wscratch2, Ra);
 
 
         if (overflow_inst) {
-            code.xor_(Xscratch0, Wscratch2, Ra);
-            code.xor_(Xscratch1, Rresult, Ra);
-            code.and_(Xscratch0, Xscratch0, Xscratch1);
-
             auto Woverflow = ctx.reg_alloc.WriteW(overflow_inst);
             RegAlloc::Realize(Woverflow);
+
+            code.xor_(Xscratch0, Rb, Ra);
+            code.xor_(Xscratch1, Rresult, Ra);
+            code.and_(Xscratch0, Xscratch0, Xscratch1);
             code.slt(Woverflow, Xscratch0, code.zero);
         }
         if (carry_inst) {
             auto Wcarry = ctx.reg_alloc.WriteW(carry_inst);
             RegAlloc::Realize(Wcarry);
-            code.sltu(Wcarry, Wscratch2, Ra);
+            code.sltu(Wcarry, Rb, Ra);
         }
         if (nzcv_inst) {
             auto Wflags = ctx.reg_alloc.WriteFlags(nzcv_inst);
@@ -1133,34 +1103,34 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 
     template<>
-    void EmitIR<IR::Opcode::Add32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Add32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitAdd<32>(code, ctx, inst);
     }
 
     template<>
-    void EmitIR<IR::Opcode::Add64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Add64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitAdd<64>(code, ctx, inst);
     }
 
     template<>
-    void EmitIR<IR::Opcode::Sub32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Sub32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitSub<32>(code, ctx, inst);
     }
 
     template<>
-    void EmitIR<IR::Opcode::Sub64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Sub64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitSub<64>(code, ctx, inst);
     }
 
     template<>
-    void EmitIR<IR::Opcode::Mul32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Mul32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp<32>(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &Wa, auto &Wb) { code.mul_w(Wresult, Wa, Wb); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::Mul64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Mul64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xa, auto &Xb) { code.mul_d(Xresult, Xa, Xb); });
@@ -1168,7 +1138,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::SignedMultiplyHigh64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::SignedMultiplyHigh64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Xresult = ctx.reg_alloc.WriteX(inst);
         auto Xop1 = ctx.reg_alloc.ReadX(args[0]);
@@ -1179,7 +1149,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::UnsignedMultiplyHigh64>(BlockOfCode&code, EmitContext &ctx,
+    void EmitIR<IR::Opcode::UnsignedMultiplyHigh64>(BlockOfCode &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Xresult = ctx.reg_alloc.WriteX(inst);
@@ -1191,28 +1161,28 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::UnsignedDiv32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::UnsignedDiv32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp<32>(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &Wa, auto &Wb) { code.div_wu(Wresult, Wa, Wb); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::UnsignedDiv64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::UnsignedDiv64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xa, auto &Xb) { code.div_du(Xresult, Xa, Xb); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::SignedDiv32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::SignedDiv32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp<32>(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &Wa, auto &Wb) { code.div_w(Wresult, Wa, Wb); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::SignedDiv64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::SignedDiv64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xa, auto &Xb) { code.div_d(Xresult, Xa, Xb); });
@@ -1220,19 +1190,19 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 
     template<size_t bitsize, typename EmitFn>
-    static void MaybeBitImm(BlockOfCode&code, u64 imm, EmitFn emit_fn) {
+    static void MaybeBitImm(BlockOfCode &code, u64 imm, EmitFn emit_fn) {
         static_assert(bitsize == 32 || bitsize == 64);
         if constexpr (bitsize == 32) {
             imm = static_cast<u32>(imm);
         }
-            code.add_imm(Rscratch0<bitsize>(), code.zero, imm, Rscratch1<bitsize>());
+        code.add_imm(Rscratch0<bitsize>(), code.zero, imm, Rscratch1<bitsize>());
 //            code.add_d(Rscratch0<bitsize>(), imm, code.zero);
-            emit_fn(Rscratch0<bitsize>());
+        emit_fn(Rscratch0<bitsize>());
     }
 
     template<size_t bitsize, typename EmitFn1, typename EmitFn2 = std::nullptr_t>
     static void
-    EmitBitOp(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst, EmitFn1 emit_without_flags,
+    EmitBitOp(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst, EmitFn1 emit_without_flags,
               EmitFn2 emit_with_flags = nullptr) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Rresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
@@ -1272,7 +1242,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<size_t bitsize>
-    static void EmitAndNot(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    static void EmitAndNot(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const auto nz_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetNZFromOp);
         const auto nzcv_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetNZCVFromOp);
         ASSERT(!(nz_inst && nzcv_inst));
@@ -1284,9 +1254,9 @@ namespace Dynarmic::Backend::LoongArch64 {
         RegAlloc::Realize(Rresult, Ra);
 
         if (args[1].IsImmediate()) {
-            code.add_imm(Xscratch0,code.zero,
+            code.add_imm(Xscratch0, code.zero,
                          bitsize == 32 ?
-                         static_cast<u32>(args[1].GetImmediateU64()) :args[1].GetImmediateU64(),
+                         static_cast<u32>(args[1].GetImmediateU64()) : args[1].GetImmediateU64(),
                          Wscratch2);
         }
         code.andn(Rresult, Ra, Xscratch0);
@@ -1299,74 +1269,75 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
     }
+
     // TODO flags
     template<>
-    void EmitIR<IR::Opcode::And32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::And32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitBitOp<32>(
                 code, ctx, inst,
                 [&](auto &result, auto &a, auto &b) { code.and_(result, a, b); }
                 // FIXME
 //                ,[&](auto &result, auto &a, auto &b) { code.ANDS(result, a, b); }
-                );
+        );
     }
 
     template<>
-    void EmitIR<IR::Opcode::And64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::And64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitBitOp<64>(
                 code, ctx, inst,
                 [&](auto &result, auto &a, auto &b) { code.and_(result, a, b); }
 //               FIXME
 //                ,[&](auto &result, auto &a, auto &b) { code.ANDS(result, a, b); }
-                );
+        );
     }
 
     template<>
-    void EmitIR<IR::Opcode::AndNot32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::AndNot32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitAndNot<32>(code, ctx, inst);
     }
 
     template<>
-    void EmitIR<IR::Opcode::AndNot64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::AndNot64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitAndNot<64>(code, ctx, inst);
     }
 
     template<>
-    void EmitIR<IR::Opcode::Eor32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Eor32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitBitOp<32>(
                 code, ctx, inst,
                 [&](auto &result, auto &a, auto &b) { code.xor_(result, a, b); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::Eor64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Eor64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitBitOp<64>(
                 code, ctx, inst,
                 [&](auto &result, auto &a, auto &b) { code.xor_(result, a, b); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::Or32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Or32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitBitOp<32>(
                 code, ctx, inst,
                 [&](auto &result, auto &a, auto &b) { code.or_(result, a, b); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::Or64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Or64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitBitOp<64>(
                 code, ctx, inst,
                 [&](auto &result, auto &a, auto &b) { code.or_(result, a, b); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::Not32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Not32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp<32>(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &ra, auto &rb) { code.xor_(Wresult, ra, rb); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::Not64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::Not64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &ra, auto &rb) { code.xor_(Xresult, ra, rb); });
@@ -1374,7 +1345,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::SignExtendByteToWord>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::SignExtendByteToWord>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<32>(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &Woperand) { code.ext_w_b(Wresult, Woperand); });
@@ -1382,7 +1353,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::SignExtendHalfToWord>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::SignExtendHalfToWord>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<32>(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &Woperand) { code.ext_w_h(Wresult, Woperand); });
@@ -1390,7 +1361,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::SignExtendByteToLong>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::SignExtendByteToLong>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xoperand) {
@@ -1401,7 +1372,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::SignExtendHalfToLong>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::SignExtendHalfToLong>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xoperand) {
@@ -1412,7 +1383,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::SignExtendWordToLong>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::SignExtendWordToLong>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xoperand) {
@@ -1422,42 +1393,42 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::ZeroExtendByteToWord>(BlockOfCode&, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ZeroExtendByteToWord>(BlockOfCode &, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ctx.reg_alloc.DefineAsExisting(inst, args[0]);
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::ZeroExtendHalfToWord>(BlockOfCode&, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ZeroExtendHalfToWord>(BlockOfCode &, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ctx.reg_alloc.DefineAsExisting(inst, args[0]);
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::ZeroExtendByteToLong>(BlockOfCode&, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ZeroExtendByteToLong>(BlockOfCode &, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ctx.reg_alloc.DefineAsExisting(inst, args[0]);
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::ZeroExtendHalfToLong>(BlockOfCode&, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ZeroExtendHalfToLong>(BlockOfCode &, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ctx.reg_alloc.DefineAsExisting(inst, args[0]);
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::ZeroExtendWordToLong>(BlockOfCode&, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ZeroExtendWordToLong>(BlockOfCode &, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ctx.reg_alloc.DefineAsExisting(inst, args[0]);
     }
 
     template<>
     void
-    EmitIR<IR::Opcode::ZeroExtendLongToQuad>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ZeroExtendLongToQuad>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Xvalue = ctx.reg_alloc.ReadX(args[0]);
         auto Qresult = ctx.reg_alloc.WriteQ(inst);
@@ -1466,21 +1437,21 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::ByteReverseWord>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::ByteReverseWord>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<32>(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &Woperand) { code.revb_d(Wresult, Woperand); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::ByteReverseHalf>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::ByteReverseHalf>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<32>(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &Woperand) { code.revh_2w(Wresult, Woperand); });
     }
 
     template<>
-    void EmitIR<IR::Opcode::ByteReverseDual>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::ByteReverseDual>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xoperand) { code.revb_d(Xresult, Xoperand); });
@@ -1488,7 +1459,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::CountLeadingZeros32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::CountLeadingZeros32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<32>(
                 code, ctx, inst,
                 [&](auto &Wresult, auto &Woperand) { code.clz_w(Wresult, Woperand); });
@@ -1496,7 +1467,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::CountLeadingZeros64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::CountLeadingZeros64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xoperand) { code.clz_d(Xresult, Xoperand); });
@@ -1504,7 +1475,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::ExtractRegister32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ExtractRegister32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ASSERT(args[2].IsImmediate());
 
@@ -1519,7 +1490,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::ExtractRegister64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ExtractRegister64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ASSERT(args[2].IsImmediate());
 
@@ -1535,7 +1506,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::ReplicateBit32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::ReplicateBit32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ASSERT(args[1].IsImmediate());
 
@@ -1549,7 +1520,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::ReplicateBit64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::ReplicateBit64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         ASSERT(args[1].IsImmediate());
 
@@ -1562,7 +1533,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.srai_d(Xresult, Xresult, 63);
     }
 
-    static void EmitMaxMin32(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst,
+    static void EmitMaxMin32(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst,
                              Xbyak_loongarch64::Cond cond) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
@@ -1598,42 +1569,42 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     template<>
-    void EmitIR<IR::Opcode::MaxSigned32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::MaxSigned32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaxMin32(code, ctx, inst, GT);
     }
 
     template<>
-    void EmitIR<IR::Opcode::MaxSigned64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::MaxSigned64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaxMin32(code, ctx, inst, GT);
     }
 
     template<>
-    void EmitIR<IR::Opcode::MaxUnsigned32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::MaxUnsigned32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaxMin32(code, ctx, inst, HI);
     }
 
     template<>
-    void EmitIR<IR::Opcode::MaxUnsigned64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::MaxUnsigned64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaxMin32(code, ctx, inst, HI);
     }
 
     template<>
-    void EmitIR<IR::Opcode::MinSigned32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::MinSigned32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaxMin32(code, ctx, inst, LT);
     }
 
     template<>
-    void EmitIR<IR::Opcode::MinSigned64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::MinSigned64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaxMin32(code, ctx, inst, LT);
     }
 
     template<>
-    void EmitIR<IR::Opcode::MinUnsigned32>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::MinUnsigned32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaxMin32(code, ctx, inst, LO);
     }
 
     template<>
-    void EmitIR<IR::Opcode::MinUnsigned64>(BlockOfCode&code, EmitContext &ctx, IR::Inst *inst) {
+    void EmitIR<IR::Opcode::MinUnsigned64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitMaxMin32(code, ctx, inst, LO);
     }
 
