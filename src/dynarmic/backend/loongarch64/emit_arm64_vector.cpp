@@ -346,32 +346,32 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorAbs8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst, [&](auto &Vresult, auto &Voperand) {
-            code.vreplgr2vr_b(code.vr8, code.zero);
-            code.vabsd_b(Vresult, Voperand, code.vr8);
+            code.vreplgr2vr_b(Vscratch0, code.zero);
+            code.vabsd_b(Vresult, Voperand, Vscratch0);
         });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorAbs16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst, [&](auto &Vresult, auto &Voperand) {
-            code.vreplgr2vr_b(code.vr8, code.zero);
-            code.vabsd_h(Vresult, Voperand, code.vr8);
+            code.vreplgr2vr_b(Vscratch0, code.zero);
+            code.vabsd_h(Vresult, Voperand, Vscratch0);
         });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorAbs32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst, [&](auto &Vresult, auto &Voperand) {
-            code.vreplgr2vr_b(code.vr8, code.zero);
-            code.vabsd_w(Vresult, Voperand, code.vr8);
+            code.vreplgr2vr_b(Vscratch0, code.zero);
+            code.vabsd_w(Vresult, Voperand, Vscratch0);
         });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorAbs64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst, [&](auto &Vresult, auto &Voperand) {
-            code.vreplgr2vr_b(code.vr8, code.zero);
-            code.vabsd_d(Vresult, Voperand, code.vr8);
+            code.vreplgr2vr_b(Vscratch0, code.zero);
+            code.vabsd_d(Vresult, Voperand, Vscratch0);
         });
     }
 
@@ -507,10 +507,10 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorBroadcastLower32>(BlockOfCode &code, EmitContext &ctx,
                                                     IR::Inst *inst) {
         EmitBroadcast<32>(code, ctx, inst, [&](auto &Qvector, auto &Wvalue) {
-//            code.vxor_v(code.vr8, code.vr8, code.vr8);
+//            code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
 //            code.vreplgr2vr_w(Qvector, Wvalue);
-//            code.vpickev_b(Qvector, code.vr8, Qvector);
-//            code.vpickod_b(Qvector, code.vr8, Qvector);
+//            code.vpickev_b(Qvector, Vscratch0, Qvector);
+//            code.vpickod_b(Qvector, Vscratch0, Qvector);
             code.vreplgr2vr_w(Qvector, Wvalue);
             code.vinsgr2vr_d(Qvector, code.zero, 1);
         });
@@ -1330,8 +1330,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorNot>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst, [&](auto &Vresult, auto &Voperand) {
-            code.vorn_v(code.vr8, code.vr8, code.vr8);
-            code.vxor_v(Vresult, Voperand, code.vr8);
+            code.vorn_v(Vscratch0, Vscratch0, Vscratch0);
+            code.vxor_v(Vresult, Voperand, Vscratch0);
         });
     }
 
@@ -1485,8 +1485,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedAdd8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_b(Vresult, Va, Vb);
-            code.vpickod_b(code.vr0,Va, Vb);
-            code.vadd_b(Vresult, Vresult, code.vr0);        });
+            code.vpickod_b(Vscratch2,Va, Vb);
+            code.vadd_b(Vresult, Vresult, Vscratch2);        });
     }
 
     template<>
@@ -1494,8 +1494,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedAdd16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_h(Vresult, Va, Vb);
-            code.vpickod_h(code.vr0,Va, Vb);
-            code.vadd_h(Vresult, Vresult, code.vr0);        });
+            code.vpickod_h(Vscratch2,Va, Vb);
+            code.vadd_h(Vresult, Vresult, Vscratch2);        });
     }
 
     template<>
@@ -1503,8 +1503,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedAdd32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_w(Vresult, Va, Vb);
-            code.vpickod_w(code.vr0,Va, Vb);
-            code.vadd_w(Vresult, Vresult, code.vr0);        });
+            code.vpickod_w(Vscratch2,Va, Vb);
+            code.vadd_w(Vresult, Vresult, Vscratch2);        });
     }
 
     template<>
@@ -1512,8 +1512,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedAdd64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_d(Vresult, Va, Vb);
-            code.vpickod_d(code.vr0,Va, Vb);
-            code.vadd_d(Vresult, Vresult, code.vr0);
+            code.vpickod_d(Vscratch2,Va, Vb);
+            code.vadd_d(Vresult, Vresult, Vscratch2);
         });
     }
 
@@ -1522,8 +1522,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMaxS8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_d(Vresult, Va, Vb);
-            code.vpickod_d(code.vr0,Va, Vb);
-            code.vmax_b(Vresult, Vresult, code.vr0);
+            code.vpickod_d(Vscratch2,Va, Vb);
+            code.vmax_b(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<s8> &result, const VectorArray<s8> &a, const VectorArray<s8> &b) {
@@ -1536,8 +1536,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMaxS16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_h(Vresult, Va, Vb);
-            code.vpickod_h(code.vr0,Va, Vb);
-            code.vmax_h(Vresult, Vresult, code.vr0);
+            code.vpickod_h(Vscratch2,Va, Vb);
+            code.vmax_h(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<s16> &result, const VectorArray<s16> &a, const VectorArray<s16> &b) {
@@ -1551,8 +1551,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMaxS32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_w(Vresult, Va, Vb);
-            code.vpickod_w(code.vr0,Va, Vb);
-            code.vmax_w(Vresult, Vresult, code.vr0);
+            code.vpickod_w(Vscratch2,Va, Vb);
+            code.vmax_w(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<s32> &result, const VectorArray<s32> &a, const VectorArray<s32> &b) {
@@ -1565,8 +1565,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMaxU8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_b(Vresult, Va, Vb);
-            code.vpickod_b(code.vr0,Va, Vb);
-            code.vmax_bu(Vresult, Vresult, code.vr0);
+            code.vpickod_b(Vscratch2,Va, Vb);
+            code.vmax_bu(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<u8> &result, const VectorArray<u8> &a, const VectorArray<u8> &b) {
@@ -1579,8 +1579,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMaxU16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_h(Vresult, Va, Vb);
-            code.vpickod_h(code.vr0,Va, Vb);
-            code.vmax_hu(Vresult, Vresult, code.vr0);
+            code.vpickod_h(Vscratch2,Va, Vb);
+            code.vmax_hu(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<u16> &result, const VectorArray<u16> &a, const VectorArray<u16> &b) {
@@ -1593,8 +1593,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMaxU32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_w(Vresult, Va, Vb);
-            code.vpickod_w(code.vr0,Va, Vb);
-            code.vmax_wu(Vresult, Vresult, code.vr0);
+            code.vpickod_w(Vscratch2,Va, Vb);
+            code.vmax_wu(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<u32> &result, const VectorArray<u32> &a, const VectorArray<u32> &b) {
@@ -1607,8 +1607,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMinS8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_b(Vresult, Va, Vb);
-            code.vpickod_b(code.vr0,Va, Vb);
-            code.vmin_b(Vresult, Vresult, code.vr0);
+            code.vpickod_b(Vscratch2,Va, Vb);
+            code.vmin_b(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<s8> &result, const VectorArray<s8> &a, const VectorArray<s8> &b) {
@@ -1621,8 +1621,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMinS16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_h(Vresult, Va, Vb);
-            code.vpickod_h(code.vr0,Va, Vb);
-            code.vmin_h(Vresult, Vresult, code.vr0);
+            code.vpickod_h(Vscratch2,Va, Vb);
+            code.vmin_h(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<s16> &result, const VectorArray<s16> &a, const VectorArray<s16> &b) {
@@ -1636,8 +1636,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMinS32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_w(Vresult, Va, Vb);
-            code.vpickod_w(code.vr0,Va, Vb);
-            code.vmin_w(Vresult, Vresult, code.vr0);
+            code.vpickod_w(Vscratch2,Va, Vb);
+            code.vmin_w(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<u32> &result, const VectorArray<u32> &a, const VectorArray<u32> &b) {
@@ -1650,8 +1650,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMinU8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_b(Vresult, Va, Vb);
-            code.vpickod_b(code.vr0,Va, Vb);
-            code.vmin_bu(Vresult, Vresult, code.vr0);
+            code.vpickod_b(Vscratch2,Va, Vb);
+            code.vmin_bu(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<u8> &result, const VectorArray<u8> &a, const VectorArray<u8> &b) {
@@ -1664,8 +1664,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMinU16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_h(Vresult, Va, Vb);
-            code.vpickod_h(code.vr0,Va, Vb);
-            code.vmin_hu(Vresult, Vresult, code.vr0);
+            code.vpickod_h(Vscratch2,Va, Vb);
+            code.vmin_hu(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<u16> &result, const VectorArray<u16> &a, const VectorArray<u16> &b) {
@@ -1679,8 +1679,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorPairedMinU32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
             code.vpickev_w(Vresult, Va, Vb);
-            code.vpickod_w(code.vr0,Va, Vb);
-            code.vmin_wu(Vresult, Vresult, code.vr0);
+            code.vpickod_w(Vscratch2,Va, Vb);
+            code.vmin_wu(Vresult, Vresult, Vscratch2);
         });
 //        EmitTwoArgumentFallback(code, ctx, inst,
 //                                [](VectorArray<u32> &result, const VectorArray<u32> &a, const VectorArray<u32> &b) {
@@ -2407,13 +2407,13 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitTwoOp(code, ctx, inst, [&](auto &Vresult, auto &Voperand) {\
     Xbyak_loongarch64::Label set_qc, label_end;\
     code.vsat_##op##u(Vresult, Voperand, tosize);\
-    code.vxor_v(code.vr0, code.vr0, code.vr0);\
-    code.vslt_##op(code.vr1, Vresult, code.vr0);\
-    code.vnor_v(code.vr1, code.vr1, code.vr0);\
-    code.vmax_##op(Vresult, Vresult, code.vr1);\
-    code.vseq_##op(code.vr2, Vresult, Voperand);\
-    code.vnor_v(code.vr2, code.vr2, code.vr0);\
-    code.vsetnez_v(0 , code.vr2);\
+    code.vxor_v(Vscratch2, Vscratch2, Vscratch2);\
+    code.vslt_##op(Vscratch0, Vresult, Vscratch2);\
+    code.vnor_v(Vscratch0, Vscratch0, Vscratch2);\
+    code.vmax_##op(Vresult, Vresult, Vscratch0);\
+    code.vseq_##op(Vscratch1, Vresult, Voperand);\
+    code.vnor_v(Vscratch1, Vscratch1, Vscratch2);\
+    code.vsetnez_v(0 , Vscratch1);\
     code.bcnez(0, set_qc);\
     code.st_b(code.zero, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
     code.b(label_end);\
@@ -2426,13 +2426,13 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitTwoOp(code, ctx, inst, [&](auto &Vresult, auto &Voperand) {\
     Xbyak_loongarch64::Label set_qc, label_end;\
     code.vsat_##op(Vresult, Voperand, tosize);\
-    code.vxor_v(code.vr0, code.vr0, code.vr0);\
-    code.vslt_##op(code.vr1, Vresult, code.vr0);\
-    code.vnor_v(code.vr1, code.vr1, code.vr0);\
-    code.vmax_##op(Vresult, Vresult, code.vr1);\
-    code.vseq_##op(code.vr2, Vresult, Voperand);\
-    code.vnor_v(code.vr2, code.vr2, code.vr0);\
-    code.vsetnez_v(0 , code.vr2);\
+    code.vxor_v(Vscratch2, Vscratch2, Vscratch2);\
+    code.vslt_##op(Vscratch0, Vresult, Vscratch2);\
+    code.vnor_v(Vscratch0, Vscratch0, Vscratch2);\
+    code.vmax_##op(Vresult, Vresult, Vscratch0);\
+    code.vseq_##op(Vscratch1, Vresult, Voperand);\
+    code.vnor_v(Vscratch1, Vscratch1, Vscratch2);\
+    code.vsetnez_v(0 , Vscratch1);\
     code.bcnez(0, set_qc);\
     code.st_b(code.zero, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
     code.b(label_end);\
@@ -2494,8 +2494,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                        IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                        [&](auto &Vresult, auto &Voperand) {
-                                           code.vxor_v(code.vr0, code.vr0, code.vr0);
-                                           code.vssub_b(Vresult, code.vr0, Voperand);
+                                           code.vxor_v(Vscratch2, Vscratch2, Vscratch2);
+                                           code.vssub_b(Vresult, Vscratch2, Voperand);
                                        });
     }
 
@@ -2504,8 +2504,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                         IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                        [&](auto &Vresult, auto &Voperand) {
-                                           code.vxor_v(code.vr0, code.vr0, code.vr0);
-                                           code.vssub_h(Vresult, code.vr0, Voperand);
+                                           code.vxor_v(Vscratch2, Vscratch2, Vscratch2);
+                                           code.vssub_h(Vresult, Vscratch2, Voperand);
                                        });
     }
 
@@ -2514,8 +2514,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                         IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                        [&](auto &Vresult, auto &Voperand) {
-                                           code.vxor_v(code.vr0, code.vr0, code.vr0);
-                                           code.vssub_w(Vresult, code.vr0, Voperand);
+                                           code.vxor_v(Vscratch2, Vscratch2, Vscratch2);
+                                           code.vssub_w(Vresult, Vscratch2, Voperand);
                                        });
     }
 
@@ -2524,8 +2524,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                         IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                        [&](auto &Vresult, auto &Voperand) {
-            code.vxor_v(code.vr0, code.vr0, code.vr0);
-            code.vssub_d(Vresult, code.vr0, Voperand);
+            code.vxor_v(Vscratch2, Vscratch2, Vscratch2);
+            code.vssub_d(Vresult, Vscratch2, Voperand);
         });
     }
 

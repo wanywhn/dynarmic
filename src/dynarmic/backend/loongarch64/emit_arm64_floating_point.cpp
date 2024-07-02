@@ -105,9 +105,9 @@ static void EmitThreeOp(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, Emi
     RegAlloc::Realize(Vresult, Va, Vb);
 
     if (ctx.FPCR().DN() || ctx.conf.HasOptimization(OptimizationFlag::Unsafe_InaccurateNaN)) {
-            code.movfcsr2gr(Wscratch0, code.f1);
+            code.movfcsr2gr(Wscratch0, Fscratch1);
             code.bstrins_w(Wscratch0, code.zero, 4, 4);
-            code.movgr2fcsr(code.f1, Wscratch0);
+            code.movgr2fcsr(Fscratch1, Wscratch0);
             emit(Vresult, Va, Vb);
 
 
@@ -931,9 +931,9 @@ void EmitIR<IR::Opcode::FPFixedU16ToSingle>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
 
-            code.fmul_s(Sto, Sto, code.f0);
+            code.fmul_s(Sto, Sto, Fscratch0);
         }
     });
 }
@@ -946,9 +946,9 @@ void EmitIR<IR::Opcode::FPFixedS16ToSingle>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
 
-            code.fmul_s(Sto, Sto, code.f0);
+            code.fmul_s(Sto, Sto, Fscratch0);
         }
     });
 }
@@ -961,9 +961,9 @@ void EmitIR<IR::Opcode::FPFixedU16ToDouble>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
 
-            code.fmul_d(Dto, Dto, code.f0);
+            code.fmul_d(Dto, Dto, Fscratch0);
         }
     });
 }
@@ -976,7 +976,7 @@ void EmitIR<IR::Opcode::FPFixedS16ToDouble>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
-            code.fmul_d(Dto, Dto, code.f0);
+            code.fmul_d(Dto, Dto, Fscratch0);
         }
     });
 }
@@ -990,9 +990,9 @@ void EmitIR<IR::Opcode::FPFixedU32ToSingle>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
 
-            code.fmul_s(Sto, Sto, code.f0);
+            code.fmul_s(Sto, Sto, Fscratch0);
         }
     });
 }
@@ -1006,9 +1006,9 @@ void EmitIR<IR::Opcode::FPFixedS32ToSingle>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
 
-            code.fmul_s(Sto, Sto, code.f0);
+            code.fmul_s(Sto, Sto, Fscratch0);
         }
 
     });
@@ -1022,8 +1022,8 @@ void EmitIR<IR::Opcode::FPFixedU32ToDouble>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
-            code.fmul_d(Dto, Dto, code.f0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
+            code.fmul_d(Dto, Dto, Fscratch0);
         }
 
     });
@@ -1037,8 +1037,8 @@ void EmitIR<IR::Opcode::FPFixedS32ToDouble>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
-            code.fmul_d(Dto, Dto, code.f0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
+            code.fmul_d(Dto, Dto, Fscratch0);
         }
     });
 }
@@ -1052,8 +1052,8 @@ void EmitIR<IR::Opcode::FPFixedU64ToDouble>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
-            code.fmul_d(Dto, Dto, code.f0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
+            code.fmul_d(Dto, Dto, Fscratch0);
         }
     });
 }
@@ -1066,8 +1066,8 @@ void EmitIR<IR::Opcode::FPFixedU64ToSingle>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
-            code.fmul_d(Sto, Sto, code.f0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
+            code.fmul_d(Sto, Sto, Fscratch0);
         }
 
     });
@@ -1082,8 +1082,8 @@ void EmitIR<IR::Opcode::FPFixedS64ToDouble>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
-            code.fmul_d(Dto, Dto, code.f0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
+            code.fmul_d(Dto, Dto, Fscratch0);
         }
     });
 }
@@ -1096,8 +1096,8 @@ void EmitIR<IR::Opcode::FPFixedS64ToSingle>(BlockOfCode& code, EmitContext& ctx,
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
-            code.movgr2fr_d(code.f0, Xscratch0);
-            code.fmul_s(Sto, Sto, code.f0);
+            code.movgr2fr_d(Fscratch0, Xscratch0);
+            code.fmul_s(Sto, Sto, Fscratch0);
         }
     });
 }

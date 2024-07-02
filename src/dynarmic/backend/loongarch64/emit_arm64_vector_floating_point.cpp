@@ -51,38 +51,38 @@ namespace Dynarmic::Backend::LoongArch64 {
     Xbyak_loongarch64::VReg GetVectorOf(BlockOfCode& code, u64 value) {
         if constexpr (fsize == 16) {
             code.add_imm(Xscratch0, code.zero, (value << 48) | (value << 32) | (value << 16) | value, Xscratch1);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 0);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 1);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 0);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 1);
         } else if constexpr (fsize == 32) {
             code.add_imm(Xscratch0, code.zero, (value << 32) | value, Xscratch1);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 0);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 1);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 0);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 1);
         } else {
             static_assert(fsize == 64);
             code.add_imm(Xscratch0, code.zero, value, Xscratch1);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 0);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 1);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 0);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 1);
         }
-        return code.vr0;
+        return Vscratch2;
     }
 
     template<size_t fsize, u64 value>
     Xbyak_loongarch64::VReg GetVectorOf(BlockOfCode& code) {
         if constexpr (fsize == 16) {
             code.add_imm(Xscratch0, code.zero, (value << 48) | (value << 32) | (value << 16) | value, Xscratch1);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 0);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 1);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 0);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 1);
         } else if constexpr (fsize == 32) {
             code.add_imm(Xscratch0, code.zero, (value << 32) | value, Xscratch1);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 0);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 1);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 0);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 1);
         } else {
             static_assert(fsize == 64);
             code.add_imm(Xscratch0, code.zero, value, Xscratch1);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 0);
-            code.vinsgr2vr_d(code.vr0, Xscratch0, 1);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 0);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0, 1);
         }
-        return code.vr0;
+        return Vscratch2;
     }
 
     template<size_t fsize>
@@ -621,16 +621,16 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         if constexpr (fsize == 64) {
             code.add_imm(Xscratch0, code.zero, sign_mask64, Xscratch1);
-            code.vinsgr2vr_d(code.vr0, Xscratch0 ,0);
-            code.vxor_v(Qa, Qa, code.vr0);
+            code.vinsgr2vr_d(Vscratch2, Xscratch0 ,0);
+            code.vxor_v(Qa, Qa, Vscratch2);
         } else if constexpr (fsize == 32) {
             code.add_imm(Xscratch0, code.zero, sign_mask64, Xscratch1);
-            code.vinsgr2vr_w(code.vr0, Xscratch0 ,0);
-            code.vxor_v(Qa, Qa, code.vr0);
+            code.vinsgr2vr_w(Vscratch2, Xscratch0 ,0);
+            code.vxor_v(Qa, Qa, Vscratch2);
         } else if constexpr (fsize == 16) {
             code.add_imm(Xscratch0, code.zero, sign_mask64, Xscratch1);
-            code.vinsgr2vr_h(code.vr0, Xscratch0 ,0);
-            code.vxor_v(Qa, Qa, code.vr0);
+            code.vinsgr2vr_h(Vscratch2, Xscratch0 ,0);
+            code.vxor_v(Qa, Qa, Vscratch2);
         }
 
 
@@ -657,8 +657,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::FPVectorPairedAdd32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto &Vresult, auto &Va, auto &Vb) {
             code.vpickev_w(Vresult, Vb, Va);
-            code.vpickod_w(code.vr0, Vb, Va);
-            code.vfadd_s(Vresult, Vresult, code.vr0);
+            code.vpickod_w(Vscratch2, Vb, Va);
+            code.vfadd_s(Vresult, Vresult, Vscratch2);
 //            code.vinsgr2vr_d(Vresult, code.zero , 1);
         });
     }
@@ -668,8 +668,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::FPVectorPairedAdd64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto &Vresult, auto &Va, auto &Vb) {
             code.vpickev_d(Vresult, Vb, Va);
-            code.vpickod_d(code.vr0, Vb, Va);
-            code.vfadd_d(Vresult, Vresult, code.vr0);
+            code.vpickod_d(Vscratch2, Vb, Va);
+            code.vfadd_d(Vresult, Vresult, Vscratch2);
 //            code.vinsgr2vr_d(Vresult, code.zero , 1);
 //            code.FADDP(Vresult, Va, Vb);
         });

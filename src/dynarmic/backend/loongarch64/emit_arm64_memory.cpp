@@ -143,9 +143,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
             if constexpr (bitsize == 128) {
                 // is this OK?
-                code.vxor_v(code.vr8, code.vr8, code.vr8);
-                code.vadd_d(code.vr8, code.vr8, code.vr0);
-                ctx.reg_alloc.DefineAsRegister(inst, code.vr8);
+                code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+                code.vadd_d(Vscratch0, Vscratch0, Vscratch2);
+                ctx.reg_alloc.DefineAsRegister(inst, Vscratch0);
             } else {
                 ctx.reg_alloc.DefineAsRegister(inst, code.a0);
             }
@@ -168,9 +168,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
             if constexpr (bitsize == 128) {
                 // is this OK?
-                code.vxor_v(code.vr8, code.vr8, code.vr8);
-                code.vadd_d(code.vr8, code.vr8, code.vr0);
-                ctx.reg_alloc.DefineAsRegister(inst, code.vr8);
+                code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+                code.vadd_d(Vscratch0, Vscratch0, Vscratch2);
+                ctx.reg_alloc.DefineAsRegister(inst, Vscratch0);
 
             } else {
                 ctx.reg_alloc.DefineAsRegister(inst, code.a0);
@@ -453,7 +453,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                         }
                         if constexpr (bitsize == 128) {
                             code.vxor_v(Rvalue, Rvalue, Rvalue);
-                            code.vadd_d(Rvalue, code.vr0, Rvalue);
+                            code.vadd_d(Rvalue, Vscratch2, Rvalue);
 //                            code.add_d(Rvalue.B16(), Q0.B16(), code.zero);
                         } else {
                             code.add_d(Rvalue, Xscratch0, code.zero);
@@ -491,8 +491,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                         code.L(*fallback);
                         if constexpr (bitsize == 128) {
                             code.add_d(Xscratch0, Xaddr, code.zero);
-                            code.vxor_v(code.vr0, code.vr0, code.vr0);
-                            code.vadd_d(code.vr0, code.vr0, Rvalue);
+                            code.vxor_v(Vscratch2, Vscratch2, Vscratch2);
+                            code.vadd_d(Vscratch2, Vscratch2, Rvalue);
 //            code.add_d(Q0.B16(), Rvalue.B16(), code.zero);
                         } else {
                             code.add_d(Xscratch0, Xaddr, code.zero);
@@ -592,7 +592,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                         }
                         if constexpr (bitsize == 128) {
                             code.vxor_v(Rvalue, Rvalue, Rvalue);
-                            code.vadd_d(Rvalue, code.vr0, Rvalue);
+                            code.vadd_d(Rvalue, Vscratch2, Rvalue);
 //            code.add_d(Rvalue.B16(), Q0.B16(), code.zero);
                         } else {
                             code.add_d(Rvalue, Xscratch0, code.zero);
@@ -643,8 +643,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                         if constexpr (bitsize == 128) {
                             code.add_d(Xscratch0, Xaddr, code.zero);
                             // is this OK?
-                            code.vxor_v(code.vr0, code.vr0, code.vr0);
-                            code.vadd_d(code.vr0, Rvalue, code.vr0);
+                            code.vxor_v(Vscratch2, Vscratch2, Vscratch2);
+                            code.vadd_d(Vscratch2, Rvalue, Vscratch2);
 //            code.add_d(Q0.B16(), Rvalue.B16(), code.zero);
                         } else {
                             code.add_d(Xscratch0, Xaddr, code.zero);

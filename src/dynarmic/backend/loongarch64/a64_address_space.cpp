@@ -167,8 +167,8 @@ static void* EmitRead128CallTrampoline(BlockOfCode& code, A64::UserCallbacks* th
     code.LDLableData_d(code.a0, l_this);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.vinsgr2vr_d(code.vr0, code.a0, 0);
-    code.vinsgr2vr_d(code.vr0, code.a1, 1);
+    code.vinsgr2vr_d(Vscratch2, code.a0, 0);
+    code.vinsgr2vr_d(Vscratch2, code.a1, 1);
     ABI_PopRegisters(code, (1ull << 29) | (1ull << 30), 0);
     code.jirl(code.zero, code.ra, 0);
 
@@ -196,8 +196,8 @@ static void* EmitWrappedRead128CallTrampoline(BlockOfCode& code, A64::UserCallba
     code.add_d(code.a1, Xscratch0, code.zero);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.vinsgr2vr_d(code.vr0, code.a0, 0);
-    code.vinsgr2vr_d(code.vr0, code.a1, 1);
+    code.vinsgr2vr_d(Vscratch2, code.a0, 0);
+    code.vinsgr2vr_d(Vscratch2, code.a1, 1);
     ABI_PopRegisters(code, save_regs, 0);
     code.jirl(code.zero, code.ra, 0);
 
@@ -226,8 +226,8 @@ static void* EmitExclusiveRead128CallTrampoline(BlockOfCode& code, const A64::Us
     code.LDLableData_d(code.a0, l_this);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
-    code.vinsgr2vr_d(code.vr0, code.a0, 0);
-    code.vinsgr2vr_d(code.vr0, code.a1, 1);
+    code.vinsgr2vr_d(Vscratch2, code.a0, 0);
+    code.vinsgr2vr_d(Vscratch2, code.a1, 1);
     ABI_PopRegisters(code, (1ull << 29) | (1ull << 30), 0);
     code.jirl(code.zero, code.ra, 0);
 
@@ -249,8 +249,8 @@ static void* EmitWrite128CallTrampoline(BlockOfCode& code, A64::UserCallbacks* t
 
     void *target = code.getCode<void *>();
     code.LDLableData_d(code.a0, l_this);
-    code.vpickve2gr_d(code.a2, code.vr0, 0);
-    code.vpickve2gr_d(code.a3, code.vr0, 1);
+    code.vpickve2gr_d(code.a2, Vscratch2, 0);
+    code.vpickve2gr_d(code.a3, Vscratch2, 1);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
 
@@ -276,8 +276,8 @@ static void* EmitWrappedWrite128CallTrampoline(BlockOfCode& code, A64::UserCallb
     ABI_PushRegisters(code, save_regs, 0);
     code.LDLableData_d(code.a0, l_this);
     code.add_d(code.a1, Xscratch0, code.zero);
-    code.vpickve2gr_d(code.a2, code.vr0, 0);
-    code.vpickve2gr_d(code.a3, code.vr0, 1);
+    code.vpickve2gr_d(code.a2, Vscratch2, 0);
+    code.vpickve2gr_d(code.a3, Vscratch2, 1);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
     ABI_PopRegisters(code, save_regs, 0);
@@ -308,8 +308,8 @@ static void* EmitExclusiveWrite128CallTrampoline(BlockOfCode& code, const A64::U
 
     void *target = code.getCode<void *>();
     code.LDLableData_d(code.a0, l_this);
-    code.vpickve2gr_d(code.a2, code.vr0, 0);
-    code.vpickve2gr_d(code.a3, code.vr0, 1);
+    code.vpickve2gr_d(code.a2, Vscratch2, 0);
+    code.vpickve2gr_d(code.a3, Vscratch2, 1);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
 
