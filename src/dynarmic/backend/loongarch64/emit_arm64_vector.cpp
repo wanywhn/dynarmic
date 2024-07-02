@@ -3153,9 +3153,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     void
     EmitIR<IR::Opcode::VectorZeroUpper>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst, [&](auto &Qresult, auto &Qoperand) {
-            code.vslli_d(Qoperand, Qoperand, 64);
-            code.vxor_v(Qresult, Qresult, Qresult);
-            code.vsrlni_d_q(Qresult, Qoperand, 64);
+            code.vbsll_v(Qoperand, Qoperand, 8);
+            code.vbsrl_v(Qresult, Qoperand, 8);
         });
     }
 
