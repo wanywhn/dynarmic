@@ -1416,6 +1416,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void
     EmitIR<IR::Opcode::ZeroExtendHalfToLong>(BlockOfCode &, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        // FIXME ZeroExtend should do as bellow
         ctx.reg_alloc.DefineAsExisting(inst, args[0]);
     }
 
@@ -1433,6 +1434,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Xvalue = ctx.reg_alloc.ReadX(args[0]);
         auto Qresult = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(Xvalue, Qresult);
+        code.vxor_v(Qresult, Qresult, Qresult);
         code.vinsgr2vr_d(Qresult, Xvalue, 0);
     }
 
