@@ -11,6 +11,11 @@ namespace Dynarmic::Backend::LoongArch64::NZCV {
     constexpr u32 arm_mask = 0xF000'0000;
     constexpr size_t arm_nzcv_shift = 28;
 
+    constexpr size_t arm_n_flag_inner_sft = 3;
+    constexpr size_t arm_z_flag_inner_sft = 2;
+    constexpr size_t arm_c_flag_inner_sft = 1;
+    constexpr size_t arm_v_flag_inner_sft = 0;
+
     constexpr size_t arm_n_flag_sft = 3 + arm_nzcv_shift;
     constexpr size_t arm_z_flag_sft = 2 + arm_nzcv_shift;
     constexpr size_t arm_c_flag_sft = 1 + arm_nzcv_shift;

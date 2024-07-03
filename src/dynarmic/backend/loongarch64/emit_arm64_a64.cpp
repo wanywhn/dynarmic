@@ -304,7 +304,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wnzcv);
 
-        code.st_d(Wnzcv, Xstate, offsetof(A64JitState, cpsr_nzcv));
+        code.st_w(Wnzcv, Xstate, offsetof(A64JitState, cpsr_nzcv));
     }
 
     template<>

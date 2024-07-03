@@ -1202,42 +1202,27 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<size_t bitsize, typename EmitFn1, typename EmitFn2 = std::nullptr_t>
     static void
-    EmitBitOp(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst, EmitFn1 emit_without_flags,
-              EmitFn2 emit_with_flags = nullptr) {
+    EmitBitOp(BlockOfCode &, EmitContext &ctx, IR::Inst *inst, EmitFn1 emit_without_flags,
+              EmitFn2  = nullptr) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Rresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
         auto Ra = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
-
-        if constexpr (!std::is_same_v<EmitFn2, std::nullptr_t>) {
-            const auto nz_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetNZFromOp);
-            const auto nzcv_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetNZCVFromOp);
-            ASSERT(!(nz_inst && nzcv_inst));
-            const auto flag_inst = nz_inst ? nz_inst : nzcv_inst;
-
-            if (flag_inst) {
-                auto Wflags = ctx.reg_alloc.WriteFlags(flag_inst);
-
-                if (args[1].IsImmediate()) {
-                    RegAlloc::Realize(Rresult, Ra, Wflags);
-
-                    MaybeBitImm<bitsize>(code, args[1].GetImmediateU64(),
-                                         [&](const auto &b) { emit_with_flags(Rresult, Ra, b); });
-                } else {
-                    auto Rb = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
-                    RegAlloc::Realize(Rresult, Ra, Rb, Wflags);
-
-                    emit_with_flags(Rresult, Ra, Rb);
-                }
-
-                return;
-            }
-        }
-        auto Rb = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
+        auto Rb = ctx.reg_alloc.ReadW(args[1]);
         RegAlloc::Realize(Rresult, Ra, Rb);
-        if (args[1].IsImmediate()) {
-            RegAlloc::Realize(Rresult, Ra);
-            code.add_imm(Rb, code.zero, args[1].GetImmediateU64(), Xscratch0);
-        }
+
+//        if constexpr (!std::is_same_v<EmitFn2, std::nullptr_t>) {
+//            const auto nz_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetNZFromOp);
+//            const auto nzcv_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetNZCVFromOp);
+//            ASSERT(!(nz_inst && nzcv_inst));
+//            const auto flag_inst = nz_inst ? nz_inst : nzcv_inst;
+//
+//            if (flag_inst) {
+//                auto Wflags = ctx.reg_alloc.WriteW(flag_inst);
+//                    emit_with_flags(Rresult, Ra, Rb);
+//                return;
+//            }
+//        }
+
         emit_without_flags(Rresult, Ra, Rb);
     }
 
@@ -1275,7 +1260,10 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::And32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitBitOp<32>(
                 code, ctx, inst,
-                [&](auto &result, auto &a, auto &b) { code.and_(result, a, b); }
+                [&](auto &result, auto &a, auto &b) {
+                    code.bstrpick_d(a, a, 31, 0);
+                    code.and_(result, a, b);
+                }
                 // FIXME
 //                ,[&](auto &result, auto &a, auto &b) { code.ANDS(result, a, b); }
         );
