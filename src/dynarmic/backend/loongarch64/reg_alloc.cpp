@@ -164,7 +164,7 @@ void RegAlloc::PrepareForCall(std::optional<Argument::copyable_reference> arg0, 
 
     // FIXME is this is args reg, should change to a0?
     // AAPCS64 Next General-purpose Register Number
-    unsigned int ngrn = 0;
+    unsigned int ngrn = 4;
     // AAPCS64 Next SIMD and Floating-point Register Number
     unsigned int nsrn = 0;
 
