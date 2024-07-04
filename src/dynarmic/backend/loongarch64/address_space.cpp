@@ -138,13 +138,11 @@ static void LinkBlockLinks(LoongArch64::BlockOfCode &c, const CodePtr entry_poin
             break;
         case BlockRelocationType::MoveToScratch1:
             if (target_ptr) {
-                // FIXME
-                c.add_imm(Xscratch1, c.zero, (intptr_t)target_ptr, Xscratch2);
+                c.add_imm(Xscratch1, c.zero, (intptr_t)target_ptr, Xscratch0);
             } else {
-                c.add_imm(Xscratch1, c.zero, (intptr_t)return_to_dispatcher, Xscratch2);
+                c.add_imm(Xscratch1, c.zero, (intptr_t)return_to_dispatcher, Xscratch0);
             }
-                c.ld_d(Xscratch1, Xscratch1, 0);
-
+//                c.ld_d(Xscratch1, Xscratch1, 0);
                 break;
         default:
             ASSERT_FALSE("Invalid BlockRelocationType");

@@ -1300,31 +1300,32 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::VectorNarrow16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void)code;
-        (void)ctx;
-        (void)inst;
-        ASSERT_FALSE("Unexpected VectorNarrow16");
+        auto Va = ctx.reg_alloc.ReadQ(ctx.reg_alloc.GetArgumentInfo(inst)[0]);
+        auto Vresult = ctx.reg_alloc.WriteQ(inst);
+        RegAlloc::Realize(Va, Vresult);
 
-//        EmitTwoOpArrangedNarrow<16>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.XTN(Vresult, Voperand); });
+        code.vxor_v(Vresult, Vresult, Vresult);
+        code.vsrlni_b_h(Vresult, Va, 0);
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorNarrow32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void)code;
-        (void)ctx;
-        (void)inst;
-        ASSERT_FALSE("Unexpected VectorNarrow32");
+        auto Va = ctx.reg_alloc.ReadQ(ctx.reg_alloc.GetArgumentInfo(inst)[0]);
+        auto Vresult = ctx.reg_alloc.WriteQ(inst);
+        RegAlloc::Realize(Va, Vresult);
 
-//        EmitTwoOpArrangedNarrow<32>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.XTN(Vresult, Voperand); });
+        code.vxor_v(Vresult, Vresult, Vresult);
+        code.vsrlni_h_w(Vresult, Va, 0);
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorNarrow64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        ASSERT_FALSE("Unexpected VectorNarrow64");
-        (void)code;
-        (void)ctx;
-        (void)inst;
-//        EmitTwoOpArrangedNarrow<64>(code, ctx, inst, [&](auto Vresult, auto Voperand) { code.XTN(Vresult, Voperand); });
+        auto Va = ctx.reg_alloc.ReadQ(ctx.reg_alloc.GetArgumentInfo(inst)[0]);
+        auto Vresult = ctx.reg_alloc.WriteQ(inst);
+        RegAlloc::Realize(Va, Vresult);
+
+        code.vxor_v(Vresult, Vresult, Vresult);
+        code.vsrlni_w_d(Vresult, Va, 0);
     }
 
     template<>

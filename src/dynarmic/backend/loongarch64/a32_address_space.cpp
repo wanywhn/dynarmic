@@ -312,8 +312,8 @@ void A32AddressSpace::EmitPrelude() {
         code.bnez(Wscratch0, return_from_run_code);
 
         if (conf.enable_cycle_counting) {
-            code.blt(Xticks, code.zero, return_from_run_code);
             code.beqz(Xticks, return_from_run_code);
+            code.blt(Xticks, code.zero, return_from_run_code);
         }
 
         code.LDLableData_d(code.a0, l_this);

@@ -55,17 +55,17 @@ void EmitIR<IR::Opcode::PushRSB>(BlockOfCode& code, EmitContext& ctx, IR::Inst* 
     ASSERT(args[0].IsImmediate());
     const IR::LocationDescriptor target{args[0].GetImmediateU64()};
 
-    code.ld_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
-    code.add_imm(Wscratch2, Wscratch2, sizeof(RSBEntry), Wscratch0);
+    code.ld_w(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
+    code.addi_w(Wscratch2, Wscratch2, sizeof(RSBEntry));
     code.andi(Wscratch2, Wscratch2, RSBIndexMask);
-    code.st_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
+    code.st_w(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
     code.add_d(Xscratch2, code.sp, Xscratch2);
 
     code.add_imm(Xscratch0, code.zero, target.Value(), Wscratch1);
-    EmitBlockLinkRelocation(code, ctx, target, BlockRelocationType::MoveToScratch1);
     code.st_d(Xscratch0, Xscratch2, offsetof(StackLayout, rsb));
-    code.st_d(Xscratch1, Xscratch2, offsetof(StackLayout, rsb) + 8);
-//    code.STP(Xscratch0, Xscratch1, Xscratch2, offsetof(StackLayout, rsb));
+
+    EmitBlockLinkRelocation(code, ctx, target, BlockRelocationType::MoveToScratch1);
+    code.st_d(Xscratch1, Xscratch2, offsetof(StackLayout, rsb) + sizeof(RSBEntry::code_ptr));
 }
 
 template<>
