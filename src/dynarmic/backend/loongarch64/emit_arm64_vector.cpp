@@ -2344,51 +2344,113 @@ namespace Dynarmic::Backend::LoongArch64 {
                                         code.vsadd_du(Vaccumulator, Vaccumulator, Voperand);
         });
     }
+    template<bool is_rounding>
+    static void EmitVectorSignedSaturatedDoublingMultiply16(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        auto x = ctx.reg_alloc.ReadQ(args[0]);
+        auto y = ctx.reg_alloc.ReadQ(args[1]);
+        auto upper_tmp = Vscratch0;
+        auto lower_tmp = Vscratch1;
+        auto result = ctx.reg_alloc.WriteQ(inst);
+        RegAlloc::Realize(x, y, result);
 
+        code.vmul_h(upper_tmp, x, y);
+        code.vmul_h(lower_tmp, x, y);
+
+        //x, y released
+        auto vtmp1 = *x;
+        if constexpr (is_rounding) {
+            code.vsrli_h(lower_tmp, lower_tmp, 14);
+            code.add_imm(Xscratch0, code.zero, 0x0001000100010001, Xscratch1);
+            code.vreplgr2vr_d(vtmp1, Xscratch0);
+            code.vadd_h(lower_tmp, lower_tmp, vtmp1);
+            code.vsrli_h(lower_tmp, lower_tmp, 1);
+        } else {
+            code.vsrli_h(lower_tmp, lower_tmp, 15);
+        }
+        code.vadd_h(upper_tmp, upper_tmp, upper_tmp);
+        code.vadd_h(result, upper_tmp, lower_tmp);
+        code.add_imm(Xscratch0, code.zero, 0x8000800080008000, Xscratch1);
+        code.vreplgr2vr_d(vtmp1, Xscratch0);
+        code.vseq_h(upper_tmp, result, vtmp1);
+        code.vxor_v(result, result, upper_tmp);
+
+        code.vmskltz_b(vtmp1, upper_tmp);
+
+        code.vpickve2gr_wu(Xscratch1, vtmp1,0);
+
+        code.ld_w(Xscratch0, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);
+        code.or_(Xscratch0, Xscratch0, Xscratch1);
+        code.st_w(Xscratch0, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);
+    }
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyHigh16>(BlockOfCode &code,
                                                                          EmitContext &ctx, IR::Inst *inst) {
-        ASSERT_FALSE("Unimplemented");
-        (void)code;
-        (void)ctx;
-        (void)inst;
-//        EmitThreeOp(code, ctx, inst,
-//                                         [&](auto Vresult, auto Va, auto Vb) { code.SQDMULH(Vresult, Va, Vb); });
+        EmitVectorSignedSaturatedDoublingMultiply16<false>(code, ctx, inst);
     }
 
+    template<bool is_rounding>
+    static void EmitVectorSignedSaturatedDoublingMultiply32(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        auto x = ctx.reg_alloc.ReadQ(args[0]);
+        auto y = ctx.reg_alloc.ReadQ(args[1]);
+        auto odds = Vscratch0;
+        auto even = Vscratch1;
+        auto result = ctx.reg_alloc.WriteQ(inst);
+        RegAlloc::Realize(x, y, result);
+
+        code.vmulwod_d_w(odds, x, y);
+        code.vmulwev_d_w(even, x, y);
+        code.vadd_d(odds, odds, odds);
+        code.vadd_d(even, even, even);
+
+        if constexpr (is_rounding) {
+            code.add_imm(Xscratch0, code.zero, 0x0000000080000000ULL, Xscratch1);
+            code.vinsgr2vr_d(result, Xscratch0, 0);
+            code.vinsgr2vr_d(result, Xscratch0, 1);
+            code.vadd_d(odds, odds, result);
+            code.vadd_d(even, even, result);
+        }
+        code.vsrli_d(result, odds, 32);
+
+        // TODO change with vpermi_w
+        code.vbsrl_v(even, even, 4);
+        code.vpackev_w(result, result, even);
+
+        auto mask = *x;
+        auto bit = Xscratch2;
+        // here Vscratch0 and Vscratch1 is released
+        code.add_imm(Xscratch1, code.zero, 0x8000000080000000ULL, Xscratch2);
+        code.vreplgr2vr_d(Vscratch0, Xscratch1);
+        code.vseq_w(mask, result, Vscratch0);
+
+        code.vxor_v(result, result, mask);
+        code.vmskltz_b(Vscratch2, mask);
+        code.vpickve2gr_wu(bit, Vscratch2,0);
+
+        code.ld_w(Xscratch0, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);
+        code.or_(Xscratch0, Xscratch0, bit);
+        code.st_w(Xscratch0, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);
+
+    }
     template<>
     void EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyHigh32>(BlockOfCode &code,
                                                                          EmitContext &ctx, IR::Inst *inst) {
-        ASSERT_FALSE("Unimplemented");
-        (void)code;
-        (void)ctx;
-        (void)inst;
-//        EmitThreeOp(code, ctx, inst,
-//                                         [&](auto Vresult, auto Va, auto Vb) { code.SQDMULH(Vresult, Va, Vb); });
+        EmitVectorSignedSaturatedDoublingMultiply32<false>(code, ctx, inst);
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyHighRounding16>(BlockOfCode &code,
                                                                             EmitContext &ctx, IR::Inst *inst) {
-        ASSERT_FALSE("Unimplemented");
-        (void)code;
-        (void)ctx;
-        (void)inst;
-//        EmitThreeOp(code, ctx, inst,
-//                                         [&](auto Vresult, auto Va, auto Vb) { code.SQRDMULH(Vresult, Va, Vb); });
+        EmitVectorSignedSaturatedDoublingMultiply16<true>(code, ctx, inst);
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorSignedSaturatedDoublingMultiplyHighRounding32>(BlockOfCode &code,
                                                                             EmitContext &ctx, IR::Inst *inst) {
-        ASSERT_FALSE("Unimplemented");
-        (void)code;
-        (void)ctx;
-        (void)inst;
-//        EmitThreeOp(code, ctx, inst,
-//                                         [&](auto Vresult, auto Va, auto Vb) { code.SQRDMULH(Vresult, Va, Vb); });
+        EmitVectorSignedSaturatedDoublingMultiply32<true>(code, ctx, inst);
     }
 
     template<>
