@@ -317,7 +317,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                         code.ll_w(Xbyak_loongarch64::WReg{value_idx}, Xscratch0, 0);
                         break;
                     case 64:
-                        code.ll_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0, 0);
+                        code.ll_d(Xbyak_loongarch64::XReg{value_idx}, Xscratch0, 0);
                         break;
                     case 128:
                         code.vld(Xbyak_loongarch64::VReg{value_idx}, Xscratch0, 0);
@@ -337,7 +337,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                         code.ldx_h(Xbyak_loongarch64::WReg{value_idx}, Xbase, Xoffset);
                         break;
                     case 32:
-                        code.ldx_d(Xbyak_loongarch64::WReg{value_idx}, Xbase, Xoffset);
+                        code.ldx_w(Xbyak_loongarch64::WReg{value_idx}, Xbase, Xoffset);
                         break;
                     case 64:
                         code.ldx_d(Xbyak_loongarch64::XReg{value_idx}, Xbase, Xoffset);
@@ -384,12 +384,11 @@ namespace Dynarmic::Backend::LoongArch64 {
                         code.sc_w(Xbyak_loongarch64::WReg{value_idx}, Xscratch0, 0);
                         break;
                     case 64:
-                        code.sc_w(Xbyak_loongarch64::XReg{value_idx}, Xscratch0, 0);
+                        code.sc_d(Xbyak_loongarch64::XReg{value_idx}, Xscratch0, 0);
                         break;
                     case 128:
                         code.dbar(0x700);
                         code.vstx(Xbyak_loongarch64::VReg{value_idx}, Xscratch0, code.zero);
-//            code.stx_d(Xbyak_loongarch64::VReg{value_idx}, Xscratch0, code.zero);
                         code.dbar(0x700);
                         break;
                     default:
@@ -540,7 +539,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             }
 
             if (ctx.conf.silently_mirror_fastmem) {
-                code.bstrpick_w(Xscratch0, Xaddr, ctx.conf.fastmem_address_space_bits - 1, 0);
+                code.bstrpick_d(Xscratch0, Xaddr, ctx.conf.fastmem_address_space_bits - 1, 0);
                 return std::make_pair(Xfastmem, Xscratch0);
             }
 
@@ -592,8 +591,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                         }
                         if constexpr (bitsize == 128) {
                             code.vxor_v(Rvalue, Rvalue, Rvalue);
-                            code.vadd_d(Rvalue, Vscratch2, Rvalue);
-//            code.add_d(Rvalue.B16(), Q0.B16(), code.zero);
+                            code.vadd_d(Rvalue, code.vr0, Rvalue);
                         } else {
                             code.add_d(Rvalue, Xscratch0, code.zero);
                         }
@@ -643,9 +641,9 @@ namespace Dynarmic::Backend::LoongArch64 {
                         if constexpr (bitsize == 128) {
                             code.add_d(Xscratch0, Xaddr, code.zero);
                             // is this OK?
-                            code.vxor_v(Vscratch2, Vscratch2, Vscratch2);
-                            code.vadd_d(Vscratch2, Rvalue, Vscratch2);
-//            code.add_d(Q0.B16(), Rvalue.B16(), code.zero);
+                            code.vxor_v(code.vr0, code.vr0, code.vr0);
+                            code.vadd_d(code.vr0, Rvalue, code.vr0);
+
                         } else {
                             code.add_d(Xscratch0, Xaddr, code.zero);
                             code.add_d(Xscratch1, Rvalue, code.zero);

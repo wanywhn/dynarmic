@@ -47,11 +47,7 @@ DevirtualizedCall DevirtualizeDefault(mcl::class_type<decltype(mfp)>* this_) {
 
 template<auto mfp>
 DevirtualizedCall Devirtualize(mcl::class_type<decltype(mfp)>* this_) {
-#if defined(_WIN32)
-    return DevirtualizeWindows<mfp>(this_);
-#else
     return DevirtualizeDefault<mfp>(this_);
-#endif
 }
 
 }  // namespace Dynarmic::Backend::LoongArch64

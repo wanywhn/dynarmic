@@ -303,7 +303,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         // TODO: Detect if Gpr vs Fpr is more appropriate
 
-        code.ld_d(Wresult, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * static_cast<size_t>(reg));
+        code.ld_w(Wresult, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * static_cast<size_t>(reg));
     }
 
     template<>
@@ -370,11 +370,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Wvalue = ctx.reg_alloc.ReadW(args[1]);
         RegAlloc::Realize(Wvalue);
 
-        // TODO: if this should detect args[1] is imm, but is this need?
         // TODO: Detect if Gpr vs Fpr is more appropriate
-//        if (args[1].IsImmediate()) {
-//            code.
-//        }
 
         code.st_w(Wvalue, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * static_cast<size_t>(reg));
     }

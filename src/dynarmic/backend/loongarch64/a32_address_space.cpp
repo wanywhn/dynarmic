@@ -32,7 +32,7 @@ static void* EmitCallTrampoline(BlockOfCode& code, T* this_) {
 
     Xbyak_loongarch64::Label l_addr, l_this;
 
-    void *target = code.getCode<void *>();
+    void *target = code.getCurr<void *>();
     code.LDLableData_d(code.a0, l_this);
 
     code.LDLableData_d(Xscratch0, l_addr);
@@ -58,7 +58,7 @@ static void* EmitWrappedReadCallTrampoline(BlockOfCode& code, T* this_) {
     // ! FIXME where Xscratch0 value from ?
     constexpr u64 save_regs = ABI_CALLER_SAVE & ~ToRegList(Xscratch0);
 
-    void *target = code.getCode<void *>();
+    void *target = code.getCurr<void *>();
     ABI_PushRegisters(code, save_regs, 0);
     code.LDLableData_d(code.a0, l_this);
     code.add_d(code.a1, Xscratch0, code.zero);
@@ -89,7 +89,7 @@ static void* EmitExclusiveReadCallTrampoline(BlockOfCode& code, const A32::UserC
         });
     };
 
-    void *target = code.getCode<void *>();
+    void *target = code.getCurr<void *>();
     code.LDLableData_d(code.a0, l_this);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
@@ -113,7 +113,7 @@ static void* EmitWrappedWriteCallTrampoline(BlockOfCode& code, T* this_) {
 
     constexpr u64 save_regs = ABI_CALLER_SAVE;
 
-    void* target = code.getCode<void *>();
+    void* target = code.getCurr<void *>();
 
     ABI_PushRegisters(code, save_regs, 0);
     code.LDLableData_d(code.a0, l_this);
@@ -148,7 +148,7 @@ static void* EmitExclusiveWriteCallTrampoline(BlockOfCode& code, const A32::User
                  : 1;
     };
 
-    void* target = code.getCode<void *>();
+    void* target = code.getCurr<void *>();
 
     code.LDLableData_d(code.a0, l_this);
     code.LDLableData_d(Xscratch0, l_addr);
@@ -232,7 +232,7 @@ void A32AddressSpace::EmitPrelude() {
 
     prelude_info.run_code = code.getCurr<PreludeInfo::RunCodeFuncType>();
     {
-        ABI_PushRegisters(code, ABI_CALLEE_SAVE | (1 << code.ra.getIdx()), sizeof(StackLayout));
+        ABI_PushRegisters(code, ABI_CALLEE_SAVE | 1 << code.ra.getIdx(), sizeof(StackLayout));
 
         code.add_d(code.s0, code.a0, code.zero);
         code.add_d(Xstate, code.a1, code.zero);
@@ -267,7 +267,7 @@ void A32AddressSpace::EmitPrelude() {
     // FIXME check
     prelude_info.step_code = code.getCurr<PreludeInfo::RunCodeFuncType>();
     {
-        ABI_PushRegisters(code, ABI_CALLEE_SAVE | (1 << code.ra.getIdx()), sizeof(StackLayout));
+        ABI_PushRegisters(code, ABI_CALLEE_SAVE | 1 << code.ra.getIdx(), sizeof(StackLayout));
 
         code.add_d(code.s0, code.a0, code.zero);
         code.add_d(Xstate, code.a1, code.zero);
@@ -354,7 +354,7 @@ void A32AddressSpace::EmitPrelude() {
         code.sc_d(Wscratch1, Xhalt, 0);
         code.beqz(Wscratch1, exit_hr_loop);
         // FIXME
-        ABI_PopRegisters(code, ABI_CALLEE_SAVE | (Wscratch1.getIdx() << 30), sizeof(StackLayout));
+        ABI_PopRegisters(code, ABI_CALLEE_SAVE | 1 << code.ra.getIdx() , sizeof(StackLayout));
         code.jirl(code.zero, code.ra, 0);
     }
 
