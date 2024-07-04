@@ -1111,11 +1111,6 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorMaxS64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmax_d(Vresult, Va, Vb); });
-
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
     }
 
     template<>
@@ -1139,11 +1134,6 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorMaxU64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst,
                                 [&](auto Vresult, auto Va, auto Vb) { code.vmax_du(Vresult, Va, Vb); });
-
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
     }
 
     template<>
@@ -1164,10 +1154,6 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::VectorMinS64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmin_d(Vresult, Va, Vb); });
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
     }
 
     template<>
@@ -1191,10 +1177,6 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorMinU64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst,
                                 [&](auto Vresult, auto Va, auto Vb) { code.vmin_du(Vresult, Va, Vb); });
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
     }
 
     template<>
@@ -1218,84 +1200,72 @@ namespace Dynarmic::Backend::LoongArch64 {
     void
     EmitIR<IR::Opcode::VectorMultiply64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vmul_d(Vresult, Va, Vb); });
-
-//        ASSERT_MSG(ctx.conf.very_verbose_debugging_output, "VectorMultiply64 is for debugging only");
-//        EmitThreeOp(code, ctx, inst, [&](auto &Qresult, auto &Qa, auto &Qb) {
-//            code.FMOV(Xscratch0, Qa->toD());
-//            code.FMOV(Xscratch1, Qb->toD());
-//            code.mul_d(Xscratch0, Xscratch0, Xscratch1);
-//            code.FMOV(Qresult->toD(), Xscratch0);
-//            code.FMOV(Xscratch0, Qa->Delem()[1]);
-//            code.FMOV(Xscratch1, Qb->Delem()[1]);
-//            code.mul_d(Xscratch0, Xscratch0, Xscratch1);
-//            code.FMOV(Qresult->Delem()[1], Xscratch0);
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplySignedWiden8>(BlockOfCode &code, EmitContext &ctx,
                                                         IR::Inst *inst) {
-        ASSERT_FALSE("Unexpected VectorMultiplySignedWiden8");
-        (void)code;
-        (void)ctx;
-        (void)inst;
-//        EmitThreeOp(code, ctx, inst,
-//                                    [&](auto Vresult, auto Va, auto Vb) { code.SMULL(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vresult, Vresult, Vresult);
+            code.vmulwod_h_b(Vresult, Va, Vb);
+            code.vmulwev_h_b(Vscratch0, Va, Vb);
+            code.vilvl_h(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplySignedWiden16>(BlockOfCode &code, EmitContext &ctx,
                                                          IR::Inst *inst) {
-        (void)code;
-        (void)ctx;
-        (void)inst;
-        ASSERT_FALSE("Unexpected VectorMultiplySignedWiden16");
-//        EmitThreeOp<(code, ctx, inst,
-//                                     [&](auto Vresult, auto Va, auto Vb) { code.SMULL(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vresult, Vresult, Vresult);
+            code.vmulwod_w_h(Vresult, Va, Vb);
+            code.vmulwev_w_h(Vscratch0, Va, Vb);
+            code.vilvl_w(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplySignedWiden32>(BlockOfCode &code, EmitContext &ctx,
                                                          IR::Inst *inst) {
-        (void)code;
-        (void)ctx;
-        (void)inst;
-        ASSERT_FALSE("Unexpected VectorMultiplySignedWiden32");
-
-//        EmitThreeOp(code, ctx, inst,
-//                                     [&](auto Vresult, auto Va, auto Vb) { code.SMULL(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vresult, Vresult, Vresult);
+            code.vmulwod_d_w(Vresult, Va, Vb);
+            code.vmulwev_d_w(Vscratch0, Va, Vb);
+            code.vilvl_d(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplyUnsignedWiden8>(BlockOfCode &code, EmitContext &ctx,
                                                           IR::Inst *inst) {
-        (void)code;
-        (void)ctx;
-        (void)inst;
-        ASSERT_FALSE("Unexpected VectorMultiplyUnsignedWiden8");
-//        EmitThreeOp(code, ctx, inst,
-//                                    [&](auto Vresult, auto Va, auto Vb) { code.UMULL(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vresult, Vresult, Vresult);
+            code.vmulwod_h_bu(Vresult, Va, Vb);
+            code.vmulwev_h_bu(Vscratch0, Va, Vb);
+            code.vilvl_h(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplyUnsignedWiden16>(BlockOfCode &code, EmitContext &ctx,
                                                            IR::Inst *inst) {
-        (void)code;
-        (void)ctx;
-        (void)inst;
-        ASSERT_FALSE("Unexpected VectorMultiplyUnsignedWiden16");
-//        EmitThreeOp(code, ctx, inst,
-//                                     [&](auto Vresult, auto Va, auto Vb) { code.UMULL(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vresult, Vresult, Vresult);
+            code.vmulwod_w_hu(Vresult, Va, Vb);
+            code.vmulwev_w_hu(Vscratch0, Va, Vb);
+            code.vilvl_w(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorMultiplyUnsignedWiden32>(BlockOfCode &code, EmitContext &ctx,
                                                            IR::Inst *inst) {
-        (void)code;
-        (void)ctx;
-        (void)inst;
-        ASSERT_FALSE("Unexpected VectorMultiplyUnsignedWiden32");
-//        EmitThreeOp(code, ctx, inst,
-//                                     [&](auto Vresult, auto Va, auto Vb) { code.UMULL(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vresult, Vresult, Vresult);
+            code.vmulwod_d_wu(Vresult, Va, Vb);
+            code.vmulwev_d_wu(Vscratch0, Va, Vb);
+            code.vilvl_d(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
