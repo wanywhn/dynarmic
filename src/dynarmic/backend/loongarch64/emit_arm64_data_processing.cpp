@@ -456,7 +456,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             RegAlloc::Realize(Xresult, Xoperand);
 
             if (shift <= 63) {
-                code.slli_w(Xresult, Xoperand, shift);
+                code.slli_d(Xresult, Xoperand, shift);
             } else {
                 code.add_d(Xresult, code.zero, code.zero);
             }
