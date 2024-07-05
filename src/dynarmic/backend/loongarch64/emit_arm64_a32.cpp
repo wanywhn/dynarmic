@@ -154,7 +154,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         code.L(fail);
         code.add_imm(Wscratch0, code.zero, A32::LocationDescriptor{terminal.next}.PC(), Wscratch1);
-        code.st_d(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
+        code.st_w(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
         EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
     }
 
@@ -168,7 +168,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         code.add_imm(Wscratch0, code.zero, A32::LocationDescriptor{terminal.next}.PC(), Xscratch1);
 //        code.add_d(Wscratch0, A32::LocationDescriptor{terminal.next}.PC(), code.zero);
-        code.st_d(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
+        code.st_w(Wscratch0, Xstate, offsetof(A32JitState, regs) + sizeof(u32) * 15);
         EmitRelocation(code, ctx, LinkTarget::ReturnToDispatcher);
     }
 
@@ -177,11 +177,11 @@ namespace Dynarmic::Backend::LoongArch64 {
         if (ctx.conf.HasOptimization(OptimizationFlag::ReturnStackBuffer) && !is_single_step) {
             Xbyak_loongarch64::Label fail;
 
-            code.ld_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
+            code.ld_w(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
             code.andi(Wscratch2, Wscratch2, RSBIndexMask);
             code.add_d(code.a2, code.sp, Xscratch2);
             code.sub_imm(Wscratch2, Wscratch2, sizeof(RSBEntry), code.t0);
-            code.st_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
+            code.st_w(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
 
             code.ld_d(Xscratch0, code.a2, offsetof(StackLayout, rsb));
             code.ld_d(Xscratch1, code.a2, offsetof(StackLayout, rsb) + 8);
@@ -190,7 +190,8 @@ namespace Dynarmic::Backend::LoongArch64 {
             static_assert(
                     offsetof(A32JitState, regs) + 16 * sizeof(u32) == offsetof(A32JitState, upper_location_descriptor));
 //            code.LDUR(code.a0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
-            code.ld_hu(code.a0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
+            // FIXME ,is this right ? just want upper_location_descriptor + pc ?
+            code.ld_d(code.a0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
 
 //            code.CMP(code.a0, Xscratch0);
 //            code.B(NE, fail);
@@ -458,7 +459,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.or_(Wcpsr, Wcpsr, Wscratch0);
 //        code.ORR(Wcpsr, Wcpsr, Wscratch0, LSR, 12);
 
-        code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
+        code.ld_w(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
         code.andi(Wscratch0, Wscratch0, 0b11);
         // 9 8 7 6 5
         //       E T
@@ -536,10 +537,10 @@ namespace Dynarmic::Backend::LoongArch64 {
 //        code.BFXIL(Wscratch0, Wcpsr, 5, 1);
         code.add_imm(Wscratch2, code.zero, 0xFFFF0000, Wscratch1);
 
-        code.ld_d(Wscratch1, Xstate, offsetof(A32JitState, upper_location_descriptor));
+        code.ld_w(Wscratch1, Xstate, offsetof(A32JitState, upper_location_descriptor));
         code.and_(Wscratch1, Wscratch1, Wscratch2);
         code.or_(Wscratch0, Wscratch0, Wscratch1);
-        code.st_d(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
+        code.st_w(Wscratch0, Xstate, offsetof(A32JitState, upper_location_descriptor));
     }
 
     template<>
@@ -547,7 +548,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wnzcv);
-
+        // nzcv show like what?
         code.st_w(Wnzcv, Xstate, offsetof(A32JitState, cpsr_nzcv));
     }
 
@@ -562,7 +563,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 //        code.addi_w(Wscratch0, code.zero, 28);
         code.srli_w(Wnzcv, Wnzcv, NZCV::arm_nzcv_shift);
 
-        code.st_d(Wnzcv, Xstate, offsetof(A32JitState, cpsr_nzcv));
+        code.st_w(Wnzcv, Xstate, offsetof(A32JitState, cpsr_nzcv));
     }
 
     template<>
@@ -591,12 +592,12 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         // TODO: Track latent value
 
-        code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+        code.ld_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
 //        code.add_imm(Wscratch1, code.zero, 0x3, Wscratch2);
         code.andi(Wscratch0, Wscratch0, 0x3);
-        code.srli_w(Wnz, Wnz, NZCV::arm_nzcv_shift);
+//        code.srli_w(Wnz, Wnz, NZCV::arm_nzcv_shift);
         code.or_(Wscratch0, Wscratch0, Wnz);
-        code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+        code.st_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
     }
 
     template<>
@@ -609,7 +610,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             if (args[1].IsImmediate()) {
                 const u32 carry = args[1].GetImmediateU1() ? 0x2 : 0;
 
-                code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+                code.ld_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
 //                code.add_imm(Wscratch1, code.zero, 0x10000000, Wscratch2);
 
                 code.andi(Wscratch0, Wscratch0, 0x1);
@@ -617,17 +618,17 @@ namespace Dynarmic::Backend::LoongArch64 {
 //                    code.add_imm(Wscratch1, code.zero, carry, Wscratch2);
                     code.ori(Wscratch0, Wscratch0, carry);
                 }
-                code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+                code.st_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
             } else {
                 auto Wc = ctx.reg_alloc.ReadW(args[1]);
                 RegAlloc::Realize(Wc);
 
-                code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+                code.ld_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
                 code.andi(Wscratch0, Wscratch0, 0x1);
-                code.slli_w(Wc, Wc, NZCV::arm_nzcv_shift);
-                code.andi(Wc, Wc, 0x2);
+//                code.slli_w(Wc, Wc, NZCV::arm_nzcv_shift);
+//                code.andi(Wc, Wc, 0x2);
                 code.or_(Wscratch0, Wscratch0, Wc);
-                code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+                code.st_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
             }
         } else {
             if (args[1].IsImmediate()) {
@@ -635,27 +636,27 @@ namespace Dynarmic::Backend::LoongArch64 {
                 auto Wnz = ctx.reg_alloc.ReadW(args[0]);
                 RegAlloc::Realize(Wnz);
 
-                code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+                code.ld_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
                 code.andi(Wscratch0, Wscratch0, 0x1);
                 code.srli_w(Wnz, Wnz, NZCV::arm_nzcv_shift);
                 code.or_(Wscratch0, Wscratch0, Wnz);
                 if (carry) {
                     code.ori(Wscratch0, Wscratch0, carry);
                 }
-                code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+                code.st_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
             } else {
                 auto Wnz = ctx.reg_alloc.ReadW(args[0]);
                 auto Wc = ctx.reg_alloc.ReadW(args[1]);
                 RegAlloc::Realize(Wnz, Wc);
 
-                code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+                code.ld_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
                 code.andi(Wscratch0, Wscratch0, 0x1);
-                code.srli_w(Wnz, Wnz, NZCV::arm_nzcv_shift);
-                code.srli_w(Wc, Wc, NZCV::arm_nzcv_shift);
-                code.andi(Wc, Wc, 0x2);
+//                code.srli_w(Wnz, Wnz, NZCV::arm_nzcv_shift);
+//                code.srli_w(Wc, Wc, NZCV::arm_nzcv_shift);
+//                code.andi(Wc, Wc, 0x2);
                 code.or_(Wscratch0, Wscratch0, Wnz);
                 code.or_(Wscratch0, Wscratch0, Wc);
-                code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
+                code.st_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
             }
         }
     }
@@ -666,7 +667,8 @@ namespace Dynarmic::Backend::LoongArch64 {
         RegAlloc::Realize(Wflag);
 
         code.ld_w(Wflag, Xstate, offsetof(A32JitState, cpsr_nzcv));
-        code.andi(Wflag, Wflag, 1 << 1);
+//        code.srli_w(Wflag, Wflag, NZCV::arm_c_flag_inner_sft);
+        code.andi(Wflag, Wflag, NZCV::arm_c_flag_mask);
     }
 
     template<>
@@ -731,7 +733,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             const u32 new_upper = upper_without_t | (mcl::bit::get_bit<0>(new_pc) ? 1 : 0);
             // TODO check if eq to stp
             code.add_imm(Xscratch0, code.zero, (u64{new_upper} << 32) | (new_pc & mask), Xscratch1);
-            code.st_d(Xscratch0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
+            code.st_w(Xscratch0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
 //            code.STUR(Xscratch0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
         } else {
             auto Wpc = ctx.reg_alloc.ReadW(args[0]);

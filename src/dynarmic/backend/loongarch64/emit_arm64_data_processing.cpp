@@ -230,7 +230,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         RegAlloc::Realize(Xresult, Xthen, Xelse);
         Xbyak_loongarch64::Label then_rst;
 
-        code.ld_d(Xscratch0, Xstate, offsetof(A64JitState, cpsr_nzcv));
+        code.ld_w(Xscratch0, Xstate, offsetof(A64JitState, cpsr_nzcv));
         // FIXME
 //        LoadRequiredFlagsForCondFromReg(code, Xscratch2, Xscratch0, args[0].GetImmediateCond());
 
@@ -381,7 +381,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
                     code.bstrpick_w(Wcarry_out, Woperand, 32 - shift, 32 - shift);
 //                code.UBFX(Wcarry_out, Woperand, 32 - shift, 1);
-                    code.slli_w(Wcarry_out, Wcarry_out, 29);
+                    code.slli_w(Wcarry_out, Wcarry_out, NZCV::arm_c_flag_inner_sft);
                     code.slli_w(Wresult, Woperand, shift);
                 } else if (shift > 32) {
                     auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -395,9 +395,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                     auto Wcarry_out = ctx.reg_alloc.WriteW(carry_inst);
                     auto Woperand = ctx.reg_alloc.ReadW(operand_arg);
                     RegAlloc::Realize(Wresult, Wcarry_out, Woperand);
-                    code.add_d(Wcarry_out, code.zero, code.zero);
-                    code.bstrins_w(Wcarry_out, Woperand, 29, 29);
-//                code.UBFIZ(Wcarry_out, Woperand, 29, 1);
+                    code.andi(Wcarry_out, Woperand, 0x1);
+                    code.slli_w(Wcarry_out, Wcarry_out, NZCV::arm_c_flag_inner_sft);
                     code.add_d(Wresult, code.zero, code.zero);
                 }
             } else {
@@ -1016,6 +1015,14 @@ namespace Dynarmic::Backend::LoongArch64 {
 //        }
     }
 
+    static void
+    foo(BlockOfCode &code, const RAReg <Xbyak_loongarch64::WReg> &Rresult, const RAReg <Xbyak_loongarch64::WReg> &Ra,
+        const RAReg <Xbyak_loongarch64::WReg> &Rb, const RAReg <Xbyak_loongarch64::WReg> &nzcv);
+
+    static void
+    foo1(BlockOfCode &code, const RAReg <Xbyak_loongarch64::WReg> &Rresult, const RAReg <Xbyak_loongarch64::WReg> &Ra,
+         const RAReg <Xbyak_loongarch64::WReg> &Rb, const Xbyak_loongarch64::WReg &Woverflow);
+
     template<size_t bitsize>
     static void EmitAdd(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         const auto carry_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetCarryFromOp);
@@ -1036,29 +1043,58 @@ namespace Dynarmic::Backend::LoongArch64 {
         } else if constexpr (bitsize == 64) {
             addfn = &BlockOfCode::add_d;
         }
-        (code.*addfn)(Rresult, Ra, Rb);
-        (code.*addfn)(Rresult, Rresult, carry_in);
+        (code.*addfn)(Rresult, Ra, carry_in);
+        (code.*addfn)(Rresult, Rresult, Rb);
 
         if (overflow_inst) {
-            code.xor_(Xscratch0, Rb, Ra);
-            code.xor_(Xscratch1, Rresult, Ra);
-            code.and_(Xscratch0, Xscratch0, Xscratch1);
-
             auto Woverflow = ctx.reg_alloc.WriteW(overflow_inst);
             RegAlloc::Realize(Woverflow);
-            code.slt(Woverflow, Xscratch0, code.zero);
-        }
-        if (carry_inst) {
-            auto Wcarry = ctx.reg_alloc.WriteW(carry_inst);
-            RegAlloc::Realize(Wcarry);
-            code.sltu(Wcarry, Rresult, Ra);
-        }
-        if (nzcv_inst) {
-            auto Wflags = ctx.reg_alloc.WriteFlags(nzcv_inst);
-            // TODO how to impl?
-            RegAlloc::Realize(Wflags);
-        }
 
+            foo1(code, Rresult, Ra, Rb, Wscratch2);
+
+        }
+        if (carry_inst || nzcv_inst) {
+            code.sltu(Xscratch0, Rresult, Ra);
+            if (carry_inst) {
+                auto Wcarry = ctx.reg_alloc.WriteW(carry_inst);
+                RegAlloc::Realize(Wcarry);
+                code.add_d(Wcarry, code.zero, Xscratch0);
+            }
+            if (nzcv_inst) {
+                auto nzcv = ctx.reg_alloc.WriteW(nzcv_inst);
+                RegAlloc::Realize(nzcv);
+
+                foo(code, Rresult, Ra, Rb, nzcv);
+
+            }
+        }
+    }
+
+    static void
+    foo1(BlockOfCode &code, const RAReg <Xbyak_loongarch64::WReg> &Rresult, const RAReg <Xbyak_loongarch64::WReg> &Ra,
+         const RAReg <Xbyak_loongarch64::WReg> &Rb, const Xbyak_loongarch64::WReg &Woverflow) {
+        code.xor_(Xscratch0, Rresult, Rb);
+        code.xor_(Xscratch1, Rresult, Ra);
+        code.and_(Xscratch0, Xscratch0, Xscratch1);
+
+        code.slt(Woverflow, Xscratch0, code.zero);
+    }
+
+    static void
+    foo(BlockOfCode &code, const RAReg <Xbyak_loongarch64::WReg> &Rresult, const RAReg <Xbyak_loongarch64::WReg> &Ra,
+        const RAReg <Xbyak_loongarch64::WReg> &Rb, const RAReg <Xbyak_loongarch64::WReg> &nzcv) {
+        code.xor_(nzcv, nzcv, nzcv);
+        code.bstrins_w(nzcv, Xscratch0, NZCV::arm_c_flag_inner_sft, NZCV::arm_c_flag_inner_sft);
+
+        code.slt(Xscratch0, Ra, Rb);
+        code.bstrins_w(nzcv, Xscratch0, NZCV::arm_n_flag_inner_sft, NZCV::arm_n_flag_inner_sft);
+
+        code.addi_d(Xscratch1, code.zero, 0x1);
+        code.masknez(Xscratch0, Xscratch1, Rresult);
+        code.bstrins_w(nzcv, Xscratch0, NZCV::arm_z_flag_inner_sft, NZCV::arm_z_flag_inner_sft);
+
+        foo1(code, Rresult, Ra, Rb, Wscratch0);
+        code.bstrins_w(nzcv, Xscratch0, NZCV::arm_v_flag_inner_sft, NZCV::arm_v_flag_inner_sft);
     }
 
     template<size_t bitsize>
@@ -1072,12 +1108,50 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Rresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
         auto Ra = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
         auto Rb = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
-        auto carry_in = ctx.reg_alloc.ReadReg<bitsize>(args[2]);
-        RegAlloc::Realize(Rresult, Ra, Rb, carry_in);
+        auto carry_in = args[2];
+        RegAlloc::Realize(Rresult, Ra, Rb);
 
-        code.add_d(Rb, Rb, carry_in);
-        code.sub_d(Rresult, Wscratch2, Ra);
+        decltype(&BlockOfCode::sub_d) subfn;
+        decltype(&BlockOfCode::add_d) addfn;
 
+        if constexpr (bitsize == 32) {
+            subfn = &BlockOfCode::sub_w;
+            addfn = &BlockOfCode::add_w;
+        } else if constexpr (bitsize == 64) {
+            subfn = &BlockOfCode::sub_d;
+            addfn = &BlockOfCode::add_d;
+        }
+        const bool is_cmp = inst->UseCount() == size_t(!!carry_inst + !!overflow_inst + !!nzcv_inst) && carry_in.IsImmediate() && carry_in.GetImmediateU1();
+
+        bool invert_output_carry = true;
+        if (is_cmp) {
+            (code.*subfn)(Rresult, Ra, Rb);
+
+        } else
+        if (args[1].IsImmediate() && args[1].GetType() == IR::Type::U32) {
+            if (carry_in.IsImmediate()) {
+                if (carry_in.GetImmediateU1()) {
+                    (code.*subfn)(Rresult, Ra, Rb);
+                } else {
+                    code.nor(Rb, Rb, Rb);
+                    code.add_w(Rresult, Ra, Rb);
+                    invert_output_carry = false;
+                }
+            } else {
+                auto ci = ctx.reg_alloc.ReadX(args[2]);
+                RegAlloc::Realize(ci);
+                code.add_d(Ra, Ra, Ra);
+                code.nor(Rb, Rb, Rb);
+                code.add_w(Rresult, Ra, Rb);
+                invert_output_carry = false;
+            }
+        }else {
+            auto ci = ctx.reg_alloc.ReadX(args[2]);
+            RegAlloc::Realize(ci);
+            code.xori(ci, ci, 0x1);
+            (code.*subfn)(Ra, Ra, ci);
+            (code.*subfn)(Rresult, Ra, Rb);
+        }
 
         if (overflow_inst) {
             auto Woverflow = ctx.reg_alloc.WriteW(overflow_inst);
@@ -1088,16 +1162,28 @@ namespace Dynarmic::Backend::LoongArch64 {
             code.and_(Xscratch0, Xscratch0, Xscratch1);
             code.slt(Woverflow, Xscratch0, code.zero);
         }
-        if (carry_inst) {
-            auto Wcarry = ctx.reg_alloc.WriteW(carry_inst);
-            RegAlloc::Realize(Wcarry);
-            code.sltu(Wcarry, Rb, Ra);
+        if (carry_inst || nzcv_inst) {
+
+            code.slt(Xscratch0, Ra, Rb);
+            if (invert_output_carry) {
+                code.xori(Xscratch0, Xscratch0, 0x1);
+            }
+            if (carry_inst){
+                auto Wcarry = ctx.reg_alloc.WriteW(carry_inst);
+                RegAlloc::Realize(Wcarry);
+                code.add_d(Wcarry, code.zero, Xscratch0);
+//                code.xor_(Wcarry, Wcarry, Wcarry);
+//                code.bstrins_w(Wcarry, Xscratch0, NZCV::arm_c_flag_inner_sft, NZCV::arm_c_flag_inner_sft);
+            }
+            if (nzcv_inst) {
+                auto nzcv = ctx.reg_alloc.WriteW(nzcv_inst);
+                RegAlloc::Realize(nzcv);
+
+                foo(code, Rresult, Ra, Rb, nzcv);
+
+            }
         }
-        if (nzcv_inst) {
-            auto Wflags = ctx.reg_alloc.WriteFlags(nzcv_inst);
-            // TODO how to impl?
-            RegAlloc::Realize(Wflags);
-        }
+
 
     }
 

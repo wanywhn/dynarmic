@@ -98,17 +98,17 @@ void EmitIR<IR::Opcode::GetNZCVFromOp>(BlockOfCode& code, EmitContext& ctx, IR::
     RegAlloc::Realize(Wvalue, nzcv);
 
     switch (args[0].GetType()) {
-    case IR::Type::U32: {
-        code.srli_w(Wscratch0, Wvalue, NZCV::arm_nzcv_shift);
-        break;
-    }
-    case IR::Type::U64: {
-        code.srli_d(Wscratch0, Wvalue, NZCV::arm_nzcv_shift + 32);
-        break;
-    }
-    default:
-        ASSERT_FALSE("Invalid type for GetNZCVFromOp");
-        break;
+        case IR::Type::U32: {
+            code.srli_w(Wscratch0, Wvalue, NZCV::arm_nzcv_shift);
+            break;
+        }
+        case IR::Type::U64: {
+            code.srli_d(Wscratch0, Wvalue, NZCV::arm_nzcv_shift + 32);
+            break;
+            default:
+                ASSERT_FALSE("Invalid type for GetNZCVFromOp");
+            break;
+        }
     }
     code.bstrpick_w(nzcv, Wscratch0, NZCV::arm_n_flag_inner_sft, NZCV::arm_n_flag_inner_sft);
     code.slli_w(nzcv, nzcv,  NZCV::arm_n_flag_inner_sft);
@@ -142,8 +142,7 @@ void EmitIR<IR::Opcode::GetCFlagFromNZCV>(BlockOfCode& code, EmitContext& ctx, I
     auto Wc = ctx.reg_alloc.WriteW(inst);
     auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
     RegAlloc::Realize(Wc, Wnzcv);
-    code.srli_w(Wnzcv, Wnzcv, NZCV::arm_c_flag_sft);
-    code.bstrpick_d(Wc, Wnzcv, 0, 0);
+    code.bstrpick_d(Wc, Wnzcv, NZCV::arm_c_flag_inner_sft, NZCV::arm_c_flag_inner_sft);
 }
 
 template<>

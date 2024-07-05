@@ -182,7 +182,7 @@ public:
     template<size_t size>
     auto ReadReg(Argument& arg) {
         if constexpr (size == 64) {
-            return ReadX(arg);
+            return ReadW(arg);
         } else if constexpr (size == 32) {
             return ReadW(arg);
         } else {
@@ -222,7 +222,7 @@ public:
     template<size_t size>
     auto WriteReg(IR::Inst* inst) {
         if constexpr (size == 64) {
-            return WriteX(inst);
+            return WriteW(inst);
         } else if constexpr (size == 32) {
             return WriteW(inst);
         } else {

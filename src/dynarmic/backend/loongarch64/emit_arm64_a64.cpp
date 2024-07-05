@@ -25,7 +25,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     Xbyak_loongarch64::Label EmitA64Cond(BlockOfCode &code, EmitContext &, IR::Cond cond) {
         Xbyak_loongarch64::Label pass;
         // TODO: Flags in host flags
-        code.ld_d(Xscratch0, Xstate, offsetof(A64JitState, cpsr_nzcv));
+        code.ld_w(Xscratch0, Xstate, offsetof(A64JitState, cpsr_nzcv));
 //        void LoadRequiredFlagsForCondFromRax(IR::Cond cond);
 // FIXME
 
@@ -277,16 +277,16 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::A64GetCFlag>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Wflag = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wflag);
-        code.ld_d(Wflag, Xstate, offsetof(A64JitState, cpsr_nzcv));
-        code.andi(Wflag, Wflag, 1 << 29);
+        code.ld_w(Wflag, Xstate, offsetof(A64JitState, cpsr_nzcv));
+        code.andi(Wflag, Wflag, NZCV::arm_c_flag_mask);
     }
 
     template<>
     void EmitIR<IR::Opcode::A64GetNZCVRaw>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto Wnzcv = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wnzcv);
-
-        code.ld_d(Wnzcv, Xstate, offsetof(A64JitState, cpsr_nzcv));
+        code.ld_w(Wnzcv, Xstate, offsetof(A64JitState, cpsr_nzcv));
+        code.slli_w(Wnzcv, Wnzcv, NZCV::arm_nzcv_shift);
     }
 
     template<>
@@ -294,8 +294,8 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Wnzcv = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wnzcv);
-
-        code.st_d(Wnzcv, Xstate, offsetof(A64JitState, cpsr_nzcv));
+        code.srli_w(Wnzcv, Wnzcv, NZCV::arm_nzcv_shift);
+        code.st_w(Wnzcv, Xstate, offsetof(A64JitState, cpsr_nzcv));
     }
 
     template<>
