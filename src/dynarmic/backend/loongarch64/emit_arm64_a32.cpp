@@ -442,9 +442,10 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.ld_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_nzcv));
         code.ld_w(Wscratch1, Xstate, offsetof(A32JitState, cpsr_nzcv) + sizeof(u32));
 //        code.LDP(Wscratch0, Wscratch1, Xstate, offsetof(A32JitState, cpsr_nzcv));
+        code.xor_(Wcpsr, Wcpsr, Wcpsr);
         code.ld_d(Wcpsr, Xstate, offsetof(A32JitState, cpsr_jaifm));
-        code.or_(Wcpsr, Wcpsr, Wscratch0);
-        code.or_(Wcpsr, Wcpsr, Wscratch1);
+        code.bstrins_w(Wcpsr, Wscratch0, 31, 28);
+        code.bstrins_w(Wcpsr, Wscratch0, 27, 27);
 
         code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_ge));
         code.add_imm(Wscratch1, code.zero, 0x80808080, Wscratch2);
@@ -482,7 +483,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         // NZCV, Q flags
         code.srli_w(Wscratch0, Wcpsr, NZCV::arm_nzcv_shift);
-        code.and_(Wscratch0, Wcpsr, Wscratch1);
+        code.andi(Wscratch0, Wcpsr, 0xF);
         code.bstrpick_w(Wscratch1, Wcpsr, 27, 27);
 //        code.andi(Wscratch1, Wcpsr, 1 << 27);
 
@@ -677,9 +678,15 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Wflag = ctx.reg_alloc.ReadW(args[0]);
         RegAlloc::Realize(Wflag);
 
-        code.ld_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_q));
-        code.or_(Wscratch0, Wscratch0, Wflag);
-        code.st_d(Wscratch0, Xstate, offsetof(A32JitState, cpsr_q));
+        if (args[0].IsImmediate()) {
+            if (args[0].GetImmediateU1()) {
+                code.st_w(Wflag, Xstate, offsetof(A32JitState, cpsr_q));
+            }
+        } else {
+            code.ld_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_q));
+            code.or_(Wscratch0, Wscratch0, Wflag);
+            code.st_w(Wscratch0, Xstate, offsetof(A32JitState, cpsr_q));
+        }
     }
 
     template<>

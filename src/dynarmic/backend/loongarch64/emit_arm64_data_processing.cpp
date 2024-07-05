@@ -1050,7 +1050,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             auto Woverflow = ctx.reg_alloc.WriteW(overflow_inst);
             RegAlloc::Realize(Woverflow);
 
-            foo1(code, Rresult, Ra, Rb, Wscratch2);
+            foo1(code, Rresult, Ra, Rb, Woverflow);
 
         }
         if (carry_inst || nzcv_inst) {
