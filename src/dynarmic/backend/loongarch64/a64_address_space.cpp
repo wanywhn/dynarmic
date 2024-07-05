@@ -163,13 +163,13 @@ static void* EmitRead128CallTrampoline(BlockOfCode& code, A64::UserCallbacks* th
 
     Xbyak_loongarch64::Label l_addr, l_this;
     void * target = code.getCurr<void *>();
-    ABI_PushRegisters(code, (1ull << 29) | (1ull << 30), 0);
+    ABI_PushRegisters(code, (1ull << code.fp.getIdx()) | (1ull << code.ra.getIdx()), 0);
     code.LDLableData_d(code.a0, l_this);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
     code.vinsgr2vr_d(Vscratch2, code.a0, 0);
     code.vinsgr2vr_d(Vscratch2, code.a1, 1);
-    ABI_PopRegisters(code, (1ull << 29) | (1ull << 30), 0);
+    ABI_PopRegisters(code, (1ull << code.fp.getIdx()) | (1ull << code.ra.getIdx()), 0);
     code.jirl(code.zero, code.ra, 0);
 
     code.align(8);
@@ -222,13 +222,13 @@ static void* EmitExclusiveRead128CallTrampoline(BlockOfCode& code, const A64::Us
     };
 
     void *target = code.getCurr<void *>();
-    ABI_PushRegisters(code, (1ull << 29) | (1ull << 30), 0);
+    ABI_PushRegisters(code, (1ull << code.fp.getIdx()) | (1ull << code.ra.getIdx()), 0);
     code.LDLableData_d(code.a0, l_this);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
     code.vinsgr2vr_d(Vscratch2, code.a0, 0);
     code.vinsgr2vr_d(Vscratch2, code.a1, 1);
-    ABI_PopRegisters(code, (1ull << 29) | (1ull << 30), 0);
+    ABI_PopRegisters(code, (1ull << code.fp.getIdx()) | (1ull << code.ra.getIdx()), 0);
     code.jirl(code.zero, code.ra, 0);
 
     code.align(8);
@@ -308,8 +308,8 @@ static void* EmitExclusiveWrite128CallTrampoline(BlockOfCode& code, const A64::U
 
     void *target = code.getCurr<void *>();
     code.LDLableData_d(code.a0, l_this);
-    code.vpickve2gr_d(code.a2, Vscratch2, 0);
-    code.vpickve2gr_d(code.a3, Vscratch2, 1);
+    code.vpickve2gr_d(code.a2, code.vr0, 0);
+    code.vpickve2gr_d(code.a3, code.vr0, 1);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.zero, Xscratch0, 0);
 

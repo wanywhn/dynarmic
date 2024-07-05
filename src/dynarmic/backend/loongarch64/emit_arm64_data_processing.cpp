@@ -69,8 +69,8 @@ namespace Dynarmic::Backend::LoongArch64 {
             auto Qresult = ctx.reg_alloc.WriteQ(inst);
             RegAlloc::Realize(Xlo, Xhi, Qresult);
 
-            code.vinsgr2vr_w(Qresult, Xlo, 0);
-            code.vinsgr2vr_w(Qresult, Xhi, 1);
+            code.vinsgr2vr_d(Qresult, Xlo, 0);
+            code.vinsgr2vr_d(Qresult, Xhi, 1);
         } else if (args[0].IsInGpr()) {
             auto Xlo = ctx.reg_alloc.ReadX(args[0]);
             auto Dhi = ctx.reg_alloc.ReadD(args[1]);
@@ -78,7 +78,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             RegAlloc::Realize(Xlo, Dhi, Qresult);
 
             code.vslli_d(Qresult, Dhi, 64);
-            code.vinsgr2vr_w(Qresult, Xlo, 0);
+            code.vinsgr2vr_d(Qresult, Xlo, 0);
         } else if (args[1].IsInGpr()) {
             auto Dlo = ctx.reg_alloc.ReadD(args[0]);
             auto Xhi = ctx.reg_alloc.ReadX(args[1]);
@@ -88,18 +88,14 @@ namespace Dynarmic::Backend::LoongArch64 {
             code.vinsgr2vr_d(Qresult, Xhi, 1);
             code.vinsgr2vr_d(Qresult, code.zero, 0);
             code.vadd_d(Qresult, Qresult, Dlo);
-//        code.FMOV(Qresult->toD(), Dlo);  // TODO: Move eliminiation
-//        code.add_d(Xbyak_loongarch64::VRegSelector{Qresult->getIdx()))}.D()[1], Xhi, code.zero);
         } else {
             auto Dlo = ctx.reg_alloc.ReadD(args[0]);
             auto Dhi = ctx.reg_alloc.ReadD(args[1]);
             auto Qresult = ctx.reg_alloc.WriteQ(inst);
             RegAlloc::Realize(Dlo, Dhi, Qresult);
             code.vslli_d(Qresult, Dhi, 64);
+            code.vinsgr2vr_d(Qresult, code.zero, 0);
             code.vadd_d(Qresult, Dlo, Qresult);
-            // TODO is this instrc ok?
-//        code.FMOV(Qresult->toD(), Dlo);  // TODO: Move eliminiation
-//        code.add_d(Xbyak_loongarch64::VRegSelector{Qresult->getIdx()}.D()[1], Xbyak_loongarch64::VRegSelector{Dhi->getIdx()}.D()[0], code.zero);
         }
     }
 

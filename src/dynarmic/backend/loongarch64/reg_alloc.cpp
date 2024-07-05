@@ -462,7 +462,7 @@ void RegAlloc::SpillFpr(unsigned int index) {
         return;
     }
     const int new_location_index = FindFreeSpill();
-    code.fst_d(Xbyak_loongarch64::XReg{index}, code.sp, spill_offset + new_location_index * spill_slot_size);
+    code.vst(Xbyak_loongarch64::VReg{index}, code.sp, spill_offset + new_location_index * spill_slot_size);
     spills[new_location_index] = std::exchange(fprs[index], {});
 }
 

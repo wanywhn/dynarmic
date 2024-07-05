@@ -205,9 +205,9 @@ namespace Dynarmic::Backend::LoongArch64 {
                 code.dbar(0x700);
             }
             code.addi_d(code.a0, code.zero, 1);
-            code.ld_b(Wscratch0, Xstate, ctx.conf.state_exclusive_state_offset);
+            code.ld_w(Wscratch0, Xstate, ctx.conf.state_exclusive_state_offset);
             code.beqz(Wscratch0, end);
-            code.st_b(code.zero, Xstate, ctx.conf.state_exclusive_state_offset);
+            code.st_w(code.zero, Xstate, ctx.conf.state_exclusive_state_offset);
             EmitRelocation(code, ctx, ExclusiveWriteMemoryLinkTarget(bitsize));
             if (ordered) {
                 code.dbar(0x700);
