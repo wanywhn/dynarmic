@@ -294,6 +294,10 @@ namespace Dynarmic::Backend::LoongArch64 {
                 code.addi_d(Xscratch1, code.zero, NZCV::arm_n_flag_mask);
                 code.beq(Xscratch0, Xscratch1, then_rst);
                 break;
+            case IR::Cond::AL:
+            case IR::Cond::NV:
+                code.add_d(Xelse, code.zero, Xthen);
+                break;
             default:
                 ASSERT_MSG(false, "Unknown cond {}", static_cast<size_t>(cond));
                 break;
