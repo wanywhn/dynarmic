@@ -320,6 +320,8 @@ namespace Dynarmic::Backend::LoongArch64 {
         // TODO: Detect if Gpr vs Fpr is more appropriate
         // FIXME: this assume fp is in vr
         code.ld_w(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
+        code.vxor_v(Sresult, Sresult, Sresult);
+
         code.vinsgr2vr_w(Sresult, Xscratch0, 0);
 //        code.ld_d(Sresult, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
     }
@@ -357,6 +359,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         // TODO: Detect if Gpr vs Fpr is more appropriate
         code.ld_d(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
+        code.vxor_v(Dresult, Dresult, Dresult);
         code.vinsgr2vr_d(Dresult, Xscratch0, 0);
 
 //        code.ld_d(Dresult, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
@@ -388,9 +391,8 @@ namespace Dynarmic::Backend::LoongArch64 {
         RegAlloc::Realize(Svalue);
 
         // TODO: Detect if Gpr vs Fpr is more appropriate
-        code.ld_d(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
-        code.vinsgr2vr_w(Svalue, Xscratch0, 0);
-//        code.st_d(Svalue, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u32) * index);
+        code.vpickve2gr_w(Xscratch0, Svalue, 0);
+        code.st_w(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
     }
 
     template<>
@@ -405,9 +407,8 @@ namespace Dynarmic::Backend::LoongArch64 {
         RegAlloc::Realize(Dvalue);
 
         // TODO: Detect if Gpr vs Fpr is more appropriate
-        code.ld_d(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
-        code.vinsgr2vr_d(Dvalue, Xscratch0, 0);
-//        code.st_d(Dvalue, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
+        code.vpickve2gr_d(Xscratch0, Dvalue, 0);
+        code.st_d(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
     }
 
     template<>

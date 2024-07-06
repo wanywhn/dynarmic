@@ -2740,7 +2740,6 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto table = ctx.reg_alloc.GetArgumentInfo(inst->GetArg(1).GetInst());
-
         const size_t table_size = std::count_if(table.begin(), table.end(),
                                                 [](const auto &elem) { return !elem.IsVoid(); });
 //        const bool is_defaults_zero = inst->GetArg(0).IsZero();
@@ -2756,28 +2755,40 @@ namespace Dynarmic::Backend::LoongArch64 {
         };
 
         u64 stack_size = static_cast<u32>(6 * 8);
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+
+        auto result = ctx.reg_alloc.WriteQ(inst);
+        auto defaults = ctx.reg_alloc.ReadX(args[0]);
+        auto indicies = ctx.reg_alloc.ReadQ(args[2]);
+        RegAlloc::Realize(result, defaults, indicies);
+
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1 << Xscratch0.getIdx()), stack_size);
 
         for (size_t i = 0; i < table_size; ++i) {
-            auto tmp_value = ctx.reg_alloc.ReadX(table[i]);
-            code.ld_d(tmp_value, code.sp, i * 16);
+            auto tmp_value = ctx.reg_alloc.ReadQ(table[i]);
+            RegAlloc::Realize(tmp_value);
+            code.vpickve2gr_d(Xscratch0, tmp_value, 0);
+            code.st_d(Xscratch0, code.sp, i * 8);
         }
 
-        auto defaults = ctx.reg_alloc.ReadX(args[0]);
-        auto indicies = ctx.reg_alloc.ReadX(args[1]);
 
         code.st_d(defaults, code.sp , 4 * 8);
-        code.st_d(indicies, code.sp , 5 * 8);
+        code.vpickve2gr_d(Xscratch0, indicies, 0);
+        code.st_d(Xscratch0, code.sp , 5 * 8);
+
 
         code.add_d(code.a0, code.sp, code.zero);
-        code.ld_d(code.a1, code.sp , 4 * 8);
-        code.ld_d(code.a2, code.sp , 5 * 8);
+        code.addi_d(code.a1, code.sp , 4 * 8);
+        code.addi_d(code.a2, code.sp , 5 * 8);
         code.add_imm(code.a3, code.zero, table_size, Wscratch2);
         code.CallLambda(lambda);
-        code.ld_d(Xscratch0, code.sp, 4 * 8);
-        ctx.reg_alloc.DefineAsRegister(inst, Xscratch0);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        code.ld_d(Xscratch0, code.sp, 4 * 8);
+
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~( 1 << Xscratch0.getIdx()) , stack_size);
+
+        code.vinsgr2vr_d(result, Xscratch0, 0);
+
+
 
     }
 
