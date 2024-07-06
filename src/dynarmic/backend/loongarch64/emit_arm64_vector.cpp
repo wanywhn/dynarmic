@@ -181,26 +181,27 @@ namespace Dynarmic::Backend::LoongArch64 {
         constexpr u32 stack_size = 3 * 16;
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
 
+        auto arg1 = ctx.reg_alloc.ReadQ(args[0]);
+        auto arg2 = ctx.reg_alloc.ReadQ(args[1]);
+        auto result = ctx.reg_alloc.WriteQ(inst);
+        RegAlloc::Realize(arg1, arg2, result);
 
-        auto arg1 = ctx.reg_alloc.ReadX(args[0]);
-        auto arg2 = ctx.reg_alloc.ReadX(args[1]);
-        RegAlloc::Realize(arg1, arg2);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), stack_size);
+
 
         code.add_d(code.a0, code.sp, code.zero);
         code.addi_d(code.a1, code.sp, 1 * 16);
         code.addi_d(code.a2, code.sp, 2 * 16);
 
-        code.st_d(arg1, code.a1, 0);
-        code.st_d(arg2, code.a2, 0);
+        code.vst(arg1, code.a1, 0);
+        code.vst(arg2, code.a2, 0);
 
         code.CallLambda(fn);
 
-        code.ld_d(Xscratch0, code.sp, 0 * 16);
-        ctx.reg_alloc.DefineAsRegister(inst, Xscratch0);
+        code.vld(result, code.sp, 0 * 16);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), stack_size);
     }
 
     template<typename EmitFn>
