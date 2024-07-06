@@ -402,8 +402,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         auto Wvalue = ctx.reg_alloc.ReadW(args[1]);
         RegAlloc::Realize(Wvalue);
-        // must st_d
+        code.bstrpick_d(Wvalue, Wvalue, 31, 0);
         code.st_d(Wvalue, Xstate, offsetof(A64JitState, reg) + sizeof(u64) * static_cast<size_t>(reg));
+
     }
 
     template<>
