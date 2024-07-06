@@ -186,7 +186,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         auto arg1 = ctx.reg_alloc.ReadX(args[0]);
         auto arg2 = ctx.reg_alloc.ReadX(args[1]);
-
+        RegAlloc::Realize(arg1, arg2);
 
         code.add_d(code.a0, code.sp, code.zero);
         code.addi_d(code.a1, code.sp, 1 * 16);

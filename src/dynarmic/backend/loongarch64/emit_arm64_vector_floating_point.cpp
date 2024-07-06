@@ -326,14 +326,15 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<size_t fsize>
     void FPVectorAbs(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        auto result = ctx.reg_alloc.WriteQ(inst);
         auto a = ctx.reg_alloc.ReadQ(args[0]);
-        code.vand_v(a, a, GetNonSignMaskVector<fsize>(code));
+        RegAlloc::Realize(a, result);
+        code.vand_v(result, a, GetNonSignMaskVector<fsize>(code));
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorAbs16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         FPVectorAbs<16>(code, ctx, inst);
-
     }
 
     template<>
