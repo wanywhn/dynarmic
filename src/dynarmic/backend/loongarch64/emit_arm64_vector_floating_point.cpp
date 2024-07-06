@@ -588,7 +588,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void
     EmitIR<IR::Opcode::FPVectorMulAdd32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitFPVectorMulAdd<16>(code, ctx, inst);
+        EmitFPVectorMulAdd<32>(code, ctx, inst);
 
 //        EmitFMA<32>(code, ctx, inst, [&](auto &Va, auto Vn, auto Vm) { code.vfmadd_s(Va, Vn, Vm); });
     }
@@ -596,7 +596,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void
     EmitIR<IR::Opcode::FPVectorMulAdd64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitFPVectorMulAdd<32>(code, ctx, inst);
+        EmitFPVectorMulAdd<64>(code, ctx, inst);
 
 //        EmitFMA<64>(code, ctx, inst, [&](auto &Va, auto Vn, auto Vm) { code.vfmadd_d(Va, Vn, Vm); });
     }
