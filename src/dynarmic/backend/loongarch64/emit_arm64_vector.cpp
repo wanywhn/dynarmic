@@ -2757,9 +2757,17 @@ namespace Dynarmic::Backend::LoongArch64 {
         u64 stack_size = static_cast<u32>(6 * 8);
 
         auto result = ctx.reg_alloc.WriteQ(inst);
-        auto defaults = ctx.reg_alloc.ReadX(args[0]);
-        auto indicies = ctx.reg_alloc.ReadQ(args[2]);
-        RegAlloc::Realize(result, defaults, indicies);
+        auto defaults = ctx.reg_alloc.ReadQ(args[0]);
+        auto indic = ctx.reg_alloc.ReadQ(args[2]);
+        auto indicies = Vscratch0;
+        RegAlloc::Realize(result);
+        RegAlloc::Realize(defaults);
+        if ( inst->GetArg(0).IsImmediate() || (!inst->GetArg(0).IsImmediate() && (inst->GetArg(0).GetInst()->GetName() != inst->GetArg(2).GetInst()->GetName()))) {
+            RegAlloc::Realize(indic);
+            indicies = indic;
+        } else {
+            indicies = defaults;
+        }
 
         ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1 << Xscratch0.getIdx()), stack_size);
 
@@ -2770,8 +2778,9 @@ namespace Dynarmic::Backend::LoongArch64 {
             code.st_d(Xscratch0, code.sp, i * 8);
         }
 
+        code.vpickve2gr_d(Xscratch0, defaults, 0);
+        code.st_d(Xscratch0, code.sp , 4 * 8);
 
-        code.st_d(defaults, code.sp , 4 * 8);
         code.vpickve2gr_d(Xscratch0, indicies, 0);
         code.st_d(Xscratch0, code.sp , 5 * 8);
 
