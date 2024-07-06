@@ -1409,8 +1409,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                          IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                       [&](auto &Vresult, auto &Voperand) {
-                                          code.vbsrl_v(Vresult, Voperand, 1);
-                                          code.vaddwev_h_b(Vresult, Vresult, Voperand);
+                                          code.vhaddw_h_b(Vresult, Voperand, Voperand);
         });
     }
 
@@ -1419,8 +1418,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                           IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                        [&](auto &Vresult, auto &Voperand) {
-                                           code.vbsrl_v(Vresult, Voperand, 2);
-                                           code.vaddwev_w_h(Vresult, Vresult, Voperand);
+                                           code.vhaddw_w_h(Vresult, Voperand, Voperand);
+
         });
     }
 
@@ -1429,8 +1428,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                           IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                        [&](auto &Vresult, auto &Voperand) {
-                                           code.vbsrl_v(Vresult, Voperand, 4);
-                                           code.vaddwev_d_w(Vresult, Vresult, Voperand);
+                                            code.vhaddw_d_w(Vresult, Voperand, Voperand);
         });
     }
 
@@ -1439,8 +1437,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                            IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                       [&](auto &Vresult, auto &Voperand) {
-                                          code.vbsrl_v(Vresult, Voperand, 1);
-                                          code.vaddwev_h_bu(Vresult, Vresult, Voperand);
+                                          code.vhaddw_hu_bu(Vresult, Voperand, Voperand);
         });
     }
 
@@ -1449,8 +1446,9 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                             IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                        [&](auto &Vresult, auto &Voperand) {
-                                           code.vbsrl_v(Vresult, Voperand, 2);
-                                           code.vaddwev_w_hu(Vresult, Vresult, Voperand);        });
+                                           code.vhaddw_wu_hu(Vresult, Voperand, Voperand);
+                                       });
+
     }
 
     template<>
@@ -1458,8 +1456,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                                                             IR::Inst *inst) {
         EmitTwoOp(code, ctx, inst,
                                        [&](auto &Vresult, auto &Voperand) {
-            code.vbsrl_v(Vresult, Voperand, 4);
-            code.vaddwev_d_wu(Vresult, Vresult, Voperand);
+                                           code.vhaddw_du_wu(Vresult, Voperand, Voperand);
+
         });
     }
 
