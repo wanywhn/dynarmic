@@ -675,22 +675,44 @@ void EmitIR<IR::Opcode::FPRSqrtEstimate64>(BlockOfCode& code, EmitContext& ctx, 
     EmitFPRSqrtEstimate<64>(code,ctx, inst);
 }
 
+    template<size_t fsize>
+    static void EmitFPRSqrtStepFused(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+        auto result = ctx.reg_alloc.WriteQ(inst);
+        auto a1 = ctx.reg_alloc.ReadQ(args[0]);
+        auto a2 = ctx.reg_alloc.ReadQ(args[1]);
+
+        RegAlloc::Realize(result);
+        RegAlloc::Realize(a1, a2);
+
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), 0);
+
+        code.movfr2gr_s(code.a0, a1);
+        code.movfr2gr_s(code.a1, a2);
+
+        code.add_imm(code.a2, code.zero, ctx.FPCR().Value(), Wscratch0);
+        code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+        code.CallFunction(&FP::FPRSqrtStepFused<FPT>);
+        code.movgr2fr_d(result, code.a0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), 0);
+    }
+
 template<>
 void EmitIR<IR::Opcode::FPRSqrtStepFused16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    (void)code;
-    (void)ctx;
-    (void)inst;
-    ASSERT_FALSE("Unimplemented");
+    EmitFPRSqrtStepFused<64>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPRSqrtStepFused32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa) { code.frsqrt_s(Sresult, Sa); });
+    EmitFPRSqrtStepFused<32>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPRSqrtStepFused64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitTwoOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da) { code.frsqrt_d(Dresult, Da); });
+    EmitFPRSqrtStepFused<64>(code, ctx, inst);
 }
 
 template<>

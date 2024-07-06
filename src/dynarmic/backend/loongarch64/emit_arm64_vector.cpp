@@ -242,7 +242,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         ASSERT(args[1].IsImmediate());
         const u8 index = args[1].GetImmediateU8();
 
-        auto Rresult = ctx.reg_alloc.WriteReg<std::max<size_t>(32, size)>(inst);
+        auto Rresult = ctx.reg_alloc.WriteQ(inst);
         auto Qvalue = ctx.reg_alloc.ReadQ(args[0]);
         RegAlloc::Realize(Rresult, Qvalue);
 
@@ -256,7 +256,9 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorGetElement8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitGetElement<8>(code, ctx, inst,
                           [&](auto &Wresult, auto &Qvalue, u8 index) {
-                              code.vpickve2gr_bu(Wresult, Qvalue, index);
+            code.vxor_v(Wresult, Wresult, Wresult);
+            code.vextrins_b(Wresult, Qvalue, index);
+
                           });
     }
 
@@ -265,7 +267,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorGetElement16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitGetElement<16>(code, ctx, inst,
                            [&](auto &Wresult, auto &Qvalue, u8 index) {
-                               code.vpickve2gr_hu(Wresult, Qvalue, index);
+                               code.vxor_v(Wresult, Wresult, Wresult);
+                               code.vextrins_h(Wresult, Qvalue, index);
                            });
     }
 
@@ -274,7 +277,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorGetElement32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitGetElement<32>(code, ctx, inst,
                            [&](auto &Wresult, auto &Qvalue, u8 index) {
-                               code.vpickve2gr_wu(Wresult, Qvalue, index);
+                               code.vxor_v(Wresult, Wresult, Wresult);
+                               code.vextrins_w(Wresult, Qvalue, index);
                            });
     }
 
@@ -283,7 +287,8 @@ namespace Dynarmic::Backend::LoongArch64 {
     EmitIR<IR::Opcode::VectorGetElement64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitGetElement<64>(code, ctx, inst,
                            [&](auto &Xresult, auto &Qvalue, u8 index) {
-                               code.vpickve2gr_du(Xresult, Qvalue, index);
+                               code.vxor_v(Xresult, Xresult, Xresult);
+                               code.vextrins_d(Xresult, Qvalue, index);
                            });
     }
 
