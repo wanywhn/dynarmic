@@ -2769,7 +2769,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             indicies = defaults;
         }
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1 << Xscratch0.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
 
         for (size_t i = 0; i < table_size; ++i) {
             auto tmp_value = ctx.reg_alloc.ReadQ(table[i]);
@@ -2793,7 +2793,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         code.ld_d(Xscratch0, code.sp, 4 * 8);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~( 1 << Xscratch0.getIdx()) , stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~( 1ull << Xscratch0.getIdx()) , stack_size);
 
         code.vinsgr2vr_d(result, Xscratch0, 0);
 
@@ -2807,6 +2807,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                                              IR::Inst *inst) {
         ASSERT(inst->GetArg(1).GetInst()->GetOpcode() == IR::Opcode::VectorTable);
 
+        auto result = ctx.reg_alloc.WriteQ(inst);
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto table = ctx.reg_alloc.GetArgumentInfo(inst->GetArg(1).GetInst());
 
@@ -2822,29 +2823,30 @@ namespace Dynarmic::Backend::LoongArch64 {
                 }
             }
         };
+        auto defaults = ctx.reg_alloc.ReadQ(args[0]);
+        auto indicies = ctx.reg_alloc.ReadQ(args[2]);
+        RegAlloc::Realize(result, defaults, indicies);
 
         u64 stack_size = static_cast<u32>((table_size + 2) * 16);
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << (result->getIdx() + 32)), stack_size);
 
         for (size_t i = 0; i < table_size; ++i) {
             auto tmp_value = ctx.reg_alloc.ReadQ(table[i]);
+            RegAlloc::Realize(tmp_value);
             code.vst(tmp_value, code.sp, i * 16);
         }
-        auto defaults = ctx.reg_alloc.ReadX(args[0]);
-        auto indicies = ctx.reg_alloc.ReadX(args[1]);
 
-        code.st_d(defaults, code.sp , (table_size + 0) * 16);
-        code.st_d(indicies, code.sp , (table_size + 1) * 16);
+        code.vst(defaults, code.sp , (table_size + 0) * 16);
+        code.vst(indicies, code.sp , (table_size + 1) * 16);
 
         code.add_d(code.a0, code.sp, code.zero);
-        code.ld_d(code.a1, code.sp , (table_size + 0) * 16);
-        code.ld_d(code.a2, code.sp , (table_size + 1) * 16);
+        code.addi_d(code.a1, code.sp , (table_size + 0) * 16);
+        code.addi_d(code.a2, code.sp , (table_size + 1) * 16);
         code.add_imm(code.a3, code.zero, table_size, Wscratch2);
         code.CallLambda(lambda);
-        code.ld_d(Xscratch0, code.sp, (table_size + 0) * 16);
-        ctx.reg_alloc.DefineAsRegister(inst, Xscratch0);
+        code.vld(result, code.sp, (table_size + 0) * 16);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << (result->getIdx() + 32)), stack_size);
 
     }
 

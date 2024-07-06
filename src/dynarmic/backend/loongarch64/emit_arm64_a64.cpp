@@ -424,8 +424,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
         auto Svalue = ctx.reg_alloc.ReadS(args[1]);
         RegAlloc::Realize(Svalue);
-
-        code.vstelm_w(Svalue, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec), 0);
+        code.vst(Svalue, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
     }
 
     template<>
@@ -434,9 +433,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         const A64::Vec vec = inst->GetArg(0).GetA64VecRef();
         auto Dvalue = ctx.reg_alloc.ReadD(args[1]);
         RegAlloc::Realize(Dvalue);
-
-        code.vstelm_d(Dvalue, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec), 0);
-
+        code.vst(Dvalue, Xstate, offsetof(A64JitState, vec) + sizeof(u64) * 2 * static_cast<size_t>(vec));
     }
 
     template<>
