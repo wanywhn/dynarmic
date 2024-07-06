@@ -163,13 +163,13 @@ static void* EmitRead128CallTrampoline(BlockOfCode& code, A64::UserCallbacks* th
 
     Xbyak_loongarch64::Label l_addr, l_this;
     void * target = code.getCurr<void *>();
-    ABI_PushRegisters(code, (1ull << code.fp.getIdx()) | (1ull << code.ra.getIdx()), 0);
+    ABI_PushRegisters(code, ToRegList(code.fp) | ToRegList(code.ra), 0);
     code.LDLableData_d(code.a0, l_this);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
     code.vinsgr2vr_d(Vscratch2, code.a0, 0);
     code.vinsgr2vr_d(Vscratch2, code.a1, 1);
-    ABI_PopRegisters(code, (1ull << code.fp.getIdx()) | (1ull << code.ra.getIdx()), 0);
+    ABI_PopRegisters(code, ToRegList(code.fp) | ToRegList(code.ra), 0);
     code.jirl(code.zero, code.ra, 0);
 
     code.align(8);
@@ -222,13 +222,13 @@ static void* EmitExclusiveRead128CallTrampoline(BlockOfCode& code, const A64::Us
     };
 
     void *target = code.getCurr<void *>();
-    ABI_PushRegisters(code, (1ull << code.fp.getIdx()) | (1ull << code.ra.getIdx()), 0);
+    ABI_PushRegisters(code, ToRegList(code.fp) | ToRegList(code.ra), 0);
     code.LDLableData_d(code.a0, l_this);
     code.LDLableData_d(Xscratch0, l_addr);
     code.jirl(code.ra, Xscratch0, 0);
     code.vinsgr2vr_d(Vscratch2, code.a0, 0);
     code.vinsgr2vr_d(Vscratch2, code.a1, 1);
-    ABI_PopRegisters(code, (1ull << code.fp.getIdx()) | (1ull << code.ra.getIdx()), 0);
+    ABI_PopRegisters(code, ToRegList(code.fp) | ToRegList(code.ra), 0);
     code.jirl(code.zero, code.ra, 0);
 
     code.align(8);
@@ -404,7 +404,7 @@ void A64AddressSpace::EmitPrelude() {
     prelude_info.run_code = code.getCurr<PreludeInfo::RunCodeFuncType>();
     {
 
-        ABI_PushRegisters(code, ABI_CALLEE_SAVE | 1 << code.ra.getIdx(), sizeof(StackLayout));
+        ABI_PushRegisters(code, ABI_CALLEE_SAVE | ToRegList(code.ra), sizeof(StackLayout));
 
         code.add_d(code.s0, code.a0, code.zero);
         code.add_d(Xstate, code.a1, code.zero);
@@ -439,7 +439,7 @@ void A64AddressSpace::EmitPrelude() {
 
     prelude_info.step_code = code.getCurr<PreludeInfo::RunCodeFuncType>();
     {
-        ABI_PushRegisters(code, ABI_CALLEE_SAVE | 1 << code.ra.getIdx(), sizeof(StackLayout));
+        ABI_PushRegisters(code, ABI_CALLEE_SAVE | ToRegList(code.ra), sizeof(StackLayout));
 
         code.add_d(code.s0, code.a0, code.zero);
         code.add_d(Xstate, code.a1, code.zero);
@@ -528,7 +528,7 @@ void A64AddressSpace::EmitPrelude() {
         code.sc_d(Wscratch0, Xhalt, 0);
         code.beqz(Wscratch0, exit_hr_loop);
 
-        ABI_PopRegisters(code, ABI_CALLEE_SAVE | 1 << code.ra.getIdx(), sizeof(StackLayout));
+        ABI_PopRegisters(code, ABI_CALLEE_SAVE | ToRegList(code.ra), sizeof(StackLayout));
         code.jirl(code.zero, code.ra, 0);
     }
 

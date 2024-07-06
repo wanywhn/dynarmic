@@ -61,9 +61,9 @@ constexpr std::initializer_list<int> FPR_ORDER{8, 9, 10, 11, 12, 13, 14, 15, 16,
 using RegisterList = u64;
 
 constexpr RegisterList ToRegList(Xbyak_loongarch64::Reg reg) {
-    // if (reg.is_vector()) {
-    // return RegisterList{1} << (reg.getIdx() + 32);
-    // }
+     if (reg.isXVReg() || reg.isVReg()) {
+     return RegisterList{1} << (reg.getIdx() + 32);
+     }
 
     if (reg.getIdx() == 0) {
         throw std::out_of_range("ZR not allowed in reg list");

@@ -181,7 +181,7 @@ static void EmitToFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
                                 })};
             },
             mp::cartesian_product<fbits_list, rounding_list>{});
-    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     code.movfr2gr_d(Wscratch0, Vfrom);
     code.add_d(code.a0, code.zero, Wscratch0);
     code.addi_d(code.a1, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
@@ -189,7 +189,7 @@ static void EmitToFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(lut.at(std::make_tuple(fbits, rounding_mode))), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
     code.movgr2fr_d(Rto, code.a0);
-    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
 }
 
 template<size_t bitsize_from, size_t bitsize_to, typename EmitFn>
@@ -402,7 +402,7 @@ void EmitIR<IR::Opcode::FPMulAdd32>(BlockOfCode& code, EmitContext& ctx, IR::Ins
     RegAlloc::Realize(result);
     RegAlloc::Realize(a1, a2, a3);
 
-    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ULL << (result->getIdx() + 32)), 0);
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), 0);
 //    ctx.reg_alloc.PrepareForCall(args[0], args[1], args[2]);
     code.movfr2gr_s(code.a0, a1);
     code.movfr2gr_s(code.a1, a2);
@@ -412,7 +412,7 @@ void EmitIR<IR::Opcode::FPMulAdd32>(BlockOfCode& code, EmitContext& ctx, IR::Ins
     code.addi_d(code.a4, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
     code.CallFunction(&FP::FPMulAdd<FPT>);
     code.movgr2fr_d(result, code.a0);
-    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ULL << (result->getIdx() + 32)), 0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), 0);
 
 //    EmitFourOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& S1, auto& S2) { code.fmadd_s(Sresult, S1, S2, Sa); });
 }
@@ -430,7 +430,7 @@ void EmitIR<IR::Opcode::FPMulAdd64>(BlockOfCode& code, EmitContext& ctx, IR::Ins
     RegAlloc::Realize(result);
     RegAlloc::Realize(a1, a2, a3);
 
-    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ULL << (result->getIdx() + 32)), 0);
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), 0);
     code.movfr2gr_d(code.a0, a1);
     code.movfr2gr_d(code.a1, a2);
     code.movfr2gr_d(code.a2, a3);
@@ -439,7 +439,7 @@ void EmitIR<IR::Opcode::FPMulAdd64>(BlockOfCode& code, EmitContext& ctx, IR::Ins
     code.addi_d(code.a4, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
     code.CallFunction(&FP::FPMulAdd<FPT>);
     code.movgr2fr_d(result, code.a0);
-    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ULL << (result->getIdx() + 32)), 0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), 0);
 
 //    EmitFourOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& D1, auto& D2) { code.fmadd_d(Dresult, D1, D2, Da); });
 }
@@ -500,7 +500,7 @@ void EmitIR<IR::Opcode::FPRecipEstimate64>(BlockOfCode& code, EmitContext& ctx, 
         auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
         RegAlloc::Realize(Rto, Vfrom);
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
         code.movfr2gr_d(Wscratch0, Vfrom);
         code.add_d(code.a0, code.zero, Wscratch0);
         code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
@@ -508,7 +508,7 @@ void EmitIR<IR::Opcode::FPRecipEstimate64>(BlockOfCode& code, EmitContext& ctx, 
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPRecipExponent<FPT>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
         code.movgr2fr_d(Rto, code.a0);
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     }
 
 template<>
@@ -539,7 +539,7 @@ void EmitIR<IR::Opcode::FPRecipExponent64>(BlockOfCode& code, EmitContext& ctx, 
 
         RegAlloc::Realize(Rto, Vfrom);
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
         code.movfr2gr_d(Wscratch0, Vfrom);
         code.add_d(code.a0, code.zero, Wscratch0);
         code.movfr2gr_d(Wscratch0, arg1);
@@ -550,7 +550,7 @@ void EmitIR<IR::Opcode::FPRecipExponent64>(BlockOfCode& code, EmitContext& ctx, 
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPRecipStepFused<FPT>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
         code.movgr2fr_d(Rto, code.a0);
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     }
 
 
@@ -608,7 +608,7 @@ void EmitIR<IR::Opcode::FPRecipStepFused64>(BlockOfCode& code, EmitContext& ctx,
         auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
         RegAlloc::Realize(Rto, Vfrom);
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
         code.movfr2gr_d(Wscratch0, Vfrom);
         code.add_d(code.a0, code.zero, Wscratch0);
         code.addi_d(code.a1, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
@@ -617,7 +617,7 @@ void EmitIR<IR::Opcode::FPRecipStepFused64>(BlockOfCode& code, EmitContext& ctx,
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(lut.at(std::make_tuple(fsize, rounding_mode, exact))), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
         code.movgr2fr_d(Rto, code.a0);
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     }
 
 template<>
@@ -646,7 +646,7 @@ void EmitIR<IR::Opcode::FPRoundInt64>(BlockOfCode& code, EmitContext& ctx, IR::I
         auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
         RegAlloc::Realize(Rto, Vfrom);
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
         code.movfr2gr_d(Wscratch0, Vfrom);
         code.add_d(code.a0, code.zero, Wscratch0);
         code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
@@ -654,7 +654,7 @@ void EmitIR<IR::Opcode::FPRoundInt64>(BlockOfCode& code, EmitContext& ctx, IR::I
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPRSqrtEstimate<FPT>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
         code.movgr2fr_d(Rto, code.a0);
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
 
 
     }
@@ -722,7 +722,7 @@ void EmitIR<IR::Opcode::FPHalfToDouble>(BlockOfCode& code, EmitContext& ctx, IR:
     auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
-    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     code.movfr2gr_d(Wscratch0, Vfrom);
     code.add_d(code.a0, code.zero, Wscratch0);
     code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
@@ -731,7 +731,7 @@ void EmitIR<IR::Opcode::FPHalfToDouble>(BlockOfCode& code, EmitContext& ctx, IR:
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u64, u16>), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
     code.movgr2fr_d(Rto, code.a0);
-    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
 
 }
 
@@ -744,7 +744,7 @@ void EmitIR<IR::Opcode::FPHalfToSingle>(BlockOfCode& code, EmitContext& ctx, IR:
     auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
-    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     code.movfr2gr_d(Wscratch0, Vfrom);
     code.add_d(code.a0, code.zero, Wscratch0);
     code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
@@ -753,7 +753,7 @@ void EmitIR<IR::Opcode::FPHalfToSingle>(BlockOfCode& code, EmitContext& ctx, IR:
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u32, u16>), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
     code.movgr2fr_d(Rto, code.a0);
-    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
 }
 
 template<>
@@ -773,7 +773,7 @@ void EmitIR<IR::Opcode::FPSingleToDouble>(BlockOfCode& code, EmitContext& ctx, I
         }
     } else {
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
         code.movfr2gr_d(Wscratch0, Vfrom);
         code.add_d(code.a0, code.zero, Wscratch0);
         code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
@@ -782,7 +782,7 @@ void EmitIR<IR::Opcode::FPSingleToDouble>(BlockOfCode& code, EmitContext& ctx, I
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u64, u32>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
         code.movgr2fr_d(Rto, code.a0);
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     }}
 
 template<>
@@ -794,7 +794,7 @@ void EmitIR<IR::Opcode::FPSingleToHalf>(BlockOfCode& code, EmitContext& ctx, IR:
     auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
-    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     code.movfr2gr_d(Wscratch0, Vfrom);
     code.add_d(code.a0, code.zero, Wscratch0);
     code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
@@ -803,7 +803,7 @@ void EmitIR<IR::Opcode::FPSingleToHalf>(BlockOfCode& code, EmitContext& ctx, IR:
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u16, u32>), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
     code.movgr2fr_d(Rto, code.a0);
-    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
 }
 
 template<>
@@ -815,7 +815,7 @@ void EmitIR<IR::Opcode::FPDoubleToHalf>(BlockOfCode& code, EmitContext& ctx, IR:
     auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
-    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     code.movfr2gr_d(Wscratch0, Vfrom);
     code.add_d(code.a0, code.zero, Wscratch0);
     code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
@@ -824,7 +824,7 @@ void EmitIR<IR::Opcode::FPDoubleToHalf>(BlockOfCode& code, EmitContext& ctx, IR:
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u16, u64>), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
     code.movgr2fr_d(Rto, code.a0);
-    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
 }
 
 template<>
@@ -844,7 +844,7 @@ void EmitIR<IR::Opcode::FPDoubleToSingle>(BlockOfCode& code, EmitContext& ctx, I
         }
     } else {
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
         code.movfr2gr_d(Wscratch0, Vfrom);
         code.add_d(code.a0, code.zero, Wscratch0);
         code.add_imm(code.a1, code.zero, ctx.FPCR().Value(), Xscratch2);
@@ -853,7 +853,7 @@ void EmitIR<IR::Opcode::FPDoubleToSingle>(BlockOfCode& code, EmitContext& ctx, I
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u32, u64>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
         code.movgr2fr_d(Rto, code.a0);
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
     }
 }
 

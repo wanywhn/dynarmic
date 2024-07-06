@@ -215,7 +215,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         const u32 fpcr = ctx.FPCR(fpcr_controlled).Value();
         constexpr u64 stack_size = sizeof(u64) * 4;
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Qresult.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Qresult), stack_size);
 
         code.add_imm(code.a0, code.sp, 0 * 16, Xscratch1);
         code.add_imm(code.a1, code.sp, 1 * 16, Xscratch1);
@@ -227,7 +227,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.jirl(code.ra, Xscratch0, 0);
         code.vld(Qresult, code.sp, 0);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Qresult.getIdx()), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Qresult), stack_size);
     }
 
     template<size_t fpcr_controlled_arg_index = 1, typename Lambda>
@@ -254,7 +254,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         constexpr u64 stack_size = sizeof(u64) * 4;
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << result.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(result), stack_size);
 
         code.add_imm(code.a0, code.sp, 0 * 16, Xscratch1);
         code.add_imm(code.a1, code.sp, 1 * 16, Xscratch1);
@@ -268,7 +268,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.jirl(code.ra, Xscratch0, 0);
         code.vld(result, code.sp, 0);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << result.getIdx()), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(result), stack_size);
 
     }
     enum class LoadPreviousResult {
@@ -285,7 +285,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         constexpr u32 stack_size = 4 * 16;
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << result.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(result), stack_size);
 
         code.add_imm(code.a0, code.sp, 0 * 16, Xscratch1);
         code.add_imm(code.a1, code.sp, 1 * 16, Xscratch1);
@@ -305,7 +305,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.jirl(code.ra, Xscratch0, 0);
         code.vld(result, code.sp, 0);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << result.getIdx()), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(result), stack_size);
         
     }
 

@@ -33,7 +33,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 //        const Xbyak::Xmm input = ctx.reg_alloc.UseXmm(args[0]);
 //        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
         RegAlloc::Realize(Qresult, Qinpt);
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Qresult->getIdx()), stack_space);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Qresult), stack_space);
 
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(fn), Xscratch2);
         code.addi_d(code.a0, code.sp, 0 * sizeof(AES::State));
@@ -42,7 +42,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.jirl(code.ra , Xscratch0, 0);
         code.vld(Qresult, code.a0, 0);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Qresult->getIdx()), stack_space);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Qresult), stack_space);
     }
 
     template<size_t bitsize, typename EmitFn>
@@ -149,7 +149,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 //        const Xbyak::Xmm input = ctx.reg_alloc.UseXmm(args[0]);
 //        const Xbyak::Xmm result = ctx.reg_alloc.ScratchXmm();
         RegAlloc::Realize( Qinpt, Qresult);
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Qinpt->getIdx()), 0);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Qinpt), 0);
 
         code.add_d(code.a0, code.zero, Qinpt);
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&Common::Crypto::SM4::AccessSubstitutionBox), Xscratch2);
@@ -157,7 +157,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.jirl(code.ra , Xscratch0, 0);
         code.add_d(Qresult, code.zero, code.a0);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Qinpt->getIdx()), 0);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Qinpt), 0);
     }
 
     template<>

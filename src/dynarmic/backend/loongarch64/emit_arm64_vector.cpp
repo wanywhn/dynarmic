@@ -31,7 +31,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         constexpr u32 stack_size = 3 * 16;
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
 
 
         auto arg1 = ctx.reg_alloc.ReadX(args[0]);
@@ -54,7 +54,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.or_(Xscratch1, Xscratch1, code.a0);
         code.st_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
     }
 
 
@@ -69,7 +69,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         const u8 arg2 = args[1].GetImmediateU8();
 
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
 
 
         auto arg1 = ctx.reg_alloc.ReadX(args[0]);
@@ -88,7 +88,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.or_(Xscratch1, Xscratch1, code.a0);
         code.st_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
 
     }
 
@@ -101,7 +101,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto arg1 = ctx.reg_alloc.ReadX(args[0]);
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
 
         code.add_d(code.a0, code.sp, code.zero);
         code.addi_d(code.a1, code.sp, 1 * 16);
@@ -111,7 +111,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.ld_d(Xscratch0, code.sp, 0 * 16);
         ctx.reg_alloc.DefineAsRegister(inst, Xscratch0);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
     }
 
 
@@ -123,7 +123,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         constexpr u32 stack_size = 2 * 16;
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0),stack_size);
 
 
         auto arg1 = ctx.reg_alloc.ReadX(args[0]);
@@ -143,7 +143,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.or_(Xscratch1, Xscratch1, code.a0);
         code.st_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
     }
 
     template<typename T>
@@ -181,7 +181,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         constexpr u32 stack_size = 3 * 16;
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
 
 
         auto arg1 = ctx.reg_alloc.ReadX(args[0]);
@@ -200,7 +200,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.ld_d(Xscratch0, code.sp, 0 * 16);
         ctx.reg_alloc.DefineAsRegister(inst, Xscratch0);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
     }
 
     template<typename EmitFn>
@@ -2769,7 +2769,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             indicies = defaults;
         }
 
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Xscratch0.getIdx()), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
 
         for (size_t i = 0; i < table_size; ++i) {
             auto tmp_value = ctx.reg_alloc.ReadQ(table[i]);
@@ -2793,7 +2793,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         code.ld_d(Xscratch0, code.sp, 4 * 8);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~( 1ull << Xscratch0.getIdx()) , stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(Xscratch0), stack_size);
 
         code.vinsgr2vr_d(result, Xscratch0, 0);
 
@@ -2828,7 +2828,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         RegAlloc::Realize(result, defaults, indicies);
 
         u64 stack_size = static_cast<u32>((table_size + 2) * 16);
-        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << (result->getIdx() + 32)), stack_size);
+        ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), stack_size);
 
         for (size_t i = 0; i < table_size; ++i) {
             auto tmp_value = ctx.reg_alloc.ReadQ(table[i]);
@@ -2846,7 +2846,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.CallLambda(lambda);
         code.vld(result, code.sp, (table_size + 0) * 16);
 
-        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << (result->getIdx() + 32)), stack_size);
+        ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), stack_size);
 
     }
 

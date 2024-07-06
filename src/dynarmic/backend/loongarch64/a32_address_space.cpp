@@ -232,7 +232,7 @@ void A32AddressSpace::EmitPrelude() {
 
     prelude_info.run_code = code.getCurr<PreludeInfo::RunCodeFuncType>();
     {
-        ABI_PushRegisters(code, ABI_CALLEE_SAVE | 1 << code.ra.getIdx(), sizeof(StackLayout));
+        ABI_PushRegisters(code, ABI_CALLEE_SAVE | ToRegList(code.ra), sizeof(StackLayout));
 
         code.add_d(code.s0, code.a0, code.zero);
         code.add_d(Xstate, code.a1, code.zero);
@@ -267,7 +267,7 @@ void A32AddressSpace::EmitPrelude() {
     // FIXME check
     prelude_info.step_code = code.getCurr<PreludeInfo::RunCodeFuncType>();
     {
-        ABI_PushRegisters(code, ABI_CALLEE_SAVE | 1 << code.ra.getIdx(), sizeof(StackLayout));
+        ABI_PushRegisters(code, ABI_CALLEE_SAVE | ToRegList(code.ra), sizeof(StackLayout));
 
         code.add_d(code.s0, code.a0, code.zero);
         code.add_d(Xstate, code.a1, code.zero);
@@ -354,7 +354,7 @@ void A32AddressSpace::EmitPrelude() {
         code.sc_d(Wscratch1, Xhalt, 0);
         code.beqz(Wscratch1, exit_hr_loop);
         // FIXME
-        ABI_PopRegisters(code, ABI_CALLEE_SAVE | 1 << code.ra.getIdx() , sizeof(StackLayout));
+        ABI_PopRegisters(code, ABI_CALLEE_SAVE | ToRegList(code.ra), sizeof(StackLayout));
         code.jirl(code.zero, code.ra, 0);
     }
 
