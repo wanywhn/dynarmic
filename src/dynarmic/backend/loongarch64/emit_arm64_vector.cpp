@@ -2323,7 +2323,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto result = ctx.reg_alloc.WriteQ(inst);
         RegAlloc::Realize(x, y, result);
 
-        code.vmul_h(upper_tmp, x, y);
+        code.vmuh_h(upper_tmp, x, y);
         code.vmul_h(lower_tmp, x, y);
 
         //x, y released
