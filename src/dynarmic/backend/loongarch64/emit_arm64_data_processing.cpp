@@ -1496,9 +1496,13 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void
-    EmitIR<IR::Opcode::ZeroExtendWordToLong>(BlockOfCode &, EmitContext &ctx, IR::Inst *inst) {
+    EmitIR<IR::Opcode::ZeroExtendWordToLong>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        ctx.reg_alloc.DefineAsExisting(inst, args[0]);
+        auto Xvalue = ctx.reg_alloc.ReadX(args[0]);
+        auto Qresult = ctx.reg_alloc.WriteQ(inst);
+        RegAlloc::Realize(Xvalue, Qresult);
+        code.vxor_v(Qresult, Qresult, Qresult);
+        code.vinsgr2vr_w(Qresult, Xvalue, 0);
     }
 
     template<>

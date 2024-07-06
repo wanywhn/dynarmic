@@ -388,15 +388,60 @@ void EmitIR<IR::Opcode::FPMulAdd16>(BlockOfCode& code, EmitContext& ctx, IR::Ins
     (void)inst;
     ASSERT_FALSE("Unimplemented");
 }
-
+// TODO this could opt?
 template<>
 void EmitIR<IR::Opcode::FPMulAdd32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitFourOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& S1, auto& S2) { code.fmadd_s(Sresult, S1, S2, Sa); });
+    using FPT = mcl::unsigned_integer_of_size<32>;
+
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+    auto result = ctx.reg_alloc.WriteQ(inst);
+    auto a1 = ctx.reg_alloc.ReadQ(args[0]);
+    auto a2 = ctx.reg_alloc.ReadQ(args[1]);
+    auto a3 = ctx.reg_alloc.ReadQ(args[2]);
+
+    RegAlloc::Realize(result);
+    RegAlloc::Realize(a1, a2, a3);
+
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ULL << (result->getIdx() + 32)), 0);
+//    ctx.reg_alloc.PrepareForCall(args[0], args[1], args[2]);
+    code.movfr2gr_s(code.a0, a1);
+    code.movfr2gr_s(code.a1, a2);
+    code.movfr2gr_s(code.a2, a3);
+
+    code.add_imm(code.a3, code.zero, ctx.FPCR().Value(), Wscratch0);
+    code.addi_d(code.a4, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+    code.CallFunction(&FP::FPMulAdd<FPT>);
+    code.movgr2fr_d(result, code.a0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ULL << (result->getIdx() + 32)), 0);
+
+//    EmitFourOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& S1, auto& S2) { code.fmadd_s(Sresult, S1, S2, Sa); });
 }
 
 template<>
 void EmitIR<IR::Opcode::FPMulAdd64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitFourOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& D1, auto& D2) { code.fmadd_d(Dresult, D1, D2, Da); });
+    using FPT = mcl::unsigned_integer_of_size<64>;
+
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+    auto result = ctx.reg_alloc.WriteQ(inst);
+    auto a1 = ctx.reg_alloc.ReadQ(args[0]);
+    auto a2 = ctx.reg_alloc.ReadQ(args[1]);
+    auto a3 = ctx.reg_alloc.ReadQ(args[2]);
+
+    RegAlloc::Realize(result);
+    RegAlloc::Realize(a1, a2, a3);
+
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ULL << (result->getIdx() + 32)), 0);
+    code.movfr2gr_d(code.a0, a1);
+    code.movfr2gr_d(code.a1, a2);
+    code.movfr2gr_d(code.a2, a3);
+
+    code.add_imm(code.a3, code.zero, ctx.FPCR().Value(), Wscratch0);
+    code.addi_d(code.a4, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
+    code.CallFunction(&FP::FPMulAdd<FPT>);
+    code.movgr2fr_d(result, code.a0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ULL << (result->getIdx() + 32)), 0);
+
+//    EmitFourOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& D1, auto& D2) { code.fmadd_d(Dresult, D1, D2, Da); });
 }
 
 template<>

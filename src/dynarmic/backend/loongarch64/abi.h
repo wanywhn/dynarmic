@@ -79,7 +79,9 @@ constexpr RegisterList ToRegList(Xbyak_loongarch64::Reg reg) {
 // constexpr RegisterList ABI_CALLEE_SAVE = 0x0000ff00'7ff80000;
 constexpr RegisterList ABI_CALLEE_SAVE = 0xff000000'ff800000;
 // constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'4000ffff;
-constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'001FFFF0;
+constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'001FFFF2;
+//constexpr RegisterList ABI_CALLER_SAVE = 0x000000ff'001FFFF0;
+
 
 void ABI_PushRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, size_t stack_space);
 void ABI_PopRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, size_t stack_space);
