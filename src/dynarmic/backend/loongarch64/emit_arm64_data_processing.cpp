@@ -1520,14 +1520,14 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::ByteReverseWord>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<32>(
                 code, ctx, inst,
-                [&](auto &Wresult, auto &Woperand) { code.revb_d(Wresult, Woperand); });
+                [&](auto &Wresult, auto &Woperand) { code.revb_2w(Wresult, Woperand); });
     }
 
     template<>
     void EmitIR<IR::Opcode::ByteReverseHalf>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         EmitTwoOp<32>(
                 code, ctx, inst,
-                [&](auto &Wresult, auto &Woperand) { code.revh_2w(Wresult, Woperand); });
+                [&](auto &Wresult, auto &Woperand) { code.revb_4h(Wresult, Woperand); });
     }
 
     template<>
