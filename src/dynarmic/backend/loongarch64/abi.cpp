@@ -70,7 +70,7 @@ void ABI_PushRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, 
     code.sub_imm(code.sp, code.sp, frame_info.gprs_size + frame_info.fprs_size, code.t0);
     // NOTE: seems Xbyak's stptr* 's si14 don't behave as doc[2.2.5.3] says will (si14 << 2), so st_d will also OK
     DO_IT(gpr, XReg, st_d, 0)
-    DO_IT(fpr, XReg, fst_d, frame_info.gprs_size)
+    DO_IT(fpr, VReg, fst_d, frame_info.gprs_size)
 
     code.sub_imm(code.sp, code.sp, frame_info.frame_size, code.t0);
 }
@@ -81,7 +81,7 @@ void ABI_PopRegisters(Xbyak_loongarch64::CodeGenerator& code, RegisterList rl, s
     code.add_imm(code.sp, code.sp, frame_info.frame_size, code.t0);
 
     DO_IT(gpr, XReg, ldptr_d, 0)
-    DO_IT(fpr, XReg, fld_d, frame_info.gprs_size)
+    DO_IT(fpr, VReg, fld_d, frame_info.gprs_size)
 
     code.add_imm(code.sp, code.sp, frame_info.gprs_size + frame_info.fprs_size, code.t0);
 }

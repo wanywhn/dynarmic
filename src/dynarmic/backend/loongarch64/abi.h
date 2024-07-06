@@ -29,7 +29,7 @@ constexpr size_t ABI_PARAM_COUNT = 6;
 constexpr Xbyak_loongarch64::XReg Xscratch0{18}, Xscratch1{19}, Xscratch2{20};
 constexpr Xbyak_loongarch64::WReg Wscratch0{18}, Wscratch1{19}, Wscratch2{20};
 
-constexpr Xbyak_loongarch64::WReg Fscratch0{21}, Fscratch1{22}, Fscratch2{23};
+constexpr Xbyak_loongarch64::VReg Fscratch0{21}, Fscratch1{22}, Fscratch2{23};
 constexpr Xbyak_loongarch64::VReg Vscratch0{21}, Vscratch1{22}, Vscratch2{23};
 
 // TODO no need in LoongArch ,LoongArch use instruction to distinguish

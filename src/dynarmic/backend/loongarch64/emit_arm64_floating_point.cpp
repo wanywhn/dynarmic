@@ -74,14 +74,14 @@ using namespace Xbyak_loongarch64::util;
 
 
     template<size_t fsize>
-    void ForceToDefaultNaN(BlockOfCode& code, Xbyak_loongarch64::XReg result) {
+    void ForceToDefaultNaN(BlockOfCode& code, Xbyak_loongarch64::VReg result) {
 
         Xbyak_loongarch64::Label end;
         FCODE(fcmp_sun_)(0, result, result);
         code.movcf2gr(Xscratch0, 0);
         code.beqz(Xscratch0, end);
         code.add_imm(Xscratch0, code.zero, fsize == 32 ? f32_nan : f64_nan, Xscratch2);
-        code.fmov_s(result, Xscratch0);
+        code.movgr2fr_d(result, Xscratch0);
         code.L(end);
 
     }
@@ -89,8 +89,8 @@ using namespace Xbyak_loongarch64::util;
 template<size_t bitsize, typename EmitFn>
 static void EmitTwoOp(BlockOfCode&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Vresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
-    auto Voperand = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
+    auto Vresult = ctx.reg_alloc.WriteQ(inst);
+    auto Voperand = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Vresult, Voperand);
 
     emit(Vresult, Voperand);
@@ -99,15 +99,15 @@ static void EmitTwoOp(BlockOfCode&, EmitContext& ctx, IR::Inst* inst, EmitFn emi
 template<size_t bitsize, typename EmitFn>
 static void EmitThreeOp(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Vresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
-    auto Va = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
-    auto Vb = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
+    auto Vresult = ctx.reg_alloc.WriteQ(inst);
+    auto Va = ctx.reg_alloc.ReadQ(args[0]);
+    auto Vb = ctx.reg_alloc.ReadQ(args[1]);
     RegAlloc::Realize(Vresult, Va, Vb);
 
     if (ctx.FPCR().DN() || ctx.conf.HasOptimization(OptimizationFlag::Unsafe_InaccurateNaN)) {
-            code.movfcsr2gr(Wscratch0, Fscratch1);
+            code.movfcsr2gr(Wscratch0, code.fcsr1);
             code.bstrins_w(Wscratch0, code.zero, 4, 4);
-            code.movgr2fcsr(Fscratch1, Wscratch0);
+            code.movgr2fcsr(code.fcsr1, Wscratch0);
             emit(Vresult, Va, Vb);
 
 
@@ -124,10 +124,10 @@ static void EmitThreeOp(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, Emi
 template<size_t bitsize, typename EmitFn>
 static void EmitFourOp(BlockOfCode&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Vresult = ctx.reg_alloc.WriteReg<bitsize>(inst);
-    auto Va = ctx.reg_alloc.ReadReg<bitsize>(args[0]);
-    auto Vb = ctx.reg_alloc.ReadReg<bitsize>(args[1]);
-    auto Vc = ctx.reg_alloc.ReadReg<bitsize>(args[2]);
+    auto Vresult = ctx.reg_alloc.WriteQ(inst);
+    auto Va = ctx.reg_alloc.ReadQ(args[0]);
+    auto Vb = ctx.reg_alloc.ReadQ(args[1]);
+    auto Vc = ctx.reg_alloc.ReadQ(args[2]);
     RegAlloc::Realize(Vresult, Va, Vb, Vc);
     ctx.fpsr.Load();
 
@@ -152,8 +152,8 @@ namespace mp = mcl::mp;
 template<size_t bitsize_from, size_t bitsize_to, bool is_signed>
 static void EmitToFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Rto = ctx.reg_alloc.WriteReg<std::max<size_t>(bitsize_to, 32)>(inst);
-    auto Vfrom = ctx.reg_alloc.ReadReg<bitsize_from>(args[0]);
+    auto Rto = ctx.reg_alloc.WriteQ(inst);
+    auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     const size_t fbits = args[1].GetImmediateU8();
     const auto rounding_mode = static_cast<FP::RoundingMode>(args[2].GetImmediateU8());
     RegAlloc::Realize(Rto, Vfrom);
@@ -188,15 +188,15 @@ static void EmitToFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     code.add_imm(code.a2, code.zero, ctx.FPCR().Value(), Xscratch2);
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(lut.at(std::make_tuple(fbits, rounding_mode))), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
-    code.add_d(Rto, code.zero, code.a0);
+    code.movgr2fr_d(Rto, code.a0);
     ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
 }
 
 template<size_t bitsize_from, size_t bitsize_to, typename EmitFn>
 static void EmitFromFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-    auto Vto = ctx.reg_alloc.WriteReg<bitsize_to>(inst);
-    auto Rfrom = ctx.reg_alloc.ReadReg<std::max<size_t>(bitsize_from, 32)>(args[0]);
+    auto Vto = ctx.reg_alloc.WriteQ(inst);
+    auto Rfrom = ctx.reg_alloc.ReadQ(args[0]);
     const size_t fbits = args[1].GetImmediateU8();
     const auto rounding_mode = static_cast<FP::RoundingMode>(args[2].GetImmediateU8());
     RegAlloc::Realize(Vto, Rfrom);
@@ -288,8 +288,8 @@ template<size_t size>
 void EmitCompare(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     auto flags = ctx.reg_alloc.WriteReg<32>(inst);
-    auto Va = ctx.reg_alloc.ReadReg<size>(args[0]);
-    auto Vb = ctx.reg_alloc.ReadReg<size>(args[1]);
+    auto Va = ctx.reg_alloc.ReadQ(args[0]);
+    auto Vb = ctx.reg_alloc.ReadQ(args[1]);
 
     const bool exc_on_qnan = args[2].GetImmediateU1();
 
@@ -451,8 +451,8 @@ void EmitIR<IR::Opcode::FPRecipEstimate64>(BlockOfCode& code, EmitContext& ctx, 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
 
-        auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-        auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+        auto Rto = ctx.reg_alloc.WriteQ(inst);
+        auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
         RegAlloc::Realize(Rto, Vfrom);
 
         ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
@@ -462,7 +462,7 @@ void EmitIR<IR::Opcode::FPRecipEstimate64>(BlockOfCode& code, EmitContext& ctx, 
         code.addi_d(code.a2, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPRecipExponent<FPT>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
-        code.add_d(Rto, code.zero, code.a0);
+        code.movgr2fr_d(Rto, code.a0);
         ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
     }
 
@@ -488,22 +488,23 @@ void EmitIR<IR::Opcode::FPRecipExponent64>(BlockOfCode& code, EmitContext& ctx, 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
 
-        auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-        auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
-        auto arg1 = ctx.reg_alloc.ReadReg<64>(args[1]);
+        auto Rto = ctx.reg_alloc.WriteQ(inst);
+        auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
+        auto arg1 = ctx.reg_alloc.ReadQ(args[1]);
 
         RegAlloc::Realize(Rto, Vfrom);
 
         ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
         code.movfr2gr_d(Wscratch0, Vfrom);
         code.add_d(code.a0, code.zero, Wscratch0);
-        code.add_d(code.a1, code.zero, arg1);
+        code.movfr2gr_d(Wscratch0, arg1);
+        code.add_d(code.a1, code.zero, Wscratch0);
         code.add_imm(code.a2, code.zero, ctx.FPCR().Value(), Xscratch2);
         code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
 
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPRecipStepFused<FPT>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
-        code.add_d(Rto, code.zero, code.a0);
+        code.movgr2fr_d(Rto, code.a0);
         ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
     }
 
@@ -558,8 +559,8 @@ void EmitIR<IR::Opcode::FPRecipStepFused64>(BlockOfCode& code, EmitContext& ctx,
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-        auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-        auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+        auto Rto = ctx.reg_alloc.WriteQ(inst);
+        auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
         RegAlloc::Realize(Rto, Vfrom);
 
         ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
@@ -570,7 +571,7 @@ void EmitIR<IR::Opcode::FPRecipStepFused64>(BlockOfCode& code, EmitContext& ctx,
 
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(lut.at(std::make_tuple(fsize, rounding_mode, exact))), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
-        code.add_d(Rto, code.zero, code.a0);
+        code.movgr2fr_d(Rto, code.a0);
         ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
     }
 
@@ -596,8 +597,8 @@ void EmitIR<IR::Opcode::FPRoundInt64>(BlockOfCode& code, EmitContext& ctx, IR::I
 
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-        auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-        auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+        auto Rto = ctx.reg_alloc.WriteQ(inst);
+        auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
         RegAlloc::Realize(Rto, Vfrom);
 
         ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
@@ -607,7 +608,7 @@ void EmitIR<IR::Opcode::FPRoundInt64>(BlockOfCode& code, EmitContext& ctx, IR::I
         code.addi_d(code.a2, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPRSqrtEstimate<FPT>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
-        code.add_d(Rto, code.zero, code.a0);
+        code.movgr2fr_d(Rto, code.a0);
         ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
 
 
@@ -672,8 +673,8 @@ void EmitIR<IR::Opcode::FPHalfToDouble>(BlockOfCode& code, EmitContext& ctx, IR:
     const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    auto Rto = ctx.reg_alloc.WriteQ(inst);
+    auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
     ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
@@ -684,7 +685,7 @@ void EmitIR<IR::Opcode::FPHalfToDouble>(BlockOfCode& code, EmitContext& ctx, IR:
     code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u64, u16>), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
-    code.add_d(Rto, code.zero, code.a0);
+    code.movgr2fr_d(Rto, code.a0);
     ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
 
 }
@@ -694,8 +695,8 @@ void EmitIR<IR::Opcode::FPHalfToSingle>(BlockOfCode& code, EmitContext& ctx, IR:
     const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    auto Rto = ctx.reg_alloc.WriteQ(inst);
+    auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
     ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
@@ -706,7 +707,7 @@ void EmitIR<IR::Opcode::FPHalfToSingle>(BlockOfCode& code, EmitContext& ctx, IR:
     code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u32, u16>), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
-    code.add_d(Rto, code.zero, code.a0);
+    code.movgr2fr_d(Rto, code.a0);
     ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
 }
 
@@ -715,8 +716,8 @@ void EmitIR<IR::Opcode::FPSingleToDouble>(BlockOfCode& code, EmitContext& ctx, I
     const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    auto Rto = ctx.reg_alloc.WriteQ(inst);
+    auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
     // We special-case the non-IEEE-defined ToOdd rounding mode.
@@ -735,7 +736,7 @@ void EmitIR<IR::Opcode::FPSingleToDouble>(BlockOfCode& code, EmitContext& ctx, I
         code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u64, u32>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
-        code.add_d(Rto, code.zero, code.a0);
+        code.movgr2fr_d(Rto, code.a0);
         ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
     }}
 
@@ -744,8 +745,8 @@ void EmitIR<IR::Opcode::FPSingleToHalf>(BlockOfCode& code, EmitContext& ctx, IR:
     const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    auto Rto = ctx.reg_alloc.WriteQ(inst);
+    auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
     ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
@@ -756,7 +757,7 @@ void EmitIR<IR::Opcode::FPSingleToHalf>(BlockOfCode& code, EmitContext& ctx, IR:
     code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u16, u32>), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
-    code.add_d(Rto, code.zero, code.a0);
+    code.movgr2fr_d(Rto, code.a0);
     ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
 }
 
@@ -765,8 +766,8 @@ void EmitIR<IR::Opcode::FPDoubleToHalf>(BlockOfCode& code, EmitContext& ctx, IR:
     const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    auto Rto = ctx.reg_alloc.WriteQ(inst);
+    auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
     ABI_PushRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
@@ -777,7 +778,7 @@ void EmitIR<IR::Opcode::FPDoubleToHalf>(BlockOfCode& code, EmitContext& ctx, IR:
     code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u16, u64>), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
-    code.add_d(Rto, code.zero, code.a0);
+    code.movgr2fr_d(Rto, code.a0);
     ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
 }
 
@@ -786,8 +787,8 @@ void EmitIR<IR::Opcode::FPDoubleToSingle>(BlockOfCode& code, EmitContext& ctx, I
     const auto rounding_mode = static_cast<FP::RoundingMode>(inst->GetArg(1).GetU8());
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-    auto Rto = ctx.reg_alloc.WriteReg<32>(inst);
-    auto Vfrom = ctx.reg_alloc.ReadReg<64>(args[0]);
+    auto Rto = ctx.reg_alloc.WriteQ(inst);
+    auto Vfrom = ctx.reg_alloc.ReadQ(args[0]);
     RegAlloc::Realize(Rto, Vfrom);
 
     // We special-case the non-IEEE-defined ToOdd rounding mode.
@@ -806,7 +807,7 @@ void EmitIR<IR::Opcode::FPDoubleToSingle>(BlockOfCode& code, EmitContext& ctx, I
         code.addi_d(code.a3, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
         code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(&FP::FPConvert<u32, u64>), Xscratch2);
         code.jirl(code.ra, Xscratch0, 0);
-        code.add_d(Rto, code.zero, code.a0);
+        code.movgr2fr_d(Rto, code.a0);
         ABI_PopRegisters(code, ABI_CALLER_SAVE & ~(1ull << Rto->getIdx()) & ~(1ull << Vfrom->getIdx()), 0);
     }
 }
@@ -926,8 +927,7 @@ void EmitIR<IR::Opcode::FPSingleToFixedU64>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::FPFixedU16ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
-        code.bstrpick_w(Wscratch0, Wfrom, 15, 0);
-        code.ffint_s_w(Sto, Wscratch0);
+        code.ffint_s_w(Sto, Wfrom);
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
@@ -941,8 +941,7 @@ void EmitIR<IR::Opcode::FPFixedU16ToSingle>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::FPFixedS16ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
-        code.add_w(Wscratch0, code.zero, Wfrom);
-        code.ffint_s_w(Sto, Wscratch0);
+        code.ffint_s_w(Sto, Wfrom);
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
@@ -956,8 +955,7 @@ void EmitIR<IR::Opcode::FPFixedS16ToSingle>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::FPFixedU16ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
-        code.bstrpick_w(Wscratch0, Wfrom, 15, 0);
-        code.ffint_d_w(Dto, Wscratch0);
+        code.ffint_d_w(Dto, Wfrom);
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
@@ -971,8 +969,7 @@ void EmitIR<IR::Opcode::FPFixedU16ToDouble>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::FPFixedS16ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<16, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
-        code.add_w(Wscratch0, code.zero, Wfrom);
-        code.ffint_d_w(Dto, Wscratch0);
+        code.ffint_d_w(Dto, Wfrom);
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
@@ -985,8 +982,7 @@ template<>
 void EmitIR<IR::Opcode::FPFixedU32ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
     EmitFromFixed<32, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
-        code.bstrpick_d(Xscratch0, Wfrom, 31, 0);
-        code.ffint_s_w(Sto, Xscratch0);
+        code.ffint_s_w(Sto, Wfrom);
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
@@ -1001,8 +997,7 @@ template<>
 void EmitIR<IR::Opcode::FPFixedS32ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
     EmitFromFixed<32, 32>(code, ctx, inst, [&](auto& Sto, auto& Wfrom, u8 fbits) {
-        code.add_d(Wscratch0, code.zero, Wfrom);
-        code.ffint_s_l(Sto, Wscratch0);
+        code.ffint_s_w(Sto, Wfrom);
         if (fbits != 0) {
             const u32 scale_factor = static_cast<u32>((127 - fbits) << 23);
             code.add_imm(Wscratch0, code.zero, scale_factor, Wscratch2);
@@ -1017,8 +1012,7 @@ void EmitIR<IR::Opcode::FPFixedS32ToSingle>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::FPFixedU32ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<32, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
-        code.bstrpick_d(Xscratch0, Wfrom, 31, 0);
-        code.ffint_d_w(Dto, Xscratch0);
+        code.ffint_s_l(Dto, Wfrom);
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
@@ -1032,8 +1026,7 @@ void EmitIR<IR::Opcode::FPFixedU32ToDouble>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::FPFixedS32ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<32, 64>(code, ctx, inst, [&](auto& Dto, auto& Wfrom, u8 fbits) {
-        code.add_d(Wscratch0, code.zero, Wfrom);
-        code.ffint_d_w(Dto, Xscratch0);
+        code.ffint_s_l(Dto, Wfrom);
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
@@ -1047,8 +1040,7 @@ template<>
 void EmitIR<IR::Opcode::FPFixedU64ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
     EmitFromFixed<64, 64>(code, ctx, inst, [&](auto& Dto, auto& Xfrom, u8 fbits) {
-        code.bstrpick_d(Xscratch0, Xfrom, 63, 0);
-        code.ffint_d_l(Dto, Xscratch0);
+        code.ffint_d_l(Dto, Xfrom);
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
@@ -1061,8 +1053,7 @@ void EmitIR<IR::Opcode::FPFixedU64ToDouble>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::FPFixedU64ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<64, 32>(code, ctx, inst, [&](auto& Sto, auto& Xfrom, u8 fbits) {
-        code.bstrpick_d(Xscratch0, Xfrom, 63, 0);
-        code.ffint_s_l(Sto, Xscratch0);
+        code.ffint_d_w(Sto, Xfrom);
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
@@ -1077,8 +1068,7 @@ template<>
 void EmitIR<IR::Opcode::FPFixedS64ToDouble>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
     EmitFromFixed<64, 64>(code, ctx, inst, [&](auto& Dto, auto& Xfrom, u8 fbits) {
-        code.add_d(Wscratch0, code.zero, Xfrom);
-        code.ffint_d_w(Dto, Xscratch0);
+        code.ffint_d_l(Dto, Xfrom);
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);
@@ -1091,8 +1081,7 @@ void EmitIR<IR::Opcode::FPFixedS64ToDouble>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::FPFixedS64ToSingle>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitFromFixed<64, 32>(code, ctx, inst, [&](auto& Sto, auto& Xfrom, u8 fbits) {
-        code.add_d(Wscratch0, code.zero, Xfrom);
-        code.ffint_s_w(Sto, Xscratch0);
+        code.ffint_d_w(Sto, Xfrom);
         if (fbits != 0) {
             const u64 scale_factor = static_cast<u64>((1023ul - fbits) << 52);
             code.add_imm(Xscratch0, code.zero, scale_factor, Xscratch2);

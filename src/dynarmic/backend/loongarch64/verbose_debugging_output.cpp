@@ -36,7 +36,7 @@ void EmitVerboseDebuggingOutput(BlockOfCode& code, EmitContext& ctx) {
     ctx.reg_alloc.EmitVerboseDebuggingOutput();
 
     code.ld_d(Xscratch0, code.sp, offsetof(RegisterData, fpsr));
-    code.movgr2fcsr(Xscratch0, code.fcsr0);
+    code.movgr2fcsr(code.fcsr0,Xscratch0);
     for (unsigned int i = 0; i < 32; i++) {
         code.vld(Xbyak_loongarch64::VReg{i}, code.sp, offsetof(RegisterData, q) + i * sizeof(Vector));
     }

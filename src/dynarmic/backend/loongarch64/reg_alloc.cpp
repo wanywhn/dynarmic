@@ -546,7 +546,7 @@ void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::XReg reg)
 void RegAlloc::LoadCopyInto(const IR::Value& value, Xbyak_loongarch64::VReg reg) {
     if (value.IsImmediate()) {
         code.add_imm(Xscratch0, code.zero, value.GetImmediateAsU64(), Xscratch1);
-        code.movgr2fr_d(Xbyak_loongarch64::XReg{reg.getIdx()}, Xscratch0);
+        code.movgr2fr_d(reg, Xscratch0);
         return;
     }
 

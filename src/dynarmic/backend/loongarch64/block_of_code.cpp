@@ -159,32 +159,32 @@ void BlockOfCode::SwitchMxcsrOnEntry() {
 }
 
 void BlockOfCode::SwitchMxcsrOnExit() {
-    movfcsr2gr(Wscratch0, Wscratch0);
+    movfcsr2gr(Wscratch0, fcsr0);
     st_w(Wscratch0, Xstate, jsi.offsetof_guest_FCSR);
 
     ld_w(Wscratch0, sp, offsetof(StackLayout, save_host_fpcr));
-    movgr2fcsr(Wscratch0, Wscratch0);
+    movgr2fcsr(fcsr0, Wscratch0);
     // FIXME r15?
 
 //    stmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
 }
 
 void BlockOfCode::EnterStandardASIMD() {
-    movfcsr2gr(Wscratch0, Wscratch0);
+    movfcsr2gr(Wscratch0, fcsr0);
     st_w(Wscratch0, Xstate, jsi.offsetof_guest_FCSR);
 
     ld_w(Wscratch0, Xstate, jsi.offsetof_asimd_MXCSR);
-    movgr2fcsr(Wscratch0, Wscratch0);
+    movgr2fcsr(fcsr0, Wscratch0);
 //    stmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
 //    ldmxcsr(dword[r15 + jsi.offsetof_asimd_MXCSR]);
 }
 
 void BlockOfCode::LeaveStandardASIMD() {
-    movfcsr2gr(Wscratch0, Wscratch0);
+    movfcsr2gr(Wscratch0, fcsr0);
     st_w(Wscratch0, Xstate, jsi.offsetof_asimd_MXCSR);
 
     ld_w(Wscratch0, Xstate, jsi.offsetof_guest_FCSR);
-    movgr2fcsr(Wscratch0, Wscratch0);
+    movgr2fcsr(fcsr0, Wscratch0);
 //    stmxcsr(dword[r15 + jsi.offsetof_asimd_MXCSR]);
 //    ldmxcsr(dword[r15 + jsi.offsetof_guest_FCSR]);
 }
