@@ -1076,25 +1076,53 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void
     EmitIR<IR::Opcode::VectorLogicalVShift8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsll_b(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+            code.addi_w(Xscratch0, code.zero, 0x7);
+            code.vreplgr2vr_b(Vscratch1, Xscratch0);
+            code.vsle_bu(Vscratch0, Vb, Vscratch1);
+            code.vsll_b(Vresult, Va, Vb);
+            code.vand_v(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorLogicalVShift16>(BlockOfCode &code, EmitContext &ctx,
                                                    IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsll_h(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+            code.addi_w(Xscratch0, code.zero, 0xf);
+            code.vreplgr2vr_h(Vscratch1, Xscratch0);
+            code.vsle_hu(Vscratch0, Vb, Vscratch1);
+            code.vsll_h(Vresult, Va, Vb);
+            code.vand_v(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorLogicalVShift32>(BlockOfCode &code, EmitContext &ctx,
                                                    IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsll_w(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+            code.addi_w(Xscratch0, code.zero, 0x1f);
+            code.vreplgr2vr_w(Vscratch1, Xscratch0);
+            code.vsle_wu(Vscratch0, Vb, Vscratch1);
+            code.vsll_w(Vresult, Va, Vb);
+            code.vand_v(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::VectorLogicalVShift64>(BlockOfCode &code, EmitContext &ctx,
                                                    IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) { code.vsll_d(Vresult, Va, Vb); });
+        EmitThreeOp(code, ctx, inst, [&](auto Vresult, auto Va, auto Vb) {
+            code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+            code.addi_w(Xscratch0, code.zero, 0x3f);
+            code.vreplgr2vr_w(Vscratch1, Xscratch0);
+            code.vsle_du(Vscratch0, Vb, Vscratch1);
+            code.vsll_d(Vresult, Va, Vb);
+            code.vand_v(Vresult, Vresult, Vscratch0);
+        });
     }
 
     template<>
