@@ -299,7 +299,7 @@ void A32AddressSpace::EmitPrelude() {
         code.bnez(Wscratch0, return_from_run_code);
         code.ori(Wscratch1, Wscratch0, static_cast<u32>(HaltReason::Step));
         code.sc_d(Wscratch1, Xhalt, 0);
-        code.bnez(Wscratch1, step_hr_loop);
+        code.beqz(Wscratch1, step_hr_loop);
 
         code.jirl(code.zero, code.s0, 0);
     }

@@ -473,7 +473,7 @@ void A64AddressSpace::EmitPrelude() {
         code.or_(Wscratch0, Wscratch0, Wscratch1);
         code.add_d(Wscratch1, code.zero, Wscratch0);
         code.sc_d(Wscratch1, Xhalt, 0);
-        code.bnez(Wscratch1, step_hr_loop);
+        code.beqz(Wscratch1, step_hr_loop);
 
         code.jirl(code.zero, code.s0, 0);
     }

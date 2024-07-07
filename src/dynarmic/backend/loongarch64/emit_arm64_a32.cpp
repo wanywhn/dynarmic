@@ -738,25 +738,23 @@ namespace Dynarmic::Backend::LoongArch64 {
             const u32 new_upper = upper_without_t | (mcl::bit::get_bit<0>(new_pc) ? 1 : 0);
             // TODO check if eq to stp
             code.add_imm(Xscratch0, code.zero, (u64{new_upper} << 32) | (new_pc & mask), Xscratch1);
-            code.st_w(Xscratch0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
+            code.st_d(Xscratch0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
 //            code.STUR(Xscratch0, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
         } else {
             auto Wpc = ctx.reg_alloc.ReadW(args[0]);
             RegAlloc::Realize(Wpc);
             ctx.reg_alloc.SpillFlags();
+            Xbyak_loongarch64::WReg mask= Wscratch0;
 
             code.add_imm(Wscratch2,  code.zero, upper_without_t, Wscratch1);
-            code.andi(Wscratch0, Wpc, 1);
-//            code.bstrpick_d(Wscratch1, Wscratch0, 0, 0);
-            code.or_(Wscratch2, Wscratch2, Wscratch0);
+            code.andi(mask, Wpc, 0b1);
+            code.or_(Wscratch2, Wscratch2, mask);
             code.st_w(Wscratch2, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32) + sizeof(u32));
 
-            code.addi_w(Wscratch0, Wscratch0, 1);
-            code.andi(Wscratch0, Wscratch0, 0x1);
-            code.slli_w(Wscratch0, Wscratch0, 1);
+            code.slli_w(mask, mask, 1);
+            code.addi_w(mask, mask, -4); // mask = pc & 1 ? 0xFFFFFFFE : 0xFFFFFFFC
+            code.and_(Wpc, Wpc, mask);
 
-            code.bstrins_d(Wpc, code.zero, 0, 0);
-            code.orn(Wpc, Wpc, Wscratch0);
             code.st_w(Wpc, Xstate, offsetof(A32JitState, regs) + 15 * sizeof(u32));
         }
     }
