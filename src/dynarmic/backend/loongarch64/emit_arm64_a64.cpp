@@ -278,7 +278,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto Wflag = ctx.reg_alloc.WriteW(inst);
         RegAlloc::Realize(Wflag);
         code.ld_w(Wflag, Xstate, offsetof(A64JitState, cpsr_nzcv));
-        code.andi(Wflag, Wflag, NZCV::arm_c_flag_mask);
+        code.bstrpick_w(Wflag, Wflag, NZCV::arm_c_flag_inner_sft, NZCV::arm_c_flag_inner_sft);
     }
 
     template<>
