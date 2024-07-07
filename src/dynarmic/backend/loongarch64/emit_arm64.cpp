@@ -255,6 +255,11 @@ void EmitBlockLinkRelocation(BlockOfCode& code, EmitContext& ctx, const IR::Loca
     case BlockRelocationType::MoveToScratch1:
         code.break_(0);
         code.nop();
+        code.nop();
+        code.nop();
+        code.nop();
+        code.nop();
+        // this should enough. it depedent on how add_imm imp
         break;
     default:
         UNREACHABLE();
