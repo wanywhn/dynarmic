@@ -262,15 +262,11 @@ static void EmitPackedAddSub(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst
         code.ext_w_h(reg_b_lo, reg_b_hi);
         code.srai_w(reg_a_hi, reg_a_hi, 16);
         code.srai_w(reg_b_hi, reg_b_hi, 16);
-//        code.SXTL(V0.S4(), Va->H4());
-//        code.SXTL(V1.S4(), Vb->H4());
     } else {
-        code.bstrins_w(reg_a_lo, reg_a_hi, 15, 0);
-        code.bstrins_w(reg_b_lo, reg_b_hi, 15, 0);
-        code.srli_d(reg_a_hi, reg_a_hi, 16);
-        code.srli_d(reg_b_hi, reg_b_hi, 16);
-//        code.UXTL(V0.S4(), Va->H4());
-//        code.UXTL(V1.S4(), Vb->H4());
+        code.bstrpick_w(reg_a_lo, reg_a_hi, 15, 0);
+        code.bstrpick_w(reg_b_lo, reg_b_hi, 15, 0);
+        code.srli_w(reg_a_hi, reg_a_hi, 16);
+        code.srli_w(reg_b_hi, reg_b_hi, 16);
     }
 
     if (add_is_hi) {
@@ -310,12 +306,18 @@ static void EmitPackedAddSub(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst
         code.or_(Vge, ge_sum, ge_diff);
     }
 
-    code.bstrins_w(reg_a_hi, reg_a_lo, 15, 0);
     if(is_halving) {
-        code.srli_w(Vresult, reg_a_hi, 1);
+        code.srli_w(reg_a_lo, reg_a_lo, 1);
+        code.srli_w(reg_a_hi, reg_a_hi, 1);
     } else {
-        code.add_w(Vresult, code.zero, reg_a_hi);
+        code.slli_w(reg_a_lo, reg_a_lo, 16);
     }
+
+    // reg_a_lo now contains the low word and reg_a_hi now contains the high word.
+    // Merge them.
+    code.bstrins_w(Vresult, reg_a_hi, 31, 16);
+    code.bstrins_w(Vresult, reg_a_lo, 15, 0);
+
 }
 
 template<>
