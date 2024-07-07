@@ -309,8 +309,6 @@ static void EmitPackedAddSub(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst
     if(is_halving) {
         code.srli_w(reg_a_lo, reg_a_lo, 1);
         code.srli_w(reg_a_hi, reg_a_hi, 1);
-    } else {
-        code.slli_w(reg_a_lo, reg_a_lo, 16);
     }
 
     // reg_a_lo now contains the low word and reg_a_hi now contains the high word.
