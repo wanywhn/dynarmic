@@ -1449,7 +1449,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xoperand) {
                     code.ext_w_h(Wscratch0, Xoperand);
-                    code.add_w(Xresult, code.zero, Wscratch0);
+                    code.bstrins_w(Xresult, Wscratch0, 31, 0);
                 });
     }
 

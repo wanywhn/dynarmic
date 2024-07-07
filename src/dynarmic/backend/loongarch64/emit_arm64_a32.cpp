@@ -391,8 +391,8 @@ namespace Dynarmic::Backend::LoongArch64 {
         RegAlloc::Realize(Svalue);
 
         // TODO: Detect if Gpr vs Fpr is more appropriate
-        code.vpickve2gr_w(Xscratch0, Svalue, 0);
-        code.st_w(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
+        code.vstelm_w(Svalue, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index, 0);
+
     }
 
     template<>
@@ -405,10 +405,8 @@ namespace Dynarmic::Backend::LoongArch64 {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Dvalue = ctx.reg_alloc.ReadD(args[1]);
         RegAlloc::Realize(Dvalue);
-
         // TODO: Detect if Gpr vs Fpr is more appropriate
-        code.vpickve2gr_d(Xscratch0, Dvalue, 0);
-        code.st_d(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index);
+        code.vstelm_d(Dvalue, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u32) * index, 0);
     }
 
     template<>

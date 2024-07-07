@@ -149,7 +149,7 @@ static void EmitConvert(BlockOfCode&, EmitContext& ctx, IR::Inst* inst, EmitFn e
 }
 namespace mp = mcl::mp;
 
-template<size_t bitsize_from, size_t bitsize_to, bool is_signed>
+template<size_t bitsize_from, size_t bitsize_to, bool unsigned_>
 static void EmitToFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
     auto Rto = ctx.reg_alloc.WriteQ(inst);
@@ -177,11 +177,11 @@ static void EmitToFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
                                     constexpr FP::RoundingMode rounding_mode = mp::get<1, I>::value;
                                     using FPT = mcl::unsigned_integer_of_size<bitsize_from>;
 
-                                    return FP::FPToFixed<FPT>(bitsize_to, static_cast<FPT>(input), fbits, is_signed, fpcr, rounding_mode, fpsr);
+                                    return FP::FPToFixed<FPT>(bitsize_to, static_cast<FPT>(input), fbits, unsigned_, fpcr, rounding_mode, fpsr);
                                 })};
             },
             mp::cartesian_product<fbits_list, rounding_list>{});
-    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
+    ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto), 0);
     code.movfr2gr_d(Wscratch0, Vfrom);
     code.add_d(code.a0, code.zero, Wscratch0);
     code.addi_d(code.a1, Xstate, code.GetJitStateInfo().offsetof_fpsr_exc);
@@ -189,7 +189,7 @@ static void EmitToFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     code.add_imm(Xscratch0, code.zero, mcl::bit_cast<u64>(lut.at(std::make_tuple(fbits, rounding_mode))), Xscratch2);
     code.jirl(code.ra, Xscratch0, 0);
     code.movgr2fr_d(Rto, code.a0);
-    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto) & ~ToRegList(*Vfrom), 0);
+    ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*Rto), 0);
 }
 
 template<size_t bitsize_from, size_t bitsize_to, typename EmitFn>
@@ -881,34 +881,34 @@ void EmitIR<IR::Opcode::FPDoubleToSingle>(BlockOfCode& code, EmitContext& ctx, I
 
 template<>
 void EmitIR<IR::Opcode::FPDoubleToFixedS16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitToFixed<64, 16, true>(code, ctx, inst);
+    EmitToFixed<64, 16, false>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPDoubleToFixedS32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitToFixed<64, 32, true>(code, ctx, inst);
+    EmitToFixed<64, 32, false>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPDoubleToFixedS64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
-    EmitToFixed<64, 64, true>(code, ctx, inst);
+    EmitToFixed<64, 64, false>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPDoubleToFixedU16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitToFixed<64, 16, false>(code, ctx, inst);
+    EmitToFixed<64, 16, true>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPDoubleToFixedU32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitToFixed<64, 32, false>(code, ctx, inst);
+    EmitToFixed<64, 32, true>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPDoubleToFixedU64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
-    EmitToFixed<64, 64, false>(code, ctx, inst);
+    EmitToFixed<64, 64, true>(code, ctx, inst);
 }
 
 template<>
@@ -961,34 +961,34 @@ void EmitIR<IR::Opcode::FPHalfToFixedU64>(BlockOfCode& code, EmitContext& ctx, I
 
 template<>
 void EmitIR<IR::Opcode::FPSingleToFixedS16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitToFixed<32, 16, true>(code, ctx, inst);
+    EmitToFixed<32, 16, false>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPSingleToFixedS32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
-    EmitToFixed<32, 32, true>(code, ctx, inst);
+    EmitToFixed<32, 32, false>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPSingleToFixedS64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitToFixed<32, 64, true>(code, ctx, inst);
+    EmitToFixed<32, 64, false>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPSingleToFixedU16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitToFixed<32, 16, false>(code, ctx, inst);
+    EmitToFixed<32, 16, true>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPSingleToFixedU32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     // TODO: Consider fpr source
-    EmitToFixed<32, 32, false>(code, ctx, inst);
+    EmitToFixed<32, 32, true>(code, ctx, inst);
 }
 
 template<>
 void EmitIR<IR::Opcode::FPSingleToFixedU64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitToFixed<32, 64, false>(code, ctx, inst);
+    EmitToFixed<32, 64, true>(code, ctx, inst);
 }
 
 template<>
