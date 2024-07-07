@@ -24,9 +24,9 @@ template<typename EmitFn>
 static void EmitPackedOp(BlockOfCode&, EmitContext& ctx, IR::Inst* inst, EmitFn emit) {
     auto args = ctx.reg_alloc.GetArgumentInfo(inst);
 
-    auto Vresult = ctx.reg_alloc.WriteXV(inst);
-    auto Va = ctx.reg_alloc.ReadXV(args[0]);
-    auto Vb = ctx.reg_alloc.ReadXV(args[1]);
+    auto Vresult = ctx.reg_alloc.WriteQ(inst);
+    auto Va = ctx.reg_alloc.ReadQ(args[0]);
+    auto Vb = ctx.reg_alloc.ReadQ(args[1]);
     RegAlloc::Realize(Vresult, Va, Vb);
 
     emit(Vresult, Va, Vb);
@@ -344,14 +344,14 @@ void EmitIR<IR::Opcode::PackedHalvingAddU8>(BlockOfCode& code, EmitContext& ctx,
         // TODO diff bettwen avgr?
 //        code.xvavg_bu(Vresult, Va, Vb);
         // FIXME
-        code.xvavg_bu(Vresult, Va, Vb);
+        code.vavg_bu(Vresult, Va, Vb);
     });
 }
 
 template<>
 void EmitIR<IR::Opcode::PackedHalvingAddS8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
-        code.xvavg_b(Vresult, Va, Vb);
+        code.vavg_b(Vresult, Va, Vb);
         // FIXME
     });
 }
@@ -359,8 +359,8 @@ void EmitIR<IR::Opcode::PackedHalvingAddS8>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::PackedHalvingSubU8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
-        code.xvavg_bu(Vresult, Va, Vb);
-        code.xvsub_b(Vresult, Vresult, Vb);
+        code.vavg_bu(Vresult, Va, Vb);
+        code.vsub_b(Vresult, Vresult, Vb);
 //        code.nop();
         // FIXME
     });
@@ -369,8 +369,8 @@ void EmitIR<IR::Opcode::PackedHalvingSubU8>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::PackedHalvingSubS8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
-        code.xvavg_b(Vresult, Va, Vb);
-        code.xvsub_b(Vresult, Vresult, Vb);
+        code.vavg_b(Vresult, Va, Vb);
+        code.vsub_b(Vresult, Vresult, Vb);
 
     });
 }
@@ -378,7 +378,7 @@ void EmitIR<IR::Opcode::PackedHalvingSubS8>(BlockOfCode& code, EmitContext& ctx,
 template<>
 void EmitIR<IR::Opcode::PackedHalvingAddU16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
-        code.xvavg_hu(Vresult, Va, Vb);
+        code.vavg_hu(Vresult, Va, Vb);
         // FIXME
     });
 }
@@ -386,7 +386,7 @@ void EmitIR<IR::Opcode::PackedHalvingAddU16>(BlockOfCode& code, EmitContext& ctx
 template<>
 void EmitIR<IR::Opcode::PackedHalvingAddS16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
-        code.xvavg_h(Vresult, Va, Vb);
+        code.vavg_h(Vresult, Va, Vb);
 
     });
 }
@@ -394,8 +394,8 @@ void EmitIR<IR::Opcode::PackedHalvingAddS16>(BlockOfCode& code, EmitContext& ctx
 template<>
 void EmitIR<IR::Opcode::PackedHalvingSubU16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
-        code.xvavg_hu(Vresult, Va, Vb);
-        code.xvsub_h(Vresult, Vresult, Vb);
+        code.vavg_hu(Vresult, Va, Vb);
+        code.vsub_h(Vresult, Vresult, Vb);
         // FIXME
 
 //        code.UHSUB(Vresult->H4(), Va->H4(), Vb->H4());
@@ -405,8 +405,8 @@ void EmitIR<IR::Opcode::PackedHalvingSubU16>(BlockOfCode& code, EmitContext& ctx
 template<>
 void EmitIR<IR::Opcode::PackedHalvingSubS16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
-        code.xvavg_hu(Vresult, Va, Vb);
-        code.xvsub_h(Vresult, Vresult, Vb);
+        code.vavg_hu(Vresult, Va, Vb);
+        code.vsub_h(Vresult, Vresult, Vb);
         // FIXME
 
 //        code.SHSUB(Vresult->H4(), Va->H4(), Vb->H4());
@@ -493,15 +493,15 @@ void EmitIR<IR::Opcode::PackedSaturatedSubS16>(BlockOfCode& code, EmitContext& c
 template<>
 void EmitIR<IR::Opcode::PackedAbsDiffSumU8>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     EmitPackedOp(code, ctx, inst, [&](auto& Vresult, auto& Va, auto& Vb) {
-        code.xvabsd_bu(Vresult, Va, Vb);
+        code.vxor_v(Vresult, Vresult, Vresult);
+        code.add_imm(Xscratch0, code.zero, 0xffff'ffff, Xscratch1);
+        code.vinsgr2vr_w(Vresult, Xscratch0, 0);
+        code.vand_v(Va, Va, Vresult);
+        code.vand_v(Vb, Vb, Vresult);
+        code.vabsd_bu(Vresult, Va, Vb);
         // FIXME add into xybak
-//        code.vhaddw_h_b(Vresult, Vresult, Vresult);
-//        code.vhaddw_w_h(Vresult, Vresult, Vresult);
-
-//        code.MOVI(D2, Xbyak_loongarch64::RepImm{0b00001111});
-//        code.UABD(Vresult->B8(), Va->B8(), Vb->B8());
-//        code.andi(Vresult->B8(), Vresult->B8(), V2.B8());  // TODO: Zext tracking
-//        code.UADDLV(Vresult->toH(), Vresult->B8());
+        code.vhaddw_hu_bu(Vresult, Vresult, Vresult);
+        code.vhaddw_wu_hu(Vresult, Vresult, Vresult);
     });
 }
 

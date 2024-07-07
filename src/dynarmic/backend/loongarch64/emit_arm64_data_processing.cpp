@@ -155,10 +155,9 @@ namespace Dynarmic::Backend::LoongArch64 {
             auto Wcarry = ctx.reg_alloc.WriteW(carry_inst);
             RegAlloc::Realize(Wcarry);
 
-            code.srli_w(Wcarry, Xoperand, 31 - 29);
-            code.add_imm(Wscratch0, code.zero, 1 << 29, Wscratch1);
+            code.srli_w(Wcarry, Xoperand, 31);
             // TODO what does this mean?
-            code.and_(Wcarry, Wcarry, Wscratch0);
+            code.andi(Wcarry, Wcarry, 0x1);
         }
     }
 
@@ -638,14 +637,13 @@ namespace Dynarmic::Backend::LoongArch64 {
                 auto Wshift = ctx.reg_alloc.ReadW(shift_arg);
                 RegAlloc::Realize(Wresult, Woperand, Wshift);
                 ctx.reg_alloc.SpillFlags();
-
-                code.andi(Wscratch0, Wshift, 0xff);
-                code.addi_d(Wscratch1, code.zero, 31);
-//            code.add_d(Wscratch1, 31, code.zero);
-                code.andi(Wscratch0, Wscratch0, 0x1F);
-//            code.CMP(Wscratch0, 31);
-//            code.CSEL(Wscratch0, Wscratch0, Wscratch1, LS);
-                code.sra_w(Wresult, Woperand, Wscratch0);
+                Xbyak_loongarch64::Label end;
+                code.slti(Wscratch0, Wshift, 0x1f);
+                code.maskeqz(Wshift, Wshift, Wscratch0);
+                code.bnez(Wscratch0, end);
+                code.addi_d(Wshift, code.zero, 0x1f);
+                code.L(end);
+                code.sra_w(Wresult, Woperand, Wshift);
             }
         } else {
             if (shift_arg.IsImmediate() && shift_arg.GetImmediateU8() == 0) {
@@ -1461,7 +1459,8 @@ namespace Dynarmic::Backend::LoongArch64 {
         EmitTwoOp<64>(
                 code, ctx, inst,
                 [&](auto &Xresult, auto &Xoperand) {
-                    code.add_w(Xresult, code.zero, Xoperand);
+                    code.bstrins_w(Xresult, Xoperand, 31, 0);
+//                    code.add_w(Xresult, code.zero, Xoperand);
                 });
     }
 
