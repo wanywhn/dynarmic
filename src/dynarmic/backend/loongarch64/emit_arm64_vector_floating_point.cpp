@@ -235,13 +235,21 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<size_t fsize>
     void DenormalsAreZero(BlockOfCode& code, FP::FPCR fpcr, std::initializer_list<Xbyak_loongarch64::VReg> to_daz, Xbyak_loongarch64::VReg tmp) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+
         if (fpcr.FZ()) {
             code.vxor_v(tmp, tmp, tmp);
+
             if (fpcr.RMode() != FP::RoundingMode::TowardsMinusInfinity) {
                 code.vor_v(tmp, tmp, GetNegativeZeroVector<fsize>(code));
             }
+
             for (const Xbyak_loongarch64::VReg& xmm : to_daz) {
-                FCODE(vfadd_)(xmm, xmm, GetNegativeZeroVector<fsize>(code));
+                FCODE(vfadd_)(xmm, xmm, tmp);
+                FCODE(vfcmp_cun_)(code.vr29, xmm, xmm);
+                code.vand_v(code.vr29, code.vr29, GetVectorOf<fsize, FP::FPInfo<FPT>::mantissa_msb>(code));
+//                code.vand_v(code.vr28, code.vr28, code.vr29);
+                code.vxor_v(xmm, xmm, code.vr29);
             }
         }
     }
@@ -436,10 +444,11 @@ namespace Dynarmic::Backend::LoongArch64 {
 
                     // evaluate xmm_a == SNaN
                     FCODE(vfcmp_cun_)(tmp1, *xmm_a, *xmm_a);
+                    //TODO fix all occur explicit_mantissa_width
                     ICODE(vslli_)(tmp2, *xmm_a, static_cast<u8>(fsize - FP::FPInfo<FPT>::explicit_mantissa_width));
                     {
                         // upper could be true even if use vfcmp_sun_ if the operate is qNan
-                        // so here just revert bit to test if is a sNaN
+                        // so here just test if is a sNaN
                         code.vbitrevi_w(tmp2, tmp2, 31);
                         code.vsrai_w(tmp2, tmp2, 31);
                         if constexpr (fsize == 64) {
@@ -463,6 +472,10 @@ namespace Dynarmic::Backend::LoongArch64 {
 
                     if constexpr (is_max) {
                         code.vand_v(eq, xmm_a, xmm_b);
+                        // FIXME don't know if it is a document err or hardware err:
+                        // this seems to don't work like 3.1.1.3指令产生的非数结果. if there is  a qNaN, the
+                        // result is other reguler number. if there is a sNaN, the resule is a qNaN.
+                        // thus we xor mantissa_msb to
                         FCODE(vfmax_)(intermediate_result, *xmm_a, *xmm_b);
                     } else {
                         code.vor_v(eq, xmm_a, xmm_b);

@@ -12,17 +12,16 @@
 namespace Dynarmic::Backend::LoongArch64 {
 
 /**
- * Comparing MXCSR and FPCR
+ * Comparing LoongArch FCSR and Arm FPCR
  * ========================
  *
- * SSE MSCSR exception masks
+ * LoongArch FCSR exception masks
  * -------------------------
- * PM   bit 12  Precision Mask
- * UM   bit 11  Underflow Mask
- * OM   bit 10  Overflow Mask
- * ZM   bit 9   Divide By Zero Mask
- * DM   bit 8   Denormal Mask
- * IM   bit 7   Invalid Operation Mask
+ * Enables  bit 4  Invalid Operation exception trap enable
+ * Enables  bit 3  Division by Zero exception trap enable
+ * Enables  bit 2  Overflow exception trap enable
+ * Enables  bit 1  Underflow exception trap enable
+ * Enables  bit 0  Inexact exception trap enable
  *
  * A64 FPCR exception trap enables
  * -------------------------------
@@ -33,11 +32,9 @@ namespace Dynarmic::Backend::LoongArch64 {
  * DZE  bit 9   Division by Zero exception trap enable
  * IOE  bit 8   Invalid Operation exception trap enable
  *
- * SSE MXCSR mode bits
+ * LoongArch FCSR mode bits
  * -------------------
- * FZ   bit 15  Flush To Zero
- * DAZ  bit 6   Denormals Are Zero
- * RN   bits 13-14  Round to {0 = Nearest, 1 = Negative, 2 = Positive, 3 = Zero}
+ * RM   bits 8-9  Round to {0 = TiesToEven, 1 = Zero, 2 = Positive, 3 = Negative}
  *
  * A64 FPCR mode bits
  * ------------------
@@ -57,33 +54,32 @@ u32 A64JitState::GetFpcr() const {
 void A64JitState::SetFpcr(u32 value) {
     fpcr = value & FPCR_MASK;
 
-    asimd_MXCSR &= 0x0000003D;
-    guest_FCSR &= 0x1F000000;
-    asimd_MXCSR |= 0x00001f80;
-    guest_FCSR |= 0x0000001f;  // Mask all exceptions
+    asimd_MXCSR &= 0x1F1F0000UL;
+    guest_FCSR &= 0x1F1F0000UL;
+    asimd_MXCSR &= ~0x1FUL;
+    guest_FCSR &= ~0x1FUL;  // Mask all exceptions
 
     // RMode
     const std::array<u32, 4> MXCSR_RMode{0x0, 0x200, 0x300, 0x100};
     guest_FCSR |= MXCSR_RMode[(value >> 22) & 0x3];
 
-//    if (mcl::bit::get_bit<24>(value)) {
+    if (mcl::bit::get_bit<24>(value)) {
 //        guest_FCSR |= (1 << 15);  // SSE Flush to Zero
 //        guest_FCSR |= (1 << 6);   // SSE Denormals are Zero
-//    }
+    }
 }
 
 /**
- * Comparing MXCSR and FPSR
+ * Comparing LoongArch FCSR and FPSR
  * ========================
  *
- * SSE MXCSR exception flags
+ * LoongArch FCSR exception flags
  * -------------------------
- * PE   bit 5   Precision Flag
- * UE   bit 4   Underflow Flag
- * OE   bit 3   Overflow Flag
- * ZE   bit 2   Divide By Zero Flag
- * DE   bit 1   Denormal Flag                                 // Appears to only be set when MXCSR.DAZ = 0
- * IE   bit 0   Invalid Operation Flag
+ * UE   bit 20   Invalid Operation cumulative exception bit
+ * OE   bit 19   Division by Zero cumulative exception bit
+ * ZE   bit 18   Overflow cumulative exception bit
+ * DE   bit 17   Underflow cumulative exception bit
+ * IE   bit 16   Inexact cumulative exception bit
  *
  * A64 FPSR cumulative exception bits
  * ----------------------------------
@@ -99,11 +95,11 @@ void A64JitState::SetFpcr(u32 value) {
 u32 A64JitState::GetFpsr() const {
     const u32 mxcsr = guest_FCSR | asimd_MXCSR;
     u32 fpsr = 0;
-    fpsr |= (mxcsr & 0x10000000 ) >> 28;
-    fpsr |= ((mxcsr & 0x8000000 ) >> 27 ) << 2;
-    fpsr |= ((mxcsr & 0x4000000 ) >> 26 ) << 3;
-    fpsr |= ((mxcsr & 0x2000000 ) >> 25 ) << 4;
-    fpsr |= ((mxcsr & 0x2000000 ) >> 24 ) << 5;
+    fpsr |=  (mxcsr & 0x100000 ) >> 20;
+    fpsr |= ((mxcsr & 0x80000 ) >> 19 ) << 1;
+    fpsr |= ((mxcsr & 0x40000 ) >> 18 ) << 2;
+    fpsr |= ((mxcsr & 0x20000 ) >> 17 ) << 3;
+    fpsr |= ((mxcsr & 0x10000 ) >> 16 ) << 4;
     fpsr |= fpsr_exc;
     fpsr |= (fpsr_qc == 0 ? 0 : 1) << 27;
     return fpsr;

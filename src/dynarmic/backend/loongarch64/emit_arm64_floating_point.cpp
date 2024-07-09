@@ -77,7 +77,7 @@ using namespace Xbyak_loongarch64::util;
     void ForceToDefaultNaN(BlockOfCode& code, Xbyak_loongarch64::VReg result) {
 
         Xbyak_loongarch64::Label end;
-        FCODE(fcmp_cun_)(0, result, result);
+        FCODE(fcmp_sun_)(0, result, result);
         code.movcf2gr(Xscratch0, 0);
         code.beqz(Xscratch0, end);
         code.add_imm(Xscratch0, code.zero, fsize == 32 ? f32_nan : f64_nan, Xscratch2);
