@@ -251,24 +251,20 @@ void ForceDenormalsToZero(BlockOfCode& code, std::initializer_list<Xbyak_loongar
         code.add_imm(Xscratch0, code.zero, fsize == 32 ? f32_non_sign_mask : f64_non_sign_mask, Xscratch2);
         code.movgr2fr_d(Vscratch0, Xscratch0);
         code.vand_v(Vscratch0, Vscratch0, xmm);
-//        code.movaps(xmm0, code.MConst(xword, fsize == 32 ? f32_non_sign_mask : f64_non_sign_mask));
-//        code.andps(xmm0, xmm);
         if constexpr (fsize == 32) {
             code.add_imm(Xscratch0, code.zero, f32_smallest_normal - 1, Xscratch2);
             code.movgr2fr_w(Vscratch1, Xscratch0);
-            code.vsle_w(Vscratch0, Vscratch0, Vscratch1);
+            code.vsle_w(Vscratch0, Vscratch1, Vscratch0);
         } else {
             code.add_imm(Xscratch0, code.zero, f64_smallest_normal - 1, Xscratch2);
             code.movgr2fr_d(Vscratch1, Xscratch0);
-            code.vsle_d(Vscratch0, Vscratch0, Vscratch1);
+            code.vsle_d(Vscratch0, Vscratch1, Vscratch0);
 
         }
-        code.add_imm(Xscratch0, code.zero, f64_smallest_normal - 1, Xscratch2);
+        code.add_imm(Xscratch0, code.zero, fsize == 32 ? f32_negative_zero : f64_negative_zero, Xscratch2);
         code.movgr2fr_d(Vscratch1, Xscratch0);
         code.vor_v(Vscratch0, Vscratch0, Vscratch1);
-//        code.orps(xmm0, code.MConst(xword, fsize == 32 ? f32_negative_zero : f64_negative_zero));
         code.vand_v(xmm, xmm, Vscratch0);
-//        code.andps(xmm, xmm0);
     }
 }
 
@@ -293,7 +289,7 @@ static void EmitFPMinMax(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     auto tmp = Vscratch0;
     auto gpr_scratch = Xscratch0;
 
-    DenormalsAreZero<fsize>(code, ctx, {result, operand2});
+    DenormalsAreZero<fsize>(code, ctx, {operand1, operand2});
 
     SharedLabel equal = GenSharedLabel(), end = GenSharedLabel();
 
@@ -442,12 +438,16 @@ void EmitIR<IR::Opcode::FPDiv64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* 
 
 template<>
 void EmitIR<IR::Opcode::FPMax32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmax_s(Sresult, Sa, Sb); });
+    EmitFPMinMax<32, true>(code, ctx, inst);
+
+//    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmax_s(Sresult, Sa, Sb); });
 }
 
 template<>
 void EmitIR<IR::Opcode::FPMax64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmax_d(Dresult, Da, Db); });
+    EmitFPMinMax<64, true>(code, ctx, inst);
+
+//    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmax_d(Dresult, Da, Db); });
 }
 
 template<>
@@ -468,7 +468,9 @@ void EmitIR<IR::Opcode::FPMin32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* 
 
 template<>
 void EmitIR<IR::Opcode::FPMin64>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmin_d(Dresult, Da, Db); });
+    EmitFPMinMax<64, false>(code, ctx, inst);
+
+//    EmitThreeOp<64>(code, ctx, inst, [&](auto& Dresult, auto& Da, auto& Db) { code.fmin_d(Dresult, Da, Db); });
 }
 
 template<>

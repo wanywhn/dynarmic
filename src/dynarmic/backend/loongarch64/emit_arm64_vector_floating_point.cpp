@@ -246,10 +246,10 @@ namespace Dynarmic::Backend::LoongArch64 {
 
             for (const Xbyak_loongarch64::VReg& xmm : to_daz) {
                 FCODE(vfadd_)(xmm, xmm, tmp);
-                FCODE(vfcmp_cun_)(code.vr29, xmm, xmm);
-                code.vand_v(code.vr29, code.vr29, GetVectorOf<fsize, FP::FPInfo<FPT>::mantissa_msb>(code));
+                FCODE(vfcmp_cun_)(code.vr28, xmm, xmm);
+                code.vand_v(code.vr28, code.vr28, GetVectorOf<fsize, FP::FPInfo<FPT>::mantissa_msb>(code));
 //                code.vand_v(code.vr28, code.vr28, code.vr29);
-                code.vxor_v(xmm, xmm, code.vr29);
+                code.vxor_v(xmm, xmm, code.vr28);
             }
         }
     }
