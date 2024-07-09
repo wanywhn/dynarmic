@@ -226,6 +226,115 @@ static void EmitFromFixed(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, E
     }
 }
 
+#define FCODE(NAME)                  \
+    [&code](auto... args) {          \
+        if constexpr (fsize == 32) { \
+            code.NAME##s(args...);   \
+        } else {                     \
+            code.NAME##d(args...);   \
+        }                            \
+    }
+#define ICODE(NAME)                  \
+    [&code](auto... args) {          \
+        if constexpr (fsize == 32) { \
+            code.NAME##d(args...);   \
+        } else {                     \
+            code.NAME##q(args...);   \
+        }                            \
+    }
+
+
+template<size_t fsize>
+void ForceDenormalsToZero(BlockOfCode& code, std::initializer_list<Xbyak_loongarch64::VReg> to_daz) {
+
+    for (const Xbyak_loongarch64::VReg& xmm : to_daz) {
+        code.add_imm(Xscratch0, code.zero, fsize == 32 ? f32_non_sign_mask : f64_non_sign_mask, Xscratch2);
+        code.movgr2fr_d(Vscratch0, Xscratch0);
+        code.vand_v(Vscratch0, Vscratch0, xmm);
+//        code.movaps(xmm0, code.MConst(xword, fsize == 32 ? f32_non_sign_mask : f64_non_sign_mask));
+//        code.andps(xmm0, xmm);
+        if constexpr (fsize == 32) {
+            code.add_imm(Xscratch0, code.zero, f32_smallest_normal - 1, Xscratch2);
+            code.movgr2fr_w(Vscratch1, Xscratch0);
+            code.vsle_w(Vscratch0, Vscratch0, Vscratch1);
+        } else {
+            code.add_imm(Xscratch0, code.zero, f64_smallest_normal - 1, Xscratch2);
+            code.movgr2fr_d(Vscratch1, Xscratch0);
+            code.vsle_d(Vscratch0, Vscratch0, Vscratch1);
+
+        }
+        code.add_imm(Xscratch0, code.zero, f64_smallest_normal - 1, Xscratch2);
+        code.movgr2fr_d(Vscratch1, Xscratch0);
+        code.vor_v(Vscratch0, Vscratch0, Vscratch1);
+//        code.orps(xmm0, code.MConst(xword, fsize == 32 ? f32_negative_zero : f64_negative_zero));
+        code.vand_v(xmm, xmm, Vscratch0);
+//        code.andps(xmm, xmm0);
+    }
+}
+
+template<size_t fsize>
+void DenormalsAreZero(BlockOfCode& code, EmitContext& ctx, std::initializer_list<Xbyak_loongarch64::VReg> to_daz) {
+    if (ctx.FPCR().FZ()) {
+        ForceDenormalsToZero<fsize>(code, to_daz);
+    }
+}
+
+template<size_t fsize, bool is_max>
+static void EmitFPMinMax(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+    auto result = ctx.reg_alloc.WriteQ(inst);
+    auto operand1 = ctx.reg_alloc.ReadQ(args[0]);
+    auto operand2 = ctx.reg_alloc.ReadQ(args[1]);
+    RegAlloc::Realize(result, operand1, operand2);
+    auto aaa=*result;
+    auto bbb=*operand1;
+    auto ccc=*operand2;
+    auto tmp = Vscratch0;
+    auto gpr_scratch = Xscratch0;
+
+    DenormalsAreZero<fsize>(code, ctx, {result, operand2});
+
+    SharedLabel equal = GenSharedLabel(), end = GenSharedLabel();
+
+    FCODE(fcmp_cun_)(0, *operand1, *operand2);
+
+    code.bcnez(0, *equal);
+    if constexpr (is_max) {
+        FCODE(fmax_)(*result, *operand1, *operand2);
+    } else {
+        FCODE(fmin_)(*result, *operand1, *operand2);
+    }
+    code.L(*end);
+
+    ctx.deferred_emits.emplace_back([=, &code, &ctx] {
+        Xbyak_loongarch64::Label nan;
+        auto result = aaa;
+        auto operand1 = bbb;
+        auto operand2 = ccc;
+        code.L(*equal);
+        FCODE(fcmp_cun_)(1, operand1, operand2);
+        code.bcnez(1, nan);
+        if constexpr (is_max) {
+            code.vand_v(result, operand1, operand2);
+        } else {
+            code.vor_v(result, operand1, operand2);
+        }
+        code.b(*end);
+
+        code.L(nan);
+        if (ctx.FPCR().DN()) {
+            code.add_imm(gpr_scratch, code.zero, fsize == 32 ? f32_nan : f64_nan, Xscratch2);
+            code.movgr2fr_d(result, gpr_scratch);
+        } else {
+            FCODE(fmov_)(tmp, operand1);
+            FCODE(fadd_)(result, operand1, operand2);
+//            EmitPostProcessNaNs<fsize>(code, result, tmp, operand2, gpr_scratch, *end);
+        }
+        code.b(*end);
+    });
+}
+
 template<>
 void EmitIR<IR::Opcode::FPAbs16>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
     (void)code;
@@ -353,7 +462,8 @@ void EmitIR<IR::Opcode::FPMaxNumeric64>(BlockOfCode& code, EmitContext& ctx, IR:
 
 template<>
 void EmitIR<IR::Opcode::FPMin32>(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
-    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmin_s(Sresult, Sa, Sb); });
+    EmitFPMinMax<32, false>(code, ctx, inst);
+//    EmitThreeOp<32>(code, ctx, inst, [&](auto& Sresult, auto& Sa, auto& Sb) { code.fmin_s(Sresult, Sa, Sb); });
 }
 
 template<>
