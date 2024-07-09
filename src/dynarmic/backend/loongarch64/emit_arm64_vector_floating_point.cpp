@@ -232,10 +232,10 @@ namespace Dynarmic::Backend::LoongArch64 {
             return std::make_tuple(a[i], b[i], c[i]);
         }
     };
+    static constexpr u32 subnormal_mask = 0x110;
 
     template<size_t fsize>
     void DenormalsAreZero(BlockOfCode& code, FP::FPCR fpcr, std::initializer_list<Xbyak_loongarch64::VReg> to_daz, Xbyak_loongarch64::VReg tmp) {
-        using FPT = mcl::unsigned_integer_of_size<fsize>;
 
         if (fpcr.FZ()) {
             code.vxor_v(tmp, tmp, tmp);
@@ -243,13 +243,14 @@ namespace Dynarmic::Backend::LoongArch64 {
             if (fpcr.RMode() != FP::RoundingMode::TowardsMinusInfinity) {
                 code.vor_v(tmp, tmp, GetNegativeZeroVector<fsize>(code));
             }
-
             for (const Xbyak_loongarch64::VReg& xmm : to_daz) {
-                FCODE(vfadd_)(xmm, xmm, tmp);
-                FCODE(vfcmp_cun_)(code.vr28, xmm, xmm);
-                code.vand_v(code.vr28, code.vr28, GetVectorOf<fsize, FP::FPInfo<FPT>::mantissa_msb>(code));
-//                code.vand_v(code.vr28, code.vr28, code.vr29);
-                code.vxor_v(xmm, xmm, code.vr28);
+                Xbyak_loongarch64::Label not_normals;
+                FCODE(vfclass_)(Vscratch1, xmm);
+                code.vand_v(Vscratch1, Vscratch1, GetVectorOf<fsize, subnormal_mask>(code));
+                code.vseteqz_v(0, Vscratch1);
+                code.bcnez(0, not_normals);
+                code.vxor_v(xmm, tmp, tmp);
+                code.L(not_normals);
             }
         }
     }
@@ -308,7 +309,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         auto nan_mask = Vscratch0;
 
-        code.vxor_v(result, result, result);
+//        code.vxor_v(result, result, result);
         code.vor_v(result, xmm_a, xmm_a);
 
         if (check_input_nan == CheckInputNaN::Yes) {
@@ -338,8 +339,9 @@ namespace Dynarmic::Backend::LoongArch64 {
         if (ctx.FPCR(fpcr_controlled).DN()) {
             auto args = ctx.reg_alloc.GetArgumentInfo(inst);
             auto result = ctx.reg_alloc.WriteQ(inst);
+            auto xmm_a = ctx.reg_alloc.ReadQ(args[0]);
             auto xmm_b = ctx.reg_alloc.ReadQ(args[1]);
-            RegAlloc::Realize(result, xmm_b);
+            RegAlloc::Realize(result, xmm_a, xmm_b);
 
             // TODO is this safe? how to get extra scratch reg?
             auto mask = code.vr31;
@@ -347,17 +349,17 @@ namespace Dynarmic::Backend::LoongArch64 {
             auto nan_mask = code.vr29;
 
             MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
-                DenormalsAreZero<fsize>(code, ctx.FPCR(fpcr_controlled), {result, xmm_b}, mask);
+                DenormalsAreZero<fsize>(code, ctx.FPCR(fpcr_controlled), {xmm_a, xmm_b}, mask);
 
 //                if (code.HasHostFeature(HostFeature::AVX)) {
-                    FCODE(vfcmp_ceq_)(mask, *result, *xmm_b);
-                    FCODE(vfcmp_cun_)(nan_mask, *result, *xmm_b);
+                    FCODE(vfcmp_ceq_)(mask, *xmm_a, *xmm_b);
+                    FCODE(vfcmp_cun_)(nan_mask, *xmm_a, *xmm_b);
                     if constexpr (is_max) {
-                        code.vand_v(eq, result, xmm_b);
-                        FCODE(vfmax_)(*result, *result, *xmm_b);
+                        code.vand_v(eq, xmm_a, xmm_b);
+                        FCODE(vfmax_)(*result, *xmm_a, *xmm_b);
                     } else {
-                        code.vor_v(eq, result, xmm_b);
-                        FCODE(vfmin_)(*result, *result, *xmm_b);
+                        code.vor_v(eq, xmm_a, xmm_b);
+                        FCODE(vfmin_)(*result, *xmm_a, *xmm_b);
                     }
                     code.vbitsel_v(result, result, eq, mask);
                     code.vbitsel_v(result, result, GetNaNVector<fsize>(code), nan_mask);
