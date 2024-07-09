@@ -26,6 +26,7 @@
 #include "dynarmic/common/fp/fpsr.h"
 #include "dynarmic/common/fp/info.h"
 #include "dynarmic/common/fp/op.h"
+#include "dynarmic/common/fp/util.h"
 #include "dynarmic/common/fp/rounding_mode.h"
 #include "dynarmic/common/lut_from_list.h"
 #include "dynarmic/ir/basic_block.h"
@@ -38,6 +39,28 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     using namespace Xbyak_loongarch64::util;
     namespace mp = mcl::mp;
+
+#define FCODE(NAME)                  \
+    [&code](auto... args) {          \
+        if constexpr (fsize == 32) { \
+            code.NAME##s(args...);   \
+        } else {                     \
+            code.NAME##d(args...);   \
+        }                            \
+    }
+#define ICODE(NAME)                  \
+    [&code](auto... args) {          \
+        if constexpr (fsize == 32) { \
+            code.NAME##w(args...);   \
+        } else {                     \
+            code.NAME##d(args...);   \
+        }                            \
+    }
+
+    enum class CheckInputNaN {
+        Yes,
+        No,
+    };
 
     using A64FullVectorWidth = std::integral_constant<size_t, 128>;
 
@@ -117,6 +140,111 @@ namespace Dynarmic::Backend::LoongArch64 {
         return GetVectorOf<fsize, FP::FPValue<FPT, sign, exponent, value>()>(code);
     }
 
+    template<size_t fsize, size_t nargs, typename NaNHandler>
+    void HandleNaNs(BlockOfCode& code, EmitContext& ctx, bool fpcr_controlled,
+                    std::array<Xbyak_loongarch64::VReg, nargs + 1> xmms,
+                    const Xbyak_loongarch64::VReg& nan_mask, NaNHandler nan_handler) {
+        static_assert(fsize == 32 || fsize == 64, "fsize must be either 32 or 64");
+
+        code.vand_v(Vscratch0, nan_mask, nan_mask);
+        code.vsetnez_v(0, Vscratch0);
+
+        SharedLabel end = GenSharedLabel(), nan = GenSharedLabel();
+
+        code.bcnez(0, *nan);
+        code.L(*end);
+
+        ctx.deferred_emits.emplace_back([=, &code, &ctx] {
+            code.L(*nan);
+
+            const auto result = xmms[0];
+            const size_t stack_space = xmms.size() * 16;
+
+            ABI_PushRegisters(code, ABI_CALLEE_SAVE & ~ToRegList(result), sizeof(StackLayout) + stack_space);
+
+            for (size_t i = 0; i < xmms.size(); ++i) {
+                code.vst(xmms[i], code.sp, i* 16);
+            }
+            code.addi_d(code.a0, code.sp, 0 * 16);
+            code.add_imm(code.a1, code.zero, ctx.FPCR(fpcr_controlled).Value(), Xscratch0);
+
+            code.CallFunction(nan_handler);
+
+            code.vld(result, code.sp, 0 * 16);
+
+            ABI_PopRegisters(code, ABI_CALLEE_SAVE & ~ToRegList(result), sizeof(StackLayout) + stack_space);
+            code.b(*end);
+        });
+    }
+
+    template<size_t fsize>
+    void ForceToDefaultNaN(BlockOfCode& code, FP::FPCR fpcr, Xbyak_loongarch64::VReg result) {
+        if (fpcr.DN()) {
+//            if (code.HasHostFeature(HostFeature::AVX)) {
+                auto nan_mask = Vscratch0;
+                FCODE(vfcmp_cun_)(nan_mask, result, result);
+                // TODO check this want qNaN or sNaN
+                code.vbitsel_v(result, result, GetNaNVector<fsize>(code), nan_mask);
+        }
+    }
+
+    template<size_t fsize, template<typename> class Indexer, size_t narg>
+    struct NaNHandler {
+    public:
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+
+        using function_type = void (*)(std::array<VectorArray<FPT>, narg>&, FP::FPCR);
+
+        static function_type GetDefault() {
+            return GetDefaultImpl(std::make_index_sequence<narg - 1>{});
+        }
+
+    private:
+        template<size_t... argi>
+        static function_type GetDefaultImpl(std::index_sequence<argi...>) {
+            const auto result = [](std::array<VectorArray<FPT>, narg>& values, FP::FPCR) {
+                VectorArray<FPT>& result = values[0];
+                for (size_t elementi = 0; elementi < result.size(); ++elementi) {
+                    const auto current_values = Indexer<FPT>{}(elementi, values[argi + 1]...);
+                    if (auto r = FP::ProcessNaNs(std::get<argi>(current_values)...)) {
+                        result[elementi] = *r;
+                    } else if (FP::IsNaN(result[elementi])) {
+                        result[elementi] = FP::FPInfo<FPT>::DefaultNaN();
+                    }
+                }
+            };
+
+            return static_cast<function_type>(result);
+        }
+    };
+
+    template<typename T>
+    struct DefaultIndexer {
+        std::tuple<T> operator()(size_t i, const VectorArray<T>& a) {
+            return std::make_tuple(a[i]);
+        }
+
+        std::tuple<T, T> operator()(size_t i, const VectorArray<T>& a, const VectorArray<T>& b) {
+            return std::make_tuple(a[i], b[i]);
+        }
+
+        std::tuple<T, T, T> operator()(size_t i, const VectorArray<T>& a, const VectorArray<T>& b, const VectorArray<T>& c) {
+            return std::make_tuple(a[i], b[i], c[i]);
+        }
+    };
+
+    template<size_t fsize>
+    void DenormalsAreZero(BlockOfCode& code, FP::FPCR fpcr, std::initializer_list<Xbyak_loongarch64::VReg> to_daz, Xbyak_loongarch64::VReg tmp) {
+        if (fpcr.FZ()) {
+            code.vxor_v(tmp, tmp, tmp);
+            if (fpcr.RMode() != FP::RoundingMode::TowardsMinusInfinity) {
+                code.vor_v(tmp, tmp, GetNegativeZeroVector<fsize>(code));
+            }
+            for (const Xbyak_loongarch64::VReg& xmm : to_daz) {
+                FCODE(vfadd_)(xmm, xmm, GetNegativeZeroVector<fsize>(code));
+            }
+        }
+    }
 
     template<typename EmitFn>
     static void MaybeStandardFPSCRValue(BlockOfCode &code, EmitContext &ctx, bool fpcr_controlled,
@@ -124,13 +252,244 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         const bool switch_mxcsr = ctx.FPCR(fpcr_controlled) != ctx.FPCR();
         // TODO Unsafe_IgnoreStandardFPCRValue
-        if (switch_mxcsr) {// &&  !ctx.HasOptimization(OptimizationFlag::Unsafe_IgnoreStandardFPCRValue)) {
+        if (switch_mxcsr && !ctx.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreStandardFPCRValue)) {
             code.EnterStandardASIMD();
             emit();
             code.LeaveStandardASIMD();
         } else {
             emit();
         }
+    }
+
+    template<size_t fsize, template<typename> class Indexer, typename Function>
+    void EmitThreeOpVectorOperation(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst, Function fn,
+                                    CheckInputNaN check_input_nan = CheckInputNaN::No,
+                                    typename NaNHandler<fsize, Indexer, 3>::function_type nan_handler = NaNHandler<fsize, Indexer, 3>::GetDefault()) {
+        static_assert(fsize == 32 || fsize == 64, "fsize must be either 32 or 64");
+
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        const bool fpcr_controlled = args[2].GetImmediateU1();
+
+        if (ctx.FPCR(fpcr_controlled).DN() || ctx.conf.HasOptimization(OptimizationFlag::Unsafe_InaccurateNaN)) {
+            auto xmm_a = ctx.reg_alloc.ReadQ(args[0]);
+            auto xmm_b = ctx.reg_alloc.ReadQ(args[1]);
+            auto result = ctx.reg_alloc.WriteQ(inst);
+            RegAlloc::Realize(xmm_a, xmm_b, result);
+
+            if constexpr (std::is_member_function_pointer_v<Function>) {
+                MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
+                    (code.*fn)(xmm_a, xmm_b);
+                });
+            } else {
+                MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
+                    fn(xmm_a, xmm_b);
+                });
+            }
+
+            if (!ctx.conf.HasOptimization(OptimizationFlag::Unsafe_InaccurateNaN)) {
+                ForceToDefaultNaN<fsize>(code, ctx.FPCR(fpcr_controlled), xmm_a);
+            }
+            code.vxor_v(result, result, result);
+            code.vor_v(result, result, xmm_a);
+            return;
+        }
+        auto result = ctx.reg_alloc.WriteQ(inst);
+        auto xmm_a = ctx.reg_alloc.ReadQ(args[0]);
+        auto xmm_b = ctx.reg_alloc.ReadQ(args[1]);
+        RegAlloc::Realize(result, xmm_b, xmm_a);
+
+        auto nan_mask = Vscratch0;
+
+        code.vxor_v(result, result, result);
+        code.vor_v(result, xmm_a, xmm_a);
+
+        if (check_input_nan == CheckInputNaN::Yes) {
+            FCODE(vfcmp_cun_)(nan_mask, *xmm_a, *xmm_b);
+        }
+
+        if constexpr (std::is_member_function_pointer_v<Function>) {
+            (code.*fn)(result, xmm_b);
+        } else {
+            fn(result, xmm_b);
+        }
+
+        if (check_input_nan == CheckInputNaN::Yes) {
+            FCODE(vfcmp_cun_)(nan_mask, nan_mask, *result);
+        } else {
+            FCODE(vfcmp_cun_)(nan_mask, *result, *result);
+        }
+
+        HandleNaNs<fsize, 2>(code, ctx, fpcr_controlled, {result, xmm_a, xmm_b}, nan_mask, nan_handler);
+    }
+
+
+    template<size_t fsize, bool is_max>
+    static void EmitFPVectorMinMax(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+        const bool fpcr_controlled = inst->GetArg(2).GetU1();
+
+        if (ctx.FPCR(fpcr_controlled).DN()) {
+            auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+            auto result = ctx.reg_alloc.WriteQ(inst);
+            auto xmm_b = ctx.reg_alloc.ReadQ(args[1]);
+            RegAlloc::Realize(result, xmm_b);
+
+            // TODO is this safe? how to get extra scratch reg?
+            auto mask = code.vr31;
+            auto eq = code.vr30;
+            auto nan_mask = code.vr29;
+
+            MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
+                DenormalsAreZero<fsize>(code, ctx.FPCR(fpcr_controlled), {result, xmm_b}, mask);
+
+//                if (code.HasHostFeature(HostFeature::AVX)) {
+                    FCODE(vfcmp_ceq_)(mask, *result, *xmm_b);
+                    FCODE(vfcmp_cun_)(nan_mask, *result, *xmm_b);
+                    if constexpr (is_max) {
+                        code.vand_v(eq, result, xmm_b);
+                        FCODE(vfmax_)(*result, *result, *xmm_b);
+                    } else {
+                        code.vor_v(eq, result, xmm_b);
+                        FCODE(vfmin_)(*result, *result, *xmm_b);
+                    }
+                    code.vbitsel_v(result, result, eq, mask);
+                    code.vbitsel_v(result, result, GetNaNVector<fsize>(code), nan_mask);
+
+            });
+
+            return;
+        }
+
+        EmitThreeOpVectorOperation<fsize, DefaultIndexer>(
+                code, ctx, inst, [&](Xbyak_loongarch64::VReg result, Xbyak_loongarch64::VReg xmm_b) {
+                    Xbyak_loongarch64::VReg mask = code.vr31;
+                    Xbyak_loongarch64::VReg eq = code.vr30;
+
+                    if (ctx.FPCR(fpcr_controlled).FZ()) {
+                        const Xbyak_loongarch64::VReg prev_xmm_b = xmm_b;
+                        xmm_b = code.vr29;
+                        code.vxor_v(xmm_b, xmm_b, xmm_b);
+                        code.vor_v(xmm_b, xmm_b , prev_xmm_b);
+                        DenormalsAreZero<fsize>(code, ctx.FPCR(fpcr_controlled), {result, xmm_b}, mask);
+                    }
+
+                    // What we are doing here is handling the case when the inputs are differently signed zeros.
+                    // x86-64 treats differently signed zeros as equal while ARM does not.
+                    // Thus if we AND together things that x86-64 thinks are equal we'll get the positive zero.
+
+                    // vrangep{s,d} here ends up not being significantly shorter than the AVX implementation
+
+//                    if (code.HasHostFeature(HostFeature::AVX)) {
+                        FCODE(vfcmp_ceq_)(mask, result, xmm_b);
+                        if constexpr (is_max) {
+                            code.vand_v(eq, result, xmm_b);
+                            FCODE(vfmax_)(result, result, xmm_b);
+                        } else {
+                            code.vor_v(eq, result, xmm_b);
+                            FCODE(vfmin_)(result, result, xmm_b);
+                        }
+                        code.vbitsel_v(result, result, eq, mask);
+
+                },
+                CheckInputNaN::Yes);
+    }
+
+    template<size_t fsize, bool is_max>
+    static void EmitFPVectorMinMaxNumeric(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+        const bool fpcr_controlled = inst->GetArg(2).GetU1();
+
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        auto xmm_a = ctx.reg_alloc.ReadQ(args[0]);
+        auto xmm_b = ctx.reg_alloc.ReadQ(args[1]);
+        auto result = ctx.reg_alloc.WriteQ(inst);
+
+        RegAlloc::Realize(xmm_a, xmm_b, result);
+        auto intermediate_result = code.vr31;
+        auto tmp1 = code.vr30;
+        auto tmp2 = code.vr29;
+
+//        const Xbyak::Xmm tmp1 = xmm0;
+
+        // NaN requirements:
+        // op1     op2      result
+        // SNaN    anything op1
+        // !SNaN   SNaN     op2
+        // QNaN    !NaN     op2
+        // !NaN    QNaN     op1
+        // QNaN    QNaN     op1
+
+//        if (code.HasHostFeature(HostFeature::AVX)) {
+            MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
+                using FPT = mcl::unsigned_integer_of_size<fsize>;
+
+                // result = xmm_a == SNaN || xmm_b == QNaN
+                {
+                    // evaluate xmm_b == QNaN
+                    FCODE(vfcmp_cun_)(tmp1, *xmm_b, *xmm_b);
+                    ICODE(vslli_)(tmp2, *xmm_b, static_cast<u8>(fsize - FP::FPInfo<FPT>::explicit_mantissa_width));
+                    {
+                        code.vsrai_w(tmp2, tmp2, 31);
+                        if constexpr (fsize == 64) {
+                            code.vshuf4i_w(tmp2, tmp2, 0b11110101);
+                        }
+                    }
+                    code.vand_v(result, tmp1, tmp2);
+
+                    // evaluate xmm_a == SNaN
+                    FCODE(vfcmp_cun_)(tmp1, *xmm_a, *xmm_a);
+                    ICODE(vslli_)(tmp2, *xmm_a, static_cast<u8>(fsize - FP::FPInfo<FPT>::explicit_mantissa_width));
+                    {
+                        // upper could be true even if use vfcmp_sun_ if the operate is qNan
+                        // so here just revert bit to test if is a sNaN
+                        code.vbitrevi_w(tmp2, tmp2, 31);
+                        code.vsrai_w(tmp2, tmp2, 31);
+                        if constexpr (fsize == 64) {
+                            code.vshuf4i_w(tmp2, tmp2, 0b11110101);
+                        }
+                    }
+                    code.vand_v(tmp2, tmp2, tmp1);
+
+                    code.vor_v(result, result, tmp2);
+                }
+
+                // Denormalization quiets SNaNs, therefore should happen after SNaN detection!
+                DenormalsAreZero<fsize>(code, ctx.FPCR(fpcr_controlled), {xmm_a, xmm_b}, tmp1);
+
+                // intermediate result = max/min(xmm_a, xmm_b)
+                {
+                    const auto eq_mask = tmp1;
+                    const auto eq = tmp2;
+
+                    FCODE(vfcmp_ceq_)(eq_mask, *xmm_a, *xmm_b);
+
+                    if constexpr (is_max) {
+                        code.vand_v(eq, xmm_a, xmm_b);
+                        FCODE(vfmax_)(intermediate_result, *xmm_a, *xmm_b);
+                    } else {
+                        code.vor_v(eq, xmm_a, xmm_b);
+                        FCODE(vfmin_)(intermediate_result, *xmm_a, *xmm_b);
+                    }
+                    code.vbitsel_v(intermediate_result, intermediate_result, eq, eq_mask);
+                }
+
+                {
+                    code.vbitsel_v(result, intermediate_result, xmm_a, result);
+                }
+
+                if (ctx.FPCR(fpcr_controlled).DN()) {
+                    const auto ord_mask = tmp1;
+
+                    FCODE(vfcmp_cun_)(ord_mask, *result, *result);
+                    code.vbitsel_v(result, result, GetNaNVector<fsize>(code), ord_mask);
+
+                } else {
+                    const auto nan_mask = tmp1;
+
+                    FCODE(vfcmp_cun_)(nan_mask, *result, *result);
+                    code.vand_v(nan_mask, nan_mask, GetVectorOf<fsize, FP::FPInfo<FPT>::mantissa_msb>(code));
+                    code.vor_v(result, result, nan_mask);
+                }
+            });
+            //        }
     }
 
     template<typename EmitFn>
@@ -500,57 +859,50 @@ namespace Dynarmic::Backend::LoongArch64 {
                                 [&](auto &Vresult, auto &Va, auto &Vb) {code.vfcmp_cle_d(Vresult, Vb, Va);     });
     }
 
+
+
     template<>
     void EmitIR<IR::Opcode::FPVectorMax32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst,
-                                [&](auto &Vresult, auto &Va, auto &Vb) { code.vfmax_s(Vresult, Va, Vb); });
+        EmitFPVectorMinMax<32, true>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorMax64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst,
-                                [&](auto &Vresult, auto &Va, auto &Vb) { code.vfmax_d(Vresult, Va, Vb); });
+        EmitFPVectorMinMax<64, true>(code, ctx, inst);
     }
 
     template<>
     void
     EmitIR<IR::Opcode::FPVectorMaxNumeric32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst,
-                                [&](auto &Vresult, auto &Va, auto &Vb) { code.vfmaxa_s(Vresult, Va, Vb); });
+        EmitFPVectorMinMaxNumeric<32, true>(code, ctx, inst);
     }
 
     template<>
     void
     EmitIR<IR::Opcode::FPVectorMaxNumeric64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst,
-                                [&](auto &Vresult, auto &Va, auto &Vb) { code.vfmaxa_d(Vresult, Va, Vb); });
+        EmitFPVectorMinMaxNumeric<64, true>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorMin32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst,
-                                [&](auto &Vresult, auto &Va, auto &Vb) { code.vfmin_s(Vresult, Va, Vb); });
+        EmitFPVectorMinMax<32, false>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorMin64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst,
-                                [&](auto &Vresult, auto &Va, auto &Vb) { code.vfmin_d(Vresult, Va, Vb); });
+        EmitFPVectorMinMax<64, false>(code, ctx, inst);
     }
 
     template<>
     void
     EmitIR<IR::Opcode::FPVectorMinNumeric32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst,
-                                [&](auto &Vresult, auto &Va, auto &Vb) { code.vfmina_s(Vresult, Va, Vb); });
+        EmitFPVectorMinMaxNumeric<32, false>(code, ctx, inst);
     }
 
     template<>
     void
     EmitIR<IR::Opcode::FPVectorMinNumeric64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        // FIXME ,EmitFPVectorMinMaxNumeric
-        EmitThreeOp(code, ctx, inst,
-                                [&](auto &Vresult, auto &Va, auto &Vb) { code.vfmina_d(Vresult, Va, Vb); });
+        EmitFPVectorMinMaxNumeric<64, false>(code, ctx, inst);
     }
 
     template<>
