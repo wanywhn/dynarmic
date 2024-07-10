@@ -27,7 +27,6 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::Identity>(BlockOfCode &, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-
         ctx.reg_alloc.DefineAsExisting(inst, args[0]);
     }
 

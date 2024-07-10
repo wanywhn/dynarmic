@@ -664,7 +664,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 
         constexpr u32 stack_size = 4 * 16;
-
+        // TODO ABI_PushRegisters save too much register, could opt
         ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(result), stack_size);
 
         code.add_imm(code.a0, code.sp, 0 * 16, Xscratch1);
