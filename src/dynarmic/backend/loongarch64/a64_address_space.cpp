@@ -490,12 +490,12 @@ namespace Dynarmic::Backend::LoongArch64 {
 
             Xbyak_loongarch64::Label step_hr_loop;
             code.L(step_hr_loop);
-            code.ll_d(Wscratch0, Xhalt, 0);
+            code.ll_w(Wscratch0, Xhalt, 0);
             code.bnez(Wscratch0, return_from_run_code);
             code.add_imm(Wscratch1, code.zero, static_cast<u32>(HaltReason::Step), Xscratch2);
             code.or_(Wscratch0, Wscratch0, Wscratch1);
             code.add_d(Wscratch1, code.zero, Wscratch0);
-            code.sc_d(Wscratch1, Xhalt, 0);
+            code.sc_w(Wscratch1, Xhalt, 0);
             code.beqz(Wscratch1, step_hr_loop);
 
             code.jirl(code.zero, code.s0, 0);
@@ -545,10 +545,10 @@ namespace Dynarmic::Backend::LoongArch64 {
 
             Xbyak_loongarch64::Label exit_hr_loop;
             code.L(exit_hr_loop);
-            code.ll_d(code.a0, Xhalt, 0);
+            code.ll_w(code.a0, Xhalt, 0);
             code.add_d(Wscratch0, code.zero, code.zero);
 //        code.dbar(0); FIXME no llacq ,is this ok ?
-            code.sc_d(Wscratch0, Xhalt, 0);
+            code.sc_w(Wscratch0, Xhalt, 0);
             code.beqz(Wscratch0, exit_hr_loop);
 
             ABI_PopRegisters(code, ABI_CALLEE_SAVE | ToRegList(code.ra), sizeof(StackLayout));

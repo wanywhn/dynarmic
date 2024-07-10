@@ -319,7 +319,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             code.ll_w(Wscratch0, Xhalt, 0);
             code.bnez(Wscratch0, return_from_run_code);
             code.ori(Wscratch1, Wscratch0, static_cast<u32>(HaltReason::Step));
-            code.sc_d(Wscratch1, Xhalt, 0);
+            code.sc_w(Wscratch1, Xhalt, 0);
             code.beqz(Wscratch1, step_hr_loop);
 
             code.jirl(code.zero, code.s0, 0);
@@ -370,9 +370,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
             Xbyak_loongarch64::Label exit_hr_loop;
             code.L(exit_hr_loop);
-            code.ll_d(code.a0, Xhalt, 0);
+            code.ll_w(code.a0, Xhalt, 0);
             code.add_d(Wscratch1, code.zero, code.zero);
-            code.sc_d(Wscratch1, Xhalt, 0);
+            code.sc_w(Wscratch1, Xhalt, 0);
             code.beqz(Wscratch1, exit_hr_loop);
             // FIXME
             ABI_PopRegisters(code, ABI_CALLEE_SAVE | ToRegList(code.ra), sizeof(StackLayout));
