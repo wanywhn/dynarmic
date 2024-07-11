@@ -160,7 +160,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             const auto result = xmms[0];
             const size_t stack_space = xmms.size() * 16;
 
-            ABI_PushRegisters(code, ABI_CALLEE_SAVE & ~ToRegList(result), sizeof(StackLayout) + stack_space);
+            ABI_PushRegisters(code, ABI_CALLER_SAVE & ~ToRegList(result), sizeof(StackLayout) + stack_space);
 
             for (size_t i = 0; i < xmms.size(); ++i) {
                 code.vst(xmms[i], code.sp, i * 16);
@@ -172,7 +172,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
             code.vld(result, code.sp, 0 * 16);
 
-            ABI_PopRegisters(code, ABI_CALLEE_SAVE & ~ToRegList(result), sizeof(StackLayout) + stack_space);
+            ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(result), sizeof(StackLayout) + stack_space);
             code.b(*end);
         });
     }
