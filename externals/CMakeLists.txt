@@ -11,6 +11,8 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # Disable tests in all externals supporting the standard option name
 set(BUILD_TESTING OFF)
 
+include(FetchContent)
+
 # For libraries that already come with a CMakeLists file,
 # simply add the directory to that file as a subdirectory
 # to have CMake automatically recognize them.
@@ -58,11 +60,23 @@ if (NOT TARGET xbyak::xbyak)
     endif()
 endif()
 
+#if (NOT TARGET xbyak_loongarch64::xbyak_loongarch64)
+#    if ("loongarch64" IN_LIST ARCHITECTURE)
+#        add_subdirectory(xbyak_loongarch64)
+#    endif()
+#endif()
+
 if (NOT TARGET xbyak_loongarch64::xbyak_loongarch64)
     if ("loongarch64" IN_LIST ARCHITECTURE)
-        add_subdirectory(xbyak_loongarch64)
+        FetchContent_Declare(xbyak_loongarch64
+                GIT_REPOSITORY "https://github.com/wanywhn/xbyak_loongarch64.git"
+                GIT_TAG "origin/master"
+                SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/xbyak_loongarch64"
+        )
+        FetchContent_MakeAvailable(xbyak_loongarch64)
     endif()
 endif()
+
 # zydis
 
 if (NOT TARGET Zydis::Zydis)
