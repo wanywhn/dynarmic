@@ -81,7 +81,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 // constexpr RegisterList ABI_CALLEE_SAVE = 0x0000ff00'7ff80000;
     constexpr RegisterList ABI_CALLEE_SAVE = 0xff000000'ff800000;
 // constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'4000ffff;
-    constexpr RegisterList ABI_CALLER_SAVE = 0xffffffff'001FFFF2;
+    constexpr RegisterList ABI_CALLER_SAVE = 0x00ffffff'001FFFF2;
 //constexpr RegisterList ABI_CALLER_SAVE = 0x000000ff'001FFFF0;
 
 
