@@ -153,22 +153,22 @@ namespace Dynarmic::Backend::LoongArch64 {
                          IR::LocationDescriptor, bool is_single_step) {
         if (ctx.conf.HasOptimization(OptimizationFlag::ReturnStackBuffer) && !is_single_step) {
             Xbyak_loongarch64::Label fail;
-            code.add_imm(Wscratch0, code.zero, A64::LocationDescriptor::fpcr_mask, Xscratch1);
+            code.add_imm(Xscratch0, code.zero, A64::LocationDescriptor::fpcr_mask, Xscratch1);
 //            code.add_d(Wscratch0, A64::LocationDescriptor::fpcr_mask, code.zero);
             code.ld_d(code.a0, Xstate, offsetof(A64JitState, fpcr));
             code.ld_d(code.a1, Xstate, offsetof(A64JitState, pc));
-            code.and_(code.a0, code.a0, Wscratch0);
-            code.add_imm(Wscratch0, code.zero, A64::LocationDescriptor::pc_mask, Xscratch1);
-            code.and_(code.a1, code.a1, Wscratch0);
-            code.slli_w(code.a0, code.a0, A64::LocationDescriptor::fpcr_shift);
+            code.and_(code.a0, code.a0, Xscratch0);
+            code.add_imm(Xscratch0, code.zero, A64::LocationDescriptor::pc_mask, Xscratch1);
+            code.and_(code.a1, code.a1, Xscratch0);
+            code.slli_d(code.a0, code.a0, A64::LocationDescriptor::fpcr_shift);
             code.or_(code.a0, code.a0, code.a1);
 
-            code.ld_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
-            code.andi(Wscratch2, Wscratch2, RSBIndexMask);
+            code.ld_d(Xscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
+            code.andi(Xscratch2, Wscratch2, RSBIndexMask);
             code.add_d(code.a2, code.sp, Xscratch2);
 //            code.ADD(code.a2, code.sp, Xscratch2);
-            code.sub_imm(Wscratch2, Wscratch2, sizeof(RSBEntry), code.t0);
-            code.st_d(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
+            code.sub_imm(Xscratch2, Xscratch2, sizeof(RSBEntry), code.t0);
+            code.st_d(Xscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
             code.ld_d(Xscratch0, code.a2, offsetof(StackLayout, rsb));
             code.ld_d(Xscratch1, code.a2, offsetof(StackLayout, rsb) + 8);
 //            code.LDP(Xscratch0, Xscratch1, code.a2, offsetof(StackLayout, rsb));
