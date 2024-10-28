@@ -498,6 +498,42 @@ TEST_CASE("A64: ANDS NZCV", "[a64]") {
     }
 }
 
+TEST_CASE("A64: BNE", "[a64]") {
+    A64TestEnv env;
+    A64::Jit jit{A64::UserConfig{&env}};
+
+    env.code_mem.emplace_back(0xeb01001f);  // 0x00 : cmp	x0, x1
+    env.code_mem.emplace_back(0x54000061);  // 0x04 : b.ne	10 <label>
+    env.code_mem.emplace_back(0xd2800022);  // 0x08 : mov	x2, #0x1
+    env.code_mem.emplace_back(0x14000000);  // 0x0C : b	c <square+0xc>
+    env.code_mem.emplace_back(0xd2800042);  // 0x10 : mov	x2, #0x2
+    env.code_mem.emplace_back(0x14000000);  // 0x14 : B .
+
+    SECTION("no branch") {
+        jit.SetPC(0);
+        jit.SetRegister(0, 1);
+        jit.SetRegister(1, 1);
+
+        env.ticks_left = 4;
+        jit.Run();
+
+        REQUIRE(jit.GetRegister(2) == 1);
+        REQUIRE(jit.GetPC() == 0xC);
+    }
+
+    SECTION("branch") {
+        jit.SetPC(0);
+        jit.SetRegister(0, 0);
+        jit.SetRegister(1, 1);
+
+        env.ticks_left = 4;
+        jit.Run();
+
+        REQUIRE(jit.GetRegister(2) == 2);
+        REQUIRE(jit.GetPC() == 0x14);
+    }
+}
+
 TEST_CASE("A64: CBZ", "[a64]") {
     A64TestEnv env;
     A64::Jit jit{A64::UserConfig{&env}};
