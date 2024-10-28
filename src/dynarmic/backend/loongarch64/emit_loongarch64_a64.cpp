@@ -31,11 +31,11 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         switch (cond) {
             case IR::Cond::EQ:
-                code.andi(Xscratch0, Xscratch0, NZCV::arm_n_flag_mask);
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_z_flag_mask);
                 code.bnez(Xscratch0, pass);
                 break;
             case IR::Cond::NE:
-                code.andi(Xscratch0, Xscratch0, NZCV::arm_n_flag_mask);
+                code.andi(Xscratch0, Xscratch0, NZCV::arm_z_flag_mask);
                 code.beqz(Xscratch0, pass);
                 break;
             case IR::Cond::CS:
