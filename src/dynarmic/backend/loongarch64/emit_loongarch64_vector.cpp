@@ -48,7 +48,6 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.CallLambda(fn);
 
         code.vld(result, code.sp, 0 * 16);
-        ctx.reg_alloc.DefineAsRegister(inst, Xscratch0);
 
         code.ld_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
         code.or_(Xscratch1, Xscratch1, code.a0);
