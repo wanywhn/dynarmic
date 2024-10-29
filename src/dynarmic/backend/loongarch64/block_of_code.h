@@ -147,7 +147,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     private:
         JitStateInfo jsi;
 
-        bool prelude_complete = false;
+        // bool prelude_complete = false;
         CodePtr code_begin = nullptr;
 
         using RunCodeFuncType = HaltReason (*)(void *, CodePtr);

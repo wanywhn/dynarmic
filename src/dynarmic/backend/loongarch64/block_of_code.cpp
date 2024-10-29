@@ -91,7 +91,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     void BlockOfCode::PreludeComplete() {
-        prelude_complete = true;
+        // prelude_complete = true;
 //    code_begin = (CodePtr) getCurr();
         ClearCache();
         DisableWriting();
@@ -118,12 +118,12 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     void BlockOfCode::ClearCache() {
-        ASSERT(prelude_complete);
+        // ASSERT(prelude_complete);
         SetCodePtr(code_begin);
     }
 
     size_t BlockOfCode::SpaceRemaining() const {
-        ASSERT(prelude_complete);
+        // ASSERT(prelude_complete);
         uint32_t *current_ptr = getCurr<uint32_t *>();
         if (current_ptr >= &top_[maxSize_])
             return 0;

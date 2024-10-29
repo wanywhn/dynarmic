@@ -83,7 +83,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     }
 
     void AddressSpace::ClearCache() {
-        code.ClearCache();
+        // code.ClearCache();
         code.SetCodePtr(reinterpret_cast<CodePtr>(prelude_info.end_of_prelude));
         block_entries.clear();
         reverse_block_entries.clear();
