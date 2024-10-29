@@ -358,11 +358,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                 RegAlloc::Realize(Wresult, Woperand, Wshift);
                 ctx.reg_alloc.SpillFlags();
 
-                code.andi(Wscratch0, Wshift, 0xff);
-                code.sll_w(Wresult, Woperand, Wscratch0);
-                code.srli_w(Wscratch0, Wscratch0, 32);
-                code.masknez(Wresult, Wresult, Wscratch0);
-
+                code.sll_w(Wresult, Woperand, Wshift);
             }
         } else {
             if (shift_arg.IsImmediate() && shift_arg.GetImmediateU8() == 0) {
