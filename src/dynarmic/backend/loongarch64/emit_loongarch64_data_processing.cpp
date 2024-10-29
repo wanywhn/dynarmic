@@ -1401,16 +1401,16 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::Not32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp<32>(
+        EmitTwoOp<32>(
                 code, ctx, inst,
-                [&](auto &Wresult, auto &ra, auto &rb) { code.xor_(Wresult, ra, rb); });
+            [&](auto &Wresult, auto &ra) { code.nor(Wresult, ra, code.zero); });
     }
 
     template<>
     void EmitIR<IR::Opcode::Not64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp<64>(
+        EmitTwoOp<64>(
                 code, ctx, inst,
-                [&](auto &Xresult, auto &ra, auto &rb) { code.xor_(Xresult, ra, rb); });
+                [&](auto &Xresult, auto &ra) { code.nor(Xresult, ra, code.zero); });
     }
 
     template<>
