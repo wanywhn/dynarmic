@@ -992,23 +992,25 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<size_t fsize>
     void FPVectorNeg(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
-        auto Qa = ctx.reg_alloc.ReadWriteQ(args[0], inst);
+        auto Qa = ctx.reg_alloc.ReadQ(args[0]);
+        auto Qresult = ctx.reg_alloc.WriteQ(inst);
         using FPT = mcl::unsigned_integer_of_size<fsize>;
         constexpr FPT sign_mask = FP::FPInfo<FPT>::sign_mask;
         constexpr u64 sign_mask64 = mcl::bit::replicate_element<fsize, u64>(sign_mask);
+        RegAlloc::Realize(Qa, Qresult);
 
         if constexpr (fsize == 64) {
             code.add_imm(Xscratch0, code.zero, sign_mask64, Xscratch1);
             code.vinsgr2vr_d(Vscratch2, Xscratch0, 0);
-            code.vxor_v(Qa, Qa, Vscratch2);
+            code.vxor_v(Qresult, Qa, Vscratch2);
         } else if constexpr (fsize == 32) {
             code.add_imm(Xscratch0, code.zero, sign_mask64, Xscratch1);
             code.vinsgr2vr_w(Vscratch2, Xscratch0, 0);
-            code.vxor_v(Qa, Qa, Vscratch2);
+            code.vxor_v(Qresult, Qa, Vscratch2);
         } else if constexpr (fsize == 16) {
             code.add_imm(Xscratch0, code.zero, sign_mask64, Xscratch1);
             code.vinsgr2vr_h(Vscratch2, Xscratch0, 0);
-            code.vxor_v(Qa, Qa, Vscratch2);
+            code.vxor_v(Qresult, Qa, Vscratch2);
         }
 
 
