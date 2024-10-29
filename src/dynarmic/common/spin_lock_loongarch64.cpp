@@ -84,7 +84,6 @@ struct SpinLockImpl {
     void (*unlock)(volatile int*);
 };
 
-std::once_flag flag;
 SpinLockImpl impl;
 
 SpinLockImpl::SpinLockImpl(): code(4096, nullptr, &s_allocator) {

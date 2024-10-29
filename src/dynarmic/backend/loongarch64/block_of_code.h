@@ -134,9 +134,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         void SetCodePtr(CodePtr code_ptr);
 
-        void B(const void *a);
+        void B(void *a);
 
-        void BL(const void *a);
+        void BL(void *a);
 
         void LDLableData_d(const Xbyak_loongarch64::XReg &rd, const Xbyak_loongarch64::Label &label);
 

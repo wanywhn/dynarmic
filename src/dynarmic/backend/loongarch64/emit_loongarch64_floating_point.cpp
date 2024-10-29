@@ -44,15 +44,6 @@ namespace Dynarmic::Backend::LoongArch64 {
     constexpr u64 f64_non_sign_mask = 0x7fffffffffffffffu;
     constexpr u64 f64_smallest_normal = 0x0010000000000000u;
 
-    constexpr u64 f64_min_s16 = 0xc0e0000000000000u;      // -32768 as a double
-    constexpr u64 f64_max_s16 = 0x40dfffc000000000u;      // 32767 as a double
-    constexpr u64 f64_min_u16 = 0x0000000000000000u;      // 0 as a double
-    constexpr u64 f64_max_u16 = 0x40efffe000000000u;      // 65535 as a double
-    constexpr u64 f64_max_s32 = 0x41dfffffffc00000u;      // 2147483647 as a double
-    constexpr u64 f64_max_u32 = 0x41efffffffe00000u;      // 4294967295 as a double
-    constexpr u64 f64_max_s64_lim = 0x43e0000000000000u;  // 2^63 as a double (actual maximum unrepresentable)
-
-
 #define FCODE(NAME)                  \
     [&code](auto... args) {          \
         if constexpr (fsize == 32) { \

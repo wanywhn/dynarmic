@@ -1110,14 +1110,11 @@ namespace Dynarmic::Backend::LoongArch64 {
         RegAlloc::Realize(Rresult, Ra, Rb);
 
         decltype(&BlockOfCode::sub_d) subfn;
-        decltype(&BlockOfCode::add_d) addfn;
 
         if constexpr (bitsize == 32) {
             subfn = &BlockOfCode::sub_w;
-            addfn = &BlockOfCode::add_w;
         } else if constexpr (bitsize == 64) {
             subfn = &BlockOfCode::sub_d;
-            addfn = &BlockOfCode::add_d;
         }
         const bool is_cmp =
                 inst->UseCount() == size_t(!!carry_inst + !!overflow_inst + !!nzcv_inst) && carry_in.IsImmediate() &&

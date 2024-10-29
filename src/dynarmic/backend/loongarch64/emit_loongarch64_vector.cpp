@@ -2631,7 +2631,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         constexpr size_t bit_size_minus_one = mcl::bitsizeof<T> - 1;
 
-        const auto saturate = [bit_size_minus_one](T value) {
+        const auto saturate = [](T value) {
             return static_cast<T>((static_cast<U>(value) >> bit_size_minus_one) + (U{1} << bit_size_minus_one) - 1);
         };
 

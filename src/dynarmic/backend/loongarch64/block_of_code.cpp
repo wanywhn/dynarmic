@@ -256,12 +256,12 @@ namespace Dynarmic::Backend::LoongArch64 {
         setSize(required_size);
     }
 
-    void BlockOfCode::B(const void *a) {
+    void BlockOfCode::B(void *a) {
         auto fn = (std::uint64_t (*)()) a;
         JumpFunction(fn);
     }
 
-    void BlockOfCode::BL(const void *a) {
+    void BlockOfCode::BL(void *a) {
         auto fn = (std::uint64_t (*)()) a;
         CallFunction(fn);
     }
