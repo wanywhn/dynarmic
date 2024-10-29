@@ -56,7 +56,10 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         code.ld_w(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
         code.addi_w(Wscratch2, Wscratch2, sizeof(RSBEntry));
-        code.andi(Wscratch2, Wscratch2, RSBIndexMask);
+
+        code.add_imm(Xscratch0, code.zero, RSBIndexMask, Wscratch1);
+        code.and_(Wscratch2, Wscratch2, Xscratch0);
+
         code.st_w(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
         code.add_d(Xscratch2, code.sp, Xscratch2);
 

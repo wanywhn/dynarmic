@@ -250,7 +250,9 @@ namespace Dynarmic::Backend::LoongArch64 {
                 code.bne(Xaddr, Xscratch0, *fallback);
             } else {
                 // If (addr & page_mask) > page_size - byte_size, use fallback.
-                code.andi(Xscratch0, Xaddr, page_mask);
+                code.add_imm(Wscratch1, code.zero, page_mask, Wscratch2);
+
+                code.and_(Xscratch0, Xaddr, Wscratch1);
                 code.addi_d(Xscratch1, code.zero, page_size - bitsize / 8);
                 code.bltu(Xscratch1, Xscratch0, *fallback);
             }
@@ -281,7 +283,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
             if (ctx.conf.page_table_pointer_mask_bits != 0) {
                 const u64 mask = u64(~u64(0)) << ctx.conf.page_table_pointer_mask_bits;
-                code.andi(Xscratch0, Xscratch0, mask);
+                code.add_imm(Wscratch1, code.zero, mask, Wscratch2);
+
+                code.and_(Xscratch0, Xscratch0, Wscratch1);
             }
 
             code.beqz(Xscratch0, *fallback);
@@ -289,7 +293,10 @@ namespace Dynarmic::Backend::LoongArch64 {
             if (ctx.conf.absolute_offset_page_table) {
                 return std::make_pair(Xscratch0, Xaddr);
             }
-            code.andi(Xscratch1, Xaddr, page_mask);
+
+            code.add_imm(Wscratch1, code.zero, page_mask, Wscratch2);
+
+            code.and_(Xscratch1, Xaddr, Wscratch1);
             return std::make_pair(Xscratch0, Xscratch1);
         }
 

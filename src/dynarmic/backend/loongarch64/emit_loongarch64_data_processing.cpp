@@ -536,8 +536,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                     auto Woperand = ctx.reg_alloc.ReadW(operand_arg);
                     RegAlloc::Realize(Wresult, Wcarry_out, Woperand);
 
-                    code.srli_w(Wcarry_out, Woperand, 31 - 29);
-                    code.andi(Wcarry_out, Wcarry_out, 1 << 29);
+                    code.srli_w(Wcarry_out, Woperand, 31);
                     code.add_d(Wresult, code.zero, code.zero);
                 }
             } else {
@@ -670,7 +669,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                     RegAlloc::Realize(Wresult, Wcarry_out, Woperand);
 
                     code.srai_w(Wresult, Woperand, 31);
-                    code.andi(Wcarry_out, Wresult, 1 << 29);
+                    code.bstrpick_w(Wcarry_out, Wresult, 0, 0);
                 }
             } else {
                 auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -713,7 +712,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                 code.L(zero);
                 code.add_d(*Wresult, Woperand, code.zero);
                 if (carry_arg.IsImmediate()) {
-                    code.add_imm(Wcarry_out, code.zero, carry_arg.GetImmediateU32() << 29, Wscratch0);
+                    code.addi_d(Wcarry_out, code.zero, carry_arg.GetImmediateU32());
                 } else {
                     code.add_d(*Wcarry_out, Wcarry_in, code.zero);
                 }
@@ -771,8 +770,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                 auto Wcarry_out = ctx.reg_alloc.WriteW(carry_inst);
                 RegAlloc::Realize(Wcarry_out);
 
-                code.rotri_w(Wcarry_out, Woperand, ((shift + 31) - 29) % 32);
-                code.andi(Wcarry_out, Wcarry_out, 1 << 29);
+                code.bstrpick_w(Wcarry_out, Wresult, 31, 31);
             }
         } else {
             auto Wresult = ctx.reg_alloc.WriteW(inst);
@@ -790,8 +788,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
 //            code.TST(Wshift, 0xff);
                 code.addi_w(Wscratch2, code.zero, 0xff);
-                code.srli_w(Wcarry_out, Wresult, 31 - 29);
-                code.andi(Wcarry_out, Wcarry_out, 1 << 29);
+
+                code.bstrpick_w(Wcarry_out, Wresult, 31, 31);
+
                 if (carry_in) {
                     Xbyak_loongarch64::Label end;
                     code.add_imm(Wscratch0, code.zero, carry_in, Wscratch1);
@@ -810,8 +809,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                 ctx.reg_alloc.SpillFlags();
 
                 Xbyak_loongarch64::Label wciend;
-                code.srli_w(Wcarry_out, Wresult, 31 - 29);
-                code.andi(Wcarry_out, Wcarry_out, 1 << 29);
+                code.bstrpick_w(Wcarry_out, Wresult, 31, 31);
+
                 code.addi_w(Wscratch0, code.zero, 0xff);
                 code.bne(Wshift, Wscratch0, wciend);
                 code.add_w(Wcarry_out, code.zero, Wcarry_in);

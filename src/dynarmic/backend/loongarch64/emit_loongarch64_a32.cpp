@@ -178,7 +178,10 @@ namespace Dynarmic::Backend::LoongArch64 {
             Xbyak_loongarch64::Label fail;
 
             code.ld_w(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
-            code.andi(Wscratch2, Wscratch2, RSBIndexMask);
+
+            code.add_imm(Xscratch0, code.zero, RSBIndexMask, Wscratch1);
+            code.and_(Wscratch2, Wscratch2, Xscratch0);
+
             code.add_d(code.a2, code.sp, Xscratch2);
             code.sub_imm(Wscratch2, Wscratch2, sizeof(RSBEntry), code.t0);
             code.st_w(Wscratch2, code.sp, offsetof(StackLayout, rsb_ptr));
