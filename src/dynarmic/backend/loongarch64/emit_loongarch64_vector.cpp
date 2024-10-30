@@ -2150,46 +2150,48 @@ namespace Dynarmic::Backend::LoongArch64 {
     void
     EmitIR<IR::Opcode::VectorSignExtend8>(BlockOfCode &code, EmitContext &ctx,
                                           IR::Inst *inst) {
-        ASSERT_FALSE("Unimplemented");
-        (void) code;
-        (void) ctx;
-        (void) inst;
-//        EmitTwoOp(code, ctx, inst,
-//                                  [&](auto &Vresult, auto &Voperand) { code.SXTL(Vresult, Voperand); });
+       EmitTwoOp(code, ctx, inst,
+                                 [&](auto &Vresult, auto &Voperand) {
+            code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+            code.vilvl_b(Vscratch1, Vscratch0, Voperand);
+            code.vhaddw_h_b(Vresult, Vscratch0, Vscratch1);
+        });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorSignExtend16>(BlockOfCode &code, EmitContext &ctx,
                                            IR::Inst *inst) {
-        ASSERT_FALSE("Unimplemented");
-        (void) code;
-        (void) ctx;
-        (void) inst;
-//        EmitTwoOp(code, ctx, inst,
-//                                   [&](auto &Vresult, auto &Voperand) { code.SXTL(Vresult, Voperand); });
+       EmitTwoOp(code, ctx, inst,
+                                  [&](auto &Vresult, auto &Voperand) {
+            code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+            code.vilvl_h(Vscratch1, Vscratch0, Voperand);
+            code.vhaddw_w_h(Vresult, Vscratch0, Vscratch1);
+        });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorSignExtend32>(BlockOfCode &code, EmitContext &ctx,
                                            IR::Inst *inst) {
-        ASSERT_FALSE("Unimplemented");
-        (void) code;
-        (void) ctx;
-        (void) inst;
-//        EmitTwoOp(code, ctx, inst,
-//                                   [&](auto &Vresult, auto &Voperand) { code.SXTL(Vresult, Voperand); });
+       EmitTwoOp(code, ctx, inst,
+                                  [&](auto &Vresult, auto &Voperand) {
+            code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+            code.vilvl_w(Vscratch1, Vscratch0, Voperand);
+            code.vhaddw_d_w(Vresult, Vscratch0, Vscratch1);
+        });
     }
 
     template<>
     void
     EmitIR<IR::Opcode::VectorSignExtend64>(BlockOfCode &code, EmitContext &ctx,
                                            IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitTwoOp(code, ctx, inst,
+                  [&](auto &Vresult, auto &Voperand) {
+                      code.vxor_v(Vscratch0, Vscratch0, Vscratch0);
+                      code.vilvl_d(Vscratch1, Vscratch0, Voperand);
+                      code.vhaddw_q_d(Vresult, Vscratch0, Vscratch1);
+                  });
     }
 
     template<>
