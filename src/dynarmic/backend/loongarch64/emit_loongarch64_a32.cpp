@@ -422,15 +422,12 @@ namespace Dynarmic::Backend::LoongArch64 {
             const size_t index = static_cast<size_t>(reg) - static_cast<size_t>(A32::ExtReg::D0);
             auto Dvalue = ctx.reg_alloc.ReadD(args[1]);
             RegAlloc::Realize(Dvalue);
-            code.ld_d(Xscratch0, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u64) * index);
-            code.vinsgr2vr_d(Dvalue, Xscratch0, 0);
-//            code.st_d(Dvalue, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u64) * index);
+            code.vstelm_d(Dvalue, Xstate, offsetof(A32JitState, ext_regs) + sizeof(u64) * index, 0);
         } else {
             const size_t index = static_cast<size_t>(reg) - static_cast<size_t>(A32::ExtReg::Q0);
             auto Qvalue = ctx.reg_alloc.ReadQ(args[1]);
             RegAlloc::Realize(Qvalue);
-            code.vld(Qvalue, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u64) * index);
-//            code.st_d(Qvalue, Xstate, offsetof(A32JitState, ext_regs) + 2 * sizeof(u64) * index);
+            code.vst(Qvalue, Xstate, offsetof(A32JitState, ext_regs) + 2 *sizeof(u64) * index);
         }
     }
 
