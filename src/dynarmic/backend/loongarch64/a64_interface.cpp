@@ -148,11 +148,14 @@ namespace Dynarmic::A64 {
         }
 
         void DumpDisassembly() const {
-            ASSERT_FALSE("Unimplemented");
+            auto rst = this->Disassemble();
+            for (auto item:rst) {
+                std::cout << item << std::endl;
+            }
         }
 
         std::vector<std::string> Disassemble() const {
-            ASSERT_FALSE("Unimplemented");
+            return current_address_space.Disassemble();
         }
 
     private:

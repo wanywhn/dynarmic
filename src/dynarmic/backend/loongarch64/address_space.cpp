@@ -11,6 +11,7 @@
 #include "dynarmic/backend/loongarch64/stack_layout.h"
 #include "dynarmic/common/cast_util.h"
 #include "dynarmic/common/fp/fpcr.h"
+#include "dynarmic/common/llvm_disassemble.h"
 #include "dynarmic/interface/exclusive_monitor.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
@@ -90,6 +91,17 @@ namespace Dynarmic::Backend::LoongArch64 {
         block_infos.clear();
         block_references.clear();
 //    code.set_ptr(prelude_info.end_of_prelude);
+    }
+
+    std::vector<std::string> AddressSpace::Disassemble() const
+    {
+
+        auto ret = std::vector<std::string>();
+        for (auto start = (uint8_t *)prelude_info.end_of_prelude; start != code.getCurr(); start +=4) {
+            const size_t pc = start - (uint8_t *)prelude_info.end_of_prelude;
+            ret.push_back(Common::DisassembleLoongArch64(const_cast<uint8_t *>(start) , pc));
+        }
+        return ret;
     }
 
     size_t AddressSpace::GetRemainingSize() {

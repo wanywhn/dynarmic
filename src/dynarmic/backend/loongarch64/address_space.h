@@ -45,6 +45,8 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         void ClearCache();
 
+        std::vector<std::string> Disassemble() const;
+
     protected:
         virtual EmitConfig GetEmitConfig() = 0;
 

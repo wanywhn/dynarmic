@@ -125,4 +125,27 @@ std::string DisassembleAArch64([[maybe_unused]] u32 instruction, [[maybe_unused]
     return result;
 }
 
+std::string DisassembleLoongArch64([[maybe_unused]] uint8_t *instruction, [[maybe_unused]] u64 pc) {
+    std::string result;
+
+#ifdef DYNARMIC_USE_LLVM
+    LLVMInitializeLoongArchTargetInfo();
+    LLVMInitializeLoongArchTargetMC();
+    LLVMInitializeLoongArchDisassembler();
+    LLVMDisasmContextRef llvm_ctx = LLVMCreateDisasm("loongarch64", nullptr, 0, nullptr, nullptr);
+    LLVMSetDisasmOptions(llvm_ctx, LLVMDisassembler_Option_AsmPrinterVariant);
+
+    char buffer[80];
+    size_t inst_size = LLVMDisasmInstruction(llvm_ctx, instruction, sizeof(u32), pc, buffer, sizeof(buffer));
+    result = fmt::format("{:016x}  {:08x} ", pc, *(u32*)instruction);
+    result += inst_size > 0 ? buffer : "<invalid instruction>";
+    result += '\n';
+
+    LLVMDisasmDispose(llvm_ctx);
+#else
+    result += fmt::format("(disassembly disabled)\n");
+#endif
+
+    return result;
+}
 }  // namespace Dynarmic::Common

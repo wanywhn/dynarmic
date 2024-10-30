@@ -123,7 +123,10 @@ namespace Dynarmic::A32 {
         }
 
         void DumpDisassembly() const {
-            ASSERT_FALSE("Unimplemented");
+            auto rst = current_address_space.Disassemble();
+            for (auto item:rst) {
+                std::cout << item << std::endl;
+            }
         }
 
     private:
