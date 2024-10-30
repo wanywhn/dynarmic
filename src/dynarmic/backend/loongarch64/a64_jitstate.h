@@ -49,7 +49,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         // Exclusive state
         static constexpr u64 RESERVATION_GRANULE_MASK = 0xFFFF'FFFF'FFFF'FFF0ull;
-        u8 exclusive_state = 0;
+        u32 exclusive_state = 0;
 
         static constexpr size_t RSBSize = 8;  // MUST be a power of 2.
         static constexpr size_t RSBPtrMask = RSBSize - 1;

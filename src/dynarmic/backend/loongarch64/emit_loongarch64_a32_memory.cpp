@@ -16,7 +16,7 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::A32ClearExclusive>(BlockOfCode &code, EmitContext &, IR::Inst *) {
-        code.st_d(code.zero, Xstate, offsetof(A32JitState, exclusive_state));
+        code.st_w(code.zero, Xstate, offsetof(A32JitState, exclusive_state));
     }
 
     template<>
