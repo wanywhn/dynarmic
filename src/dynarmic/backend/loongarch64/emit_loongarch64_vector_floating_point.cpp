@@ -567,7 +567,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         });
     }
 
-    template<size_t size, typename EmitFn>
+    template<bool unsigned_, typename EmitFn>
     static void EmitFromFixed(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst, EmitFn emit) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
         auto Qto = ctx.reg_alloc.WriteQ(inst);
@@ -580,6 +580,12 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] {
             emit(Qto, Qfrom, fbits);
+            if constexpr (unsigned_ == true) {
+                if (ctx.FPCR(fpcr_controlled).RMode() == FP::RoundingMode::TowardsMinusInfinity) {
+                    code.vand_v(Qto, Qto, GetVectorOf<64>(code, 0x7FFFFFFFFFFFFFFF));
+                }
+            }
+
         });
     }
 
@@ -808,51 +814,45 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void EmitIR<IR::Opcode::FPVectorFromSignedFixed32>(BlockOfCode &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
-//        EmitFromFixed<32>(code, ctx, inst, [&](auto Vto, auto Vfrom, u8 fbits) {
-//            fbits ? code.vffint_s_w(Vto, Vfrom, fbits) : code.SCVTF(Vto, Vfrom);
-//        });
+        EmitFromFixed<false>(code, ctx, inst, [&](auto &Vto, auto &Vfrom, u8 fbits) {
+            code.vffint_s_w(Vto, Vfrom);
+            if (fbits != 0) {
+                code.vfmul_s(Vto, Vto, GetVectorOf<32>(code, static_cast<u32>(127 - fbits) << 23));
+            }
+       });
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorFromSignedFixed64>(BlockOfCode &code, EmitContext &ctx,
                                                        IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
-//        EmitFromFixed<64>(code, ctx, inst, [&](auto Vto, auto Vfrom, u8 fbits) {
-//            fbits ? code.SCVTF(Vto, Vfrom, fbits) : code.SCVTF(Vto, Vfrom);
-//        });
+        EmitFromFixed<false>(code, ctx, inst, [&](auto &Vto, auto &Vfrom, u8 fbits) {
+            code.vffint_d_l(Vto, Vfrom);
+            if (fbits != 0) {
+                code.vfmul_d(Vto, Vto, GetVectorOf<64>(code, static_cast<u64>(1023 - fbits) << 52));
+            }
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorFromUnsignedFixed32>(BlockOfCode &code, EmitContext &ctx,
                                                          IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
-//        EmitFromFixed<32>(code, ctx, inst, [&](auto Vto, auto Vfrom, u8 fbits) {
-//            fbits ? code.UCVTF(Vto, Vfrom, fbits) : code.UCVTF(Vto, Vfrom);
-//        });
+        EmitFromFixed<true>(code, ctx, inst, [&](auto &Vto, auto &Vfrom, u8 fbits) {
+            code.vffint_s_wu(Vto, Vfrom);
+            if (fbits != 0) {
+                code.vfmul_s(Vto, Vto, GetVectorOf<32>(code, static_cast<u32>(127 - fbits) << 23));
+            }
+        });
     }
 
     template<>
     void EmitIR<IR::Opcode::FPVectorFromUnsignedFixed64>(BlockOfCode &code, EmitContext &ctx,
                                                          IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
-        // FIXME EmitFPVectorFromUnsignedFixed64
-//        EmitFromFixed<64>(code, ctx, inst, [&](auto Vto, auto Vfrom, u8 fbits) {
-
-//            fbits ? code.UCVTF(Vto, Vfrom, fbits) : code.UCVTF(Vto, Vfrom);
-//        });
+        EmitFromFixed<true>(code, ctx, inst, [&](auto &Vto, auto &Vfrom, u8 fbits) {
+            code.vffint_d_lu(Vto, Vfrom);
+            if (fbits != 0) {
+                code.vfmul_d(Vto, Vto, GetVectorOf<64>(code, static_cast<u64>(1023 - fbits) << 52));
+            }
+        });
     }
 
     template<>
