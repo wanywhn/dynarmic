@@ -412,7 +412,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorArithmeticShiftRight8>(BlockOfCode &code, EmitContext &ctx,
                                                          IR::Inst *inst) {
         EmitImmShift(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.vsrai_b(Vresult, Voperand, shift_amount);
+            code.vsrai_b(Vresult, Voperand, shift_amount  & 0x7);
         });
     }
 
@@ -420,7 +420,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorArithmeticShiftRight16>(BlockOfCode &code, EmitContext &ctx,
                                                           IR::Inst *inst) {
         EmitImmShift(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.vsrai_h(Vresult, Voperand, shift_amount);
+            code.vsrai_h(Vresult, Voperand, shift_amount & 0xf);
         });
     }
 
@@ -428,7 +428,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorArithmeticShiftRight32>(BlockOfCode &code, EmitContext &ctx,
                                                           IR::Inst *inst) {
         EmitImmShift(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.vsrai_w(Vresult, Voperand, shift_amount);
+            code.vsrai_w(Vresult, Voperand, shift_amount & 0x1f);
         });
     }
 
@@ -436,7 +436,7 @@ namespace Dynarmic::Backend::LoongArch64 {
     void EmitIR<IR::Opcode::VectorArithmeticShiftRight64>(BlockOfCode &code, EmitContext &ctx,
                                                           IR::Inst *inst) {
         EmitImmShift(code, ctx, inst, [&](auto Vresult, auto Voperand, u8 shift_amount) {
-            code.vsrai_d(Vresult, Voperand, shift_amount);
+            code.vsrai_d(Vresult, Voperand, shift_amount & 0x3f);
         });
     }
 
