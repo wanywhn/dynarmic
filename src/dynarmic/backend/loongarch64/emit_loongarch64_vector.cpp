@@ -49,9 +49,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         code.vld(result, code.sp, 0 * 16);
 
-        code.ld_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
+        code.ld_w(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
         code.or_(Xscratch1, Xscratch1, code.a0);
-        code.st_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
+        code.st_w(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
 
         ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), stack_size);
     }
@@ -80,9 +80,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         code.vld(result, code.sp, 0 * 16);
 
-        code.ld_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
+        code.ld_w(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
         code.or_(Xscratch1, Xscratch1, code.a0);
-        code.st_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
+        code.st_w(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
 
         ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), stack_size);
 
@@ -136,9 +136,9 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         code.vld(result, code.sp, 0 * 16);
 
-        code.ld_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
+        code.ld_w(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
         code.or_(Xscratch1, Xscratch1, code.a0);
-        code.st_d(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
+        code.st_w(Xscratch1, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
 
         ABI_PopRegisters(code, ABI_CALLER_SAVE & ~ToRegList(*result), stack_size);
     }
@@ -2509,11 +2509,11 @@ namespace Dynarmic::Backend::LoongArch64 {
     code.vnor_v(Vscratch1, Vscratch1, Vscratch2);\
     code.vsetnez_v(0 , Vscratch1);\
     code.bcnez(0, set_qc);\
-    code.st_b(code.zero, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
+    code.st_w(code.zero, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
     code.b(label_end);\
     code.L(set_qc);\
     code.addi_w(Xscratch0, code.zero, 1);\
-    code.st_b(Xscratch0, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
+    code.st_w(Xscratch0, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
     code.L(label_end);\
 });
 #define VSSNT(op, tosize) \
@@ -2528,11 +2528,11 @@ namespace Dynarmic::Backend::LoongArch64 {
     code.vnor_v(Vscratch1, Vscratch1, Vscratch2);\
     code.vsetnez_v(0 , Vscratch1);\
     code.bcnez(0, set_qc);\
-    code.st_b(code.zero, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
+    code.st_w(code.zero, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
     code.b(label_end);\
     code.L(set_qc);\
     code.addi_w(Xscratch0, code.zero, 1);\
-    code.st_b(Xscratch0, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
+    code.st_w(Xscratch0, Xstate, code.GetJitStateInfo().offsetof_fpsr_qc);\
     code.L(label_end);\
 });
 
