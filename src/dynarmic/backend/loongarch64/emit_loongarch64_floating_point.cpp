@@ -1025,50 +1025,32 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::FPHalfToFixedS16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitToFixed<16, 16, false>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPHalfToFixedS32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitToFixed<16, 32, false>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPHalfToFixedS64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitToFixed<16, 64, false>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPHalfToFixedU16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitToFixed<16, 16, true>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPHalfToFixedU32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitToFixed<16, 32, true>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::FPHalfToFixedU64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitToFixed<16, 64, true>(code, ctx, inst);
     }
 
     template<>
