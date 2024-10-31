@@ -16,6 +16,7 @@
 #include "xbyak_loongarch64_util.h"
 #include "nzcv_util.h"
 #include "mcl/type_traits/integer_of_size.hpp"
+#include "dynarmic/common/fp/info.h"
 #include "dynarmic/common/fp/op/FPRecipStepFused.h"
 #include "dynarmic/common/lut_from_list.h"
 #include "dynarmic/common/fp/op/FPToFixed.h"
@@ -559,12 +560,23 @@ namespace Dynarmic::Backend::LoongArch64 {
         EmitThreeOp<64>(code, ctx, inst, [&](auto &Dresult, auto &Da, auto &Db) { code.fmul_d(Dresult, Da, Db); });
     }
 
+
+    template<size_t fsize>
+    void FPNeg(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+        using FPT = mcl::unsigned_integer_of_size<fsize>;
+        constexpr FPT sign_mask = FP::FPInfo<FPT>::sign_mask;
+
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        auto result = ctx.reg_alloc.WriteQ(inst);
+        auto a1 = ctx.reg_alloc.ReadQ(args[0]);
+        code.add_imm(Wscratch0, code.zero, sign_mask, Wscratch1);
+        code.movgr2fr_w(Fscratch0, Wscratch0);
+        code.vxor_v(result, result, Fscratch0);
+    }
+
     template<>
     void EmitIR<IR::Opcode::FPNeg16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        FPNeg<16>(code, ctx, inst);
     }
 
     template<>
