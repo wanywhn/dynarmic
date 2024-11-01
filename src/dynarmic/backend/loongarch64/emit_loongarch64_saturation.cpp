@@ -11,12 +11,87 @@
 #include "dynarmic/ir/basic_block.h"
 #include "dynarmic/ir/microinstruction.h"
 #include "dynarmic/ir/opcodes.h"
+#include <mcl/type_traits/integer_of_size.hpp>
 #include "xbyak_loongarch64.h"
 #include "xbyak_loongarch64_util.h"
+#include "nzcv_util.h"
 
 namespace Dynarmic::Backend::LoongArch64 {
 
     using namespace Xbyak_loongarch64::util;
+
+    namespace {
+
+//    template<Op op, size_t size, bool has_overflow_inst = false>
+//    void EmitSignedSaturatedOp(BlockOfCode& code, EmitContext& ctx, IR::Inst* inst) {
+//        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+//
+//        Xbyak::Reg result = ctx.reg_alloc.UseScratchGpr(args[0]).changeBit(size);
+//        Xbyak::Reg addend = ctx.reg_alloc.UseGpr(args[1]).changeBit(size);
+//        Xbyak::Reg overflow = ctx.reg_alloc.ScratchGpr().changeBit(size);
+//
+//        constexpr u64 int_max = static_cast<u64>(std::numeric_limits<mcl::signed_integer_of_size<size>>::max());
+//        if constexpr (size < 64) {
+//            code.xor_(overflow.cvt32(), overflow.cvt32());
+//            code.bt(result.cvt32(), size - 1);
+//            code.adc(overflow.cvt32(), int_max);
+//        } else {
+//            code.mov(overflow, int_max);
+//            code.bt(result, 63);
+//            code.adc(overflow, 0);
+//        }
+//
+//        // overflow now contains 0x7F... if a was positive, or 0x80... if a was negative
+//
+//        if constexpr (op == Op::Add) {
+//            code.add(result, addend);
+//        } else {
+//            code.sub(result, addend);
+//        }
+//
+//        if constexpr (size == 8) {
+//            code.cmovo(result.cvt32(), overflow.cvt32());
+//        } else {
+//            code.cmovo(result, overflow);
+//        }
+//
+//        code.seto(overflow.cvt8());
+//        if constexpr (has_overflow_inst) {
+//            if (const auto overflow_inst = inst->GetAssociatedPseudoOperation(IR::Opcode::GetOverflowFromOp)) {
+//                ctx.reg_alloc.DefineValue(overflow_inst, overflow);
+//            }
+//        } else {
+//            code.or_(code.byte[code.r15 + code.GetJitStateInfo().offsetof_fpsr_qc], overflow.cvt8());
+//        }
+//
+//        ctx.reg_alloc.DefineValue(inst, result);
+//    }
+
+        template<NZCV::Op op, size_t size>
+        void EmitUnsignedSaturatedOp(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
+            auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+            auto Wresult = ctx.reg_alloc.WriteX(inst);
+            auto Wa = ctx.reg_alloc.ReadX(args[0]);
+            auto Wb = ctx.reg_alloc.ReadX(args[1]);
+            auto overflow = ctx.reg_alloc.AllocScratchGpr();
+            Xbyak_loongarch64::Label skipSaturate;
+
+            RegAlloc::Realize(Wresult, Wa, Wb, overflow);
+
+            constexpr u64 boundary =
+                    op == NZCV::Op::Add ? std::numeric_limits<mcl::unsigned_integer_of_size<size>>::max() : 0;
+
+            NZCV::calNZCV<op, size, NZCV::arm_v_flag_mask, true>(code, Wresult, Wa, Wb, overflow);
+
+            code.beqz(overflow, skipSaturate);
+            code.add_imm(Wresult, code.zero, boundary, Xscratch0);
+            code.L(skipSaturate);
+            code.st_w(overflow, code.sp, code.GetJitStateInfo().offsetof_fpsr_qc);
+
+        }
+
+    }  // anonymous namespace
 
     template<>
     void EmitIR<IR::Opcode::SignedSaturatedAddWithFlag32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
@@ -169,34 +244,22 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::SignedSaturatedAdd8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Add, 8>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::SignedSaturatedAdd16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Add, 16>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::SignedSaturatedAdd32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Add, 32>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::SignedSaturatedAdd64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Add, 64>(code, ctx, inst);
     }
 
     template<>
@@ -219,98 +282,64 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     template<>
     void EmitIR<IR::Opcode::SignedSaturatedSub8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Sub, 8>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::SignedSaturatedSub16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Sub, 16>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::SignedSaturatedSub32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Sub, 32>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::SignedSaturatedSub64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Sub, 64>(code, ctx, inst);
+        // TODO Signed ?
     }
 
     template<>
     void EmitIR<IR::Opcode::UnsignedSaturatedAdd8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Add, 8>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::UnsignedSaturatedAdd16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Add, 16>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::UnsignedSaturatedAdd32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Add, 32>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::UnsignedSaturatedAdd64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Add, 64>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::UnsignedSaturatedSub8>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Sub, 8>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::UnsignedSaturatedSub16>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Sub, 16>(code, ctx, inst);
+        // TODO fix in CODE_WD
     }
 
     template<>
     void EmitIR<IR::Opcode::UnsignedSaturatedSub32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Sub, 32>(code, ctx, inst);
     }
 
     template<>
     void EmitIR<IR::Opcode::UnsignedSaturatedSub64>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        (void) code;
-        (void) ctx;
-        (void) inst;
-        ASSERT_FALSE("Unimplemented");
+        EmitUnsignedSaturatedOp<NZCV::Op::Sub, 64>(code, ctx, inst);
     }
 
 }  // namespace Dynarmic::Backend::LoongArch64
