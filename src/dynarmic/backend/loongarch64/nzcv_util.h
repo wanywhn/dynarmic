@@ -6,8 +6,10 @@
 #pragma once
 
 #include <mcl/stdint.hpp>
+#include "reg_alloc.h"
 
 namespace Dynarmic::Backend::LoongArch64::NZCV {
+
     constexpr u32 arm_mask = 0xF000'0000;
     constexpr size_t arm_nzcv_shift = 28;
 
@@ -54,5 +56,49 @@ namespace Dynarmic::Backend::LoongArch64::NZCV {
         return nzcv;
         */
         return x64_flags << 28;
+    }
+
+    enum class Op {
+        Add,
+        Sub,
+    };
+
+    template<Op op, size_t fsize, size_t wantGetMask, bool want_rst>
+    void
+    calNZCV(BlockOfCode &code, const Xbyak_loongarch64::XReg &Rresult, const Xbyak_loongarch64::XReg &Ra,
+            const Xbyak_loongarch64::XReg &Rb, const Xbyak_loongarch64::XReg &nzcv) {
+        code.xor_(nzcv, nzcv, nzcv);
+        if constexpr (wantGetMask & NZCV::arm_c_flag_mask) {
+            if constexpr (op == Op::Add) {
+                code.nor(Wscratch0, Ra, code.zero);
+                code.sltu(Wscratch1, Wscratch0, Rb);
+            } else if constexpr (op == Op::Sub) {
+                code.sltu(Wscratch1, Ra, Rb);
+            }
+            CODE_WD(bstrins_)(nzcv, Wscratch1, NZCV::arm_c_flag_inner_sft, NZCV::arm_c_flag_inner_sft);
+        }
+        if constexpr (want_rst == true || wantGetMask != NZCV::arm_c_flag_mask) {
+            CODE_WD(add_)(Rresult, Ra, Rb);
+        }
+        if constexpr (wantGetMask & NZCV::arm_v_flag_mask) {
+            code.xor_(Xscratch0, Ra, Rb);
+            code.xor_(Xscratch1, Ra, Rresult);
+            if constexpr (op == Op::Add) {
+                code.andn(Xscratch2, Xscratch1, Xscratch0);
+            } else if constexpr (op == Op::Sub) {
+                code.and_(Xscratch2, Xscratch1, Xscratch0);
+            }
+            CODE_WD(srli_)(Xscratch2, Xscratch2, fsize - 1);
+            CODE_WD(bstrins_)(nzcv, Xscratch2, NZCV::arm_v_flag_inner_sft, NZCV::arm_v_flag_inner_sft);
+        }
+        if constexpr (wantGetMask & NZCV::arm_n_flag_mask) {
+            CODE_WD(srli_)(Rresult, Rresult, fsize - 1 - NZCV::arm_n_flag_inner_sft);
+            CODE_WD(bstrins_)(nzcv, Rresult, NZCV::arm_n_flag_inner_sft, NZCV::arm_n_flag_inner_sft);
+        }
+        if constexpr (wantGetMask & NZCV::arm_z_flag_mask) {
+            CODE_WD(addi_)(Wscratch0, code.zero, NZCV::arm_z_flag_mask);
+            code.masknez(Rresult, Wscratch0, Rresult);
+            code.or_(nzcv, nzcv, Rresult);
+        }
     }
 } // namespace Dynarmic::Backend::LoongArch64::NZCV
