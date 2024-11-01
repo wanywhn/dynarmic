@@ -45,29 +45,11 @@ namespace Dynarmic::Backend::LoongArch64 {
     constexpr u64 f64_non_sign_mask = 0x7fffffffffffffffu;
     constexpr u64 f64_smallest_normal = 0x0010000000000000u;
 
-#define FCODE(NAME)                  \
-    [&code](auto... args) {          \
-        if constexpr (fsize == 32) { \
-            code.NAME##s(args...);   \
-        } else {                     \
-            code.NAME##d(args...);   \
-        }                            \
-    }
-#define ICODE(NAME)                  \
-    [&code](auto... args) {          \
-        if constexpr (fsize == 32) { \
-            code.NAME##d(args...);   \
-        } else {                     \
-            code.NAME##q(args...);   \
-        }                            \
-    }
-
-
     template<size_t fsize>
     void ForceToDefaultNaN(BlockOfCode &code, Xbyak_loongarch64::VReg result) {
 
         Xbyak_loongarch64::Label end;
-        FCODE(fcmp_sun_)(0, result, result);
+        CODE_SD(fcmp_sun_)(0, result, result);
         code.movcf2gr(Xscratch0, 0);
         code.beqz(Xscratch0, end);
         code.add_imm(Xscratch0, code.zero, fsize == 32 ? f32_nan : f64_nan, Xscratch2);
@@ -219,24 +201,6 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
     }
 
-#define FCODE(NAME)                  \
-    [&code](auto... args) {          \
-        if constexpr (fsize == 32) { \
-            code.NAME##s(args...);   \
-        } else {                     \
-            code.NAME##d(args...);   \
-        }                            \
-    }
-#define ICODE(NAME)                  \
-    [&code](auto... args) {          \
-        if constexpr (fsize == 32) { \
-            code.NAME##d(args...);   \
-        } else {                     \
-            code.NAME##q(args...);   \
-        }                            \
-    }
-
-
     template<size_t fsize>
     void ForceDenormalsToZero(BlockOfCode &code, std::initializer_list<Xbyak_loongarch64::VReg> to_daz) {
 
@@ -286,13 +250,13 @@ namespace Dynarmic::Backend::LoongArch64 {
 
         SharedLabel equal = GenSharedLabel(), end = GenSharedLabel();
 
-        FCODE(fcmp_cun_)(0, *operand1, *operand2);
+        CODE_SD(fcmp_cun_)(0, *operand1, *operand2);
 
         code.bcnez(0, *equal);
         if constexpr (is_max) {
-            FCODE(fmax_)(*result, *operand1, *operand2);
+            CODE_SD(fmax_)(*result, *operand1, *operand2);
         } else {
-            FCODE(fmin_)(*result, *operand1, *operand2);
+            CODE_SD(fmin_)(*result, *operand1, *operand2);
         }
         code.L(*end);
 
@@ -302,7 +266,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             auto operand1 = bbb;
             auto operand2 = ccc;
             code.L(*equal);
-            FCODE(fcmp_cun_)(1, operand1, operand2);
+            CODE_SD(fcmp_cun_)(1, operand1, operand2);
             code.bcnez(1, nan);
             if constexpr (is_max) {
                 code.vand_v(result, operand1, operand2);
@@ -316,8 +280,8 @@ namespace Dynarmic::Backend::LoongArch64 {
                 code.add_imm(gpr_scratch, code.zero, fsize == 32 ? f32_nan : f64_nan, Xscratch2);
                 code.movgr2fr_d(result, gpr_scratch);
             } else {
-                FCODE(fmov_)(tmp, operand1);
-                FCODE(fadd_)(result, operand1, operand2);
+                CODE_SD(fmov_)(tmp, operand1);
+                CODE_SD(fadd_)(result, operand1, operand2);
 //            EmitPostProcessNaNs<fsize>(code, result, tmp, operand2, gpr_scratch, *end);
             }
             code.b(*end);

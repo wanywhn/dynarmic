@@ -40,23 +40,6 @@ namespace Dynarmic::Backend::LoongArch64 {
     using namespace Xbyak_loongarch64::util;
     namespace mp = mcl::mp;
 
-#define FCODE(NAME)                  \
-    [&code](auto... args) {          \
-        if constexpr (fsize == 32) { \
-            code.NAME##s(args...);   \
-        } else {                     \
-            code.NAME##d(args...);   \
-        }                            \
-    }
-#define ICODE(NAME)                  \
-    [&code](auto... args) {          \
-        if constexpr (fsize == 32) { \
-            code.NAME##w(args...);   \
-        } else {                     \
-            code.NAME##d(args...);   \
-        }                            \
-    }
-
     enum class CheckInputNaN {
         Yes,
         No,
@@ -182,7 +165,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         if (fpcr.DN()) {
 //            if (code.HasHostFeature(HostFeature::AVX)) {
             auto nan_mask = Vscratch0;
-            FCODE(vfcmp_cun_)(nan_mask, result, result);
+            CODE_SD(vfcmp_cun_)(nan_mask, result, result);
             // TODO check this want qNaN or sNaN
             code.vbitsel_v(result, result, GetNaNVector<fsize>(code), nan_mask);
         }
@@ -248,7 +231,7 @@ namespace Dynarmic::Backend::LoongArch64 {
             }
             for (const Xbyak_loongarch64::VReg &xmm: to_daz) {
                 Xbyak_loongarch64::Label not_normals;
-                FCODE(vfclass_)(Vscratch1, xmm);
+                CODE_SD(vfclass_)(Vscratch1, xmm);
                 code.vand_v(Vscratch1, Vscratch1, GetVectorOf<fsize, subnormal_mask>(code));
                 code.vseteqz_v(0, Vscratch1);
                 code.bcnez(0, not_normals);
@@ -316,7 +299,7 @@ namespace Dynarmic::Backend::LoongArch64 {
         code.vor_v(result, xmm_a, xmm_a);
 
         if (check_input_nan == CheckInputNaN::Yes) {
-            FCODE(vfcmp_cun_)(nan_mask, *xmm_a, *xmm_b);
+            CODE_SD(vfcmp_cun_)(nan_mask, *xmm_a, *xmm_b);
         }
 
         if constexpr (std::is_member_function_pointer_v<Function>) {
@@ -326,9 +309,9 @@ namespace Dynarmic::Backend::LoongArch64 {
         }
 
         if (check_input_nan == CheckInputNaN::Yes) {
-            FCODE(vfcmp_cun_)(nan_mask, nan_mask, *result);
+            CODE_SD(vfcmp_cun_)(nan_mask, nan_mask, *result);
         } else {
-            FCODE(vfcmp_cun_)(nan_mask, *result, *result);
+            CODE_SD(vfcmp_cun_)(nan_mask, *result, *result);
         }
 
         HandleNaNs<fsize, 2>(code, ctx, fpcr_controlled, {result, xmm_a, xmm_b}, nan_mask, nan_handler);
@@ -355,14 +338,14 @@ namespace Dynarmic::Backend::LoongArch64 {
                 DenormalsAreZero<fsize>(code, ctx.FPCR(fpcr_controlled), {xmm_a, xmm_b}, *mask);
 
 //                if (code.HasHostFeature(HostFeature::AVX)) {
-                FCODE(vfcmp_ceq_)(*mask, *xmm_a, *xmm_b);
-                FCODE(vfcmp_cun_)(*nan_mask, *xmm_a, *xmm_b);
+                CODE_SD(vfcmp_ceq_)(*mask, *xmm_a, *xmm_b);
+                CODE_SD(vfcmp_cun_)(*nan_mask, *xmm_a, *xmm_b);
                 if constexpr (is_max) {
                     code.vand_v(*eq, xmm_a, xmm_b);
-                    FCODE(vfmax_)(*result, *xmm_a, *xmm_b);
+                    CODE_SD(vfmax_)(*result, *xmm_a, *xmm_b);
                 } else {
                     code.vor_v(*eq, xmm_a, xmm_b);
-                    FCODE(vfmin_)(*result, *xmm_a, *xmm_b);
+                    CODE_SD(vfmin_)(*result, *xmm_a, *xmm_b);
                 }
                 code.vbitsel_v(result, result, *eq, *mask);
                 code.vbitsel_v(result, result, GetNaNVector<fsize>(code), *nan_mask);
@@ -393,13 +376,13 @@ namespace Dynarmic::Backend::LoongArch64 {
                     // vrangep{s,d} here ends up not being significantly shorter than the AVX implementation
 
 //                    if (code.HasHostFeature(HostFeature::AVX)) {
-                    FCODE(vfcmp_ceq_)(*mask, result, xmm_b);
+                    CODE_SD(vfcmp_ceq_)(*mask, result, xmm_b);
                     if constexpr (is_max) {
                         code.vand_v(*eq, result, xmm_b);
-                        FCODE(vfmax_)(result, result, xmm_b);
+                        CODE_SD(vfmax_)(result, result, xmm_b);
                     } else {
                         code.vor_v(*eq, result, xmm_b);
-                        FCODE(vfmin_)(result, result, xmm_b);
+                        CODE_SD(vfmin_)(result, result, xmm_b);
                     }
                     code.vbitsel_v(result, result, *eq, *mask);
 
@@ -438,8 +421,8 @@ namespace Dynarmic::Backend::LoongArch64 {
             // result = xmm_a == SNaN || xmm_b == QNaN
             {
                 // evaluate xmm_b == QNaN
-                FCODE(vfcmp_cun_)(*tmp1, *xmm_b, *xmm_b);
-                ICODE(vslli_)(*tmp2, *xmm_b, static_cast<u8>(fsize - FP::FPInfo<FPT>::explicit_mantissa_width));
+                CODE_SD(vfcmp_cun_)(*tmp1, *xmm_b, *xmm_b);
+                CODE_WD(vslli_)(*tmp2, *xmm_b, static_cast<u8>(fsize - FP::FPInfo<FPT>::explicit_mantissa_width));
                 {
                     code.vsrai_w(tmp2, tmp2, 31);
                     if constexpr (fsize == 64) {
@@ -449,9 +432,9 @@ namespace Dynarmic::Backend::LoongArch64 {
                 code.vand_v(result, tmp1, tmp2);
 
                 // evaluate xmm_a == SNaN
-                FCODE(vfcmp_cun_)(*tmp1, *xmm_a, *xmm_a);
+                CODE_SD(vfcmp_cun_)(*tmp1, *xmm_a, *xmm_a);
                 //TODO fix all occur explicit_mantissa_width
-                ICODE(vslli_)(*tmp2, *xmm_a, static_cast<u8>(fsize - FP::FPInfo<FPT>::explicit_mantissa_width));
+                CODE_WD(vslli_)(*tmp2, *xmm_a, static_cast<u8>(fsize - FP::FPInfo<FPT>::explicit_mantissa_width));
                 {
                     // upper could be true even if use vfcmp_sun_ if the operate is qNan
                     // so here just test if is a sNaN
@@ -474,7 +457,7 @@ namespace Dynarmic::Backend::LoongArch64 {
                 const auto eq_mask = *tmp1;
                 const auto eq = *tmp2;
 
-                FCODE(vfcmp_ceq_)(eq_mask, *xmm_a, *xmm_b);
+                CODE_SD(vfcmp_ceq_)(eq_mask, *xmm_a, *xmm_b);
 
                 if constexpr (is_max) {
                     code.vand_v(eq, xmm_a, xmm_b);
@@ -482,10 +465,10 @@ namespace Dynarmic::Backend::LoongArch64 {
                     // this seems to don't work like 3.1.1.3指令产生的非数结果. if there is  a qNaN, the
                     // result is other reguler number. if there is a sNaN, the resule is a qNaN.
                     // thus we xor mantissa_msb to
-                    FCODE(vfmax_)(*intermediate_result, *xmm_a, *xmm_b);
+                    CODE_SD(vfmax_)(*intermediate_result, *xmm_a, *xmm_b);
                 } else {
                     code.vor_v(eq, xmm_a, xmm_b);
-                    FCODE(vfmin_)(*intermediate_result, *xmm_a, *xmm_b);
+                    CODE_SD(vfmin_)(*intermediate_result, *xmm_a, *xmm_b);
                 }
                 code.vbitsel_v(intermediate_result, intermediate_result, eq, eq_mask);
             }
@@ -497,13 +480,13 @@ namespace Dynarmic::Backend::LoongArch64 {
             if (ctx.FPCR(fpcr_controlled).DN()) {
                 const auto ord_mask = *tmp1;
 
-                FCODE(vfcmp_cun_)(ord_mask, *result, *result);
+                CODE_SD(vfcmp_cun_)(ord_mask, *result, *result);
                 code.vbitsel_v(result, result, GetNaNVector<fsize>(code), ord_mask);
 
             } else {
                 const auto nan_mask = *tmp1;
 
-                FCODE(vfcmp_cun_)(nan_mask, *result, *result);
+                CODE_SD(vfcmp_cun_)(nan_mask, *result, *result);
                 code.vand_v(nan_mask, nan_mask, GetVectorOf<fsize, FP::FPInfo<FPT>::mantissa_msb>(code));
                 code.vor_v(result, result, nan_mask);
             }

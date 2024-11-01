@@ -159,4 +159,20 @@ namespace Dynarmic::Backend::LoongArch64 {
 
     };
 
+#define CODE_SD(NAME)                  \
+    [&code](auto... args) {          \
+        if constexpr (fsize == 64) { \
+            code.NAME##d(args...);   \
+        } else {                     \
+            code.NAME##s(args...);   \
+        }                            \
+    }
+#define CODE_WD(NAME)                  \
+    [&code](auto... args) {          \
+        if constexpr (fsize == 64) { \
+            code.NAME##d(args...);   \
+        } else {                     \
+            code.NAME##w(args...);   \
+        }                            \
+    }
 }  // namespace Dynarmic::Backend::LoongArch64
