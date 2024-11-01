@@ -520,6 +520,19 @@ namespace Dynarmic::Backend::LoongArch64 {
         MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] { emit(Qresult, Qa, Qb); });
     }
 
+    template<typename EmitFn>
+    static void EmitThreeOpFpcrControlled(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst, EmitFn emit) {
+        auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+        auto Qresult = ctx.reg_alloc.WriteQ(inst);
+        auto Qa = ctx.reg_alloc.ReadQ(args[0]);
+        auto Qb = ctx.reg_alloc.ReadQ(args[1]);
+        const bool fpcr_controlled = args[2].GetImmediateU1();
+        RegAlloc::Realize(Qresult, Qa, Qb);
+        ctx.fpsr.Load();
+
+        MaybeStandardFPSCRValue(code, ctx, fpcr_controlled, [&] { emit(Qresult, Qa, Qb, fpcr_controlled); });
+    }
+
     template<typename Lambda>
     void EmitThreeOpFallback(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst, Lambda lambda) {
         auto args = ctx.reg_alloc.GetArgumentInfo(inst);
@@ -841,8 +854,11 @@ namespace Dynarmic::Backend::LoongArch64 {
     template<>
     void
     EmitIR<IR::Opcode::FPVectorGreater32>(BlockOfCode &code, EmitContext &ctx, IR::Inst *inst) {
-        EmitThreeOp(code, ctx, inst,
-                    [&](auto &Vresult, auto &Va, auto &Vb) { code.vfcmp_clt_s(Vresult, Vb, Va); });
+        EmitThreeOpFpcrControlled(code, ctx, inst,
+                                  [&](auto &Vresult, auto &Va, auto &Vb, const bool fpcr_controlled) {
+                                      DenormalsAreZero<32>(code, ctx.FPCR(fpcr_controlled), {Va, Vb}, Vscratch0);
+                                      code.vfcmp_clt_s(Vresult, Vb, Va);
+                                  });
     }
 
     template<>
