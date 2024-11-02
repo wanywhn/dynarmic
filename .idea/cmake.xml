@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CMakeSharedSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug-LoongArch-GCC-8" ENABLED="false" CONFIG_NAME="Debug" TOOLCHAIN_NAME="LoongArch-GCC-8" GENERATION_OPTIONS="-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=/home/jiaqingtong/Workplace/NutstoreFiles/Nutstore/script/toolchian/loongarch64_gcc8_toolchain.cmake -DVCPKG_TARGET_TRIPLET=loongarch64-linux -DBUILD_SHARED_LIBS=OFF -DDYNARMIC_TESTS_USE_UNICORN:BOOL=OFF -DVCPKG_INSTALL_OPTIONS=--allow-unsupported -DCMAKE_TOOLCHAIN_FILE=/home/jiaqingtong/.vcpkg-clion/vcpkg/scripts/buildsystems/vcpkg.cmake -DDYNARMIC_USE_BUNDLED_EXTERNALS:BOOL=OFF" />
+      <configuration PROFILE_NAME="Debug-LoongArch-GCC-14" ENABLED="false" CONFIG_NAME="Debug" TOOLCHAIN_NAME="LoongArch-GCC-14" GENERATION_OPTIONS="-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=/home/jiaqingtong/Workplace/NutstoreFiles/Nutstore/script/toolchian/loongarch64_gcc14_toolchain.cmake -DVCPKG_TARGET_TRIPLET=loongarch64-linux -DBUILD_SHARED_LIBS=OFF -DDYNARMIC_TESTS_USE_UNICORN:BOOL=ON -DVCPKG_INSTALL_OPTIONS=--allow-unsupported -DCMAKE_TOOLCHAIN_FILE=/home/jiaqingtong/.vcpkg-clion/vcpkg/scripts/buildsystems/vcpkg.cmake -DDYNARMIC_USE_BUNDLED_EXTERNALS:BOOL=OFF" BUILD_OPTIONS="-j 12" />
+      <configuration PROFILE_NAME="Debug-LoongArch-LLVM" ENABLED="true" CONFIG_NAME="Debug" TOOLCHAIN_NAME="LoongArch-LLVM" GENERATION_OPTIONS="-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=/home/jiaqingtong/Workplace/NutstoreFiles/Nutstore/script/toolchian/loongarch64_llvm9_toolchain.cmake -DVCPKG_TARGET_TRIPLET=loongarch64-linux -DBUILD_SHARED_LIBS=OFF -DDYNARMIC_TESTS_USE_UNICORN:BOOL=ON -DVCPKG_INSTALL_OPTIONS=--allow-unsupported -DCMAKE_TOOLCHAIN_FILE=/home/jiaqingtong/.vcpkg-clion/vcpkg/scripts/buildsystems/vcpkg.cmake -DDYNARMIC_USE_BUNDLED_EXTERNALS:BOOL=OFF -DDYNARMIC_USE_PRECOMPILED_HEADERS:BOOL=ON -DDYNARMIC_USE_LLVM:BOOL=OFF" BUILD_OPTIONS="-j 12" />
+    </configurations>
+  </component>
+</project>
